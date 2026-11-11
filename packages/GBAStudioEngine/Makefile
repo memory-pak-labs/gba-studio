@@ -190,6 +190,11 @@ host-test: topdown-actor-gesture-test
 topdown-actor-gesture-test:
 	python3 tests/host/topdown_actor_gesture_tests.py
 
+.PHONY: telemetry-actor-publication-test
+host-test: telemetry-actor-publication-test
+telemetry-actor-publication-test:
+	python3 tests/host/telemetry_actor_publication_tests.py
+
 .PHONY: legacy-checkpoint-test
 host-test: legacy-checkpoint-test
 legacy-checkpoint-test:
@@ -332,6 +337,24 @@ $(ISOMETRIC_GBA): $(ISOMETRIC_ELF)
 	$(ARM_OBJCOPY) -O binary $< $@
 	$(GBAFIX) $@ -tGBS_ISO -cGBS0 -m00 -r00 >/dev/null
 	@echo "ROM gerada: $@"
+
+# Opt-in ARM regression: inspect audio_kernel_witness in mGBA after boot.
+# [2] == 1 and [3] == 136 prove exact LUT output for all alignment/tail cases.
+.PHONY: audio-mixer-kernel-rom
+audio-mixer-kernel-rom: check-toolchain $(GBA_BUILD)/tests/audio_mixer_kernel.gba
+
+$(GBA_BUILD)/tests/audio_mixer_kernel.o: tests/fixtures/audio_mixer_kernel_audit.cpp engine/src/gbs_audio.cpp engine/include/gbs/audio.hpp
+	@mkdir -p $(@D)
+	$(ARM_CXX) $(GBA_CXXFLAGS) -c $< -o $@
+
+$(GBA_BUILD)/tests/audio_mixer_kernel.elf: $(GBA_BUILD)/tests/audio_mixer_kernel.o $(ENGINE_LIB)
+	$(ARM_CXX) $(GBA_LDFLAGS) -Wl,-Map,$(GBA_BUILD)/tests/audio_mixer_kernel.map $^ -lgcc -o $@
+
+$(GBA_BUILD)/tests/audio_mixer_kernel.gba: $(GBA_BUILD)/tests/audio_mixer_kernel.elf
+	$(ARM_OBJCOPY) -O binary $< $@
+	$(GBAFIX) $@ -tGBS_AUDIO_TEST -cGBS0 -m00 -r00 >/dev/null
+
+-include $(GBA_BUILD)/tests/audio_mixer_kernel.d
 
 $(HOST_BUILD)/topdown_tests: tests/host/topdown_tests.cpp engine/src/gbs_topdown.cpp engine/src/gbs_event.cpp engine/src/gbs_dialogue_locale.cpp $(HOST_EVENT_RUNTIME_SRCS) engine/include/gbs/topdown.hpp engine/include/gbs/project.hpp
 	@mkdir -p $(@D)
@@ -560,9 +583,9 @@ $(HOST_BUILD)/pseudo_3d_tests: tests/host/pseudo_3d_tests.cpp engine/src/pseudo_
 	@mkdir -p $(@D)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
-$(HOST_BUILD)/audio_tests: tests/host/audio_tests.cpp engine/src/gbs_audio.cpp
+$(HOST_BUILD)/audio_tests: tests/host/audio_tests.cpp engine/src/gbs_audio.cpp engine/include/gbs/audio.hpp
 	@mkdir -p $(@D)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $^ -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -Iengine/src $(filter %.cpp,$^) -o $@
 
 $(HOST_BUILD)/math_tests: tests/host/math_tests.cpp engine/src/gbs_math.cpp
 	@mkdir -p $(@D)
@@ -690,6 +713,7 @@ $(HOST_BUILD)/debug_tests: tests/host/debug_tests.cpp engine/src/gbs_debug.cpp
 	$(HOST_CXX) $(HOST_CXXFLAGS) $^ -o $@
 
 assetc-test:
+	python3 tests/host/audio_mixing_rate_export_tests.py
 	python3 tests/host/hud_behavior_export_tests.py
 	python3 tests/host/background_event_tests.py
 	python3 tests/host/dialogue_font_contract_tests.py
@@ -1109,6 +1133,10 @@ assetc-test:
 	python3 tests/host/assetc_scene_video_layout_tests.py
 	python3 tests/host/assetc_color_policy_tests.py
 	python3 tests/host/assetc_audio_quality_tests.py
+	python3 tests/host/assetc_s3m_layout_tests.py
+	python3 tests/host/tracker_multichannel_tests.py
+	python3 tests/host/assetc_extended_tracker_tests.py
+	python3 tests/host/assetc_tracker_replay_tests.py
 	python3 tests/host/assetc_sprite_dedup_tests.py
 	python3 tests/host/assetc_obj_palette_tests.py
 

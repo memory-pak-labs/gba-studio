@@ -5,7 +5,15 @@
     "fixtureRevision": "2527f1db2651e221e23ceee8b5a1a2531cd18fb6",
     "review": "Existing functional pixel, collision, audio and save assertions passed; all 14 fixed-frame captures inspected. No game artwork.",
     "frameUnits": "emulated_display_frames",
-    "telemetryReview": "Native frame observer adds one cold-load display frame to visibility-graphics/resident (181/241); all 28 approved RGBA hashes remain unchanged and steady cadence is preserved."
+    "telemetryReview": "The native observer review retained fixed display checkpoints (181/241 for visibility-graphics/resident; 180/240 elsewhere). The later PCM review below updates only the phase of its moving procedural probe.",
+    "pcmPerformanceReview": {
+      "sourceRevision": "06a73e56ad8a2db406d80e5027e03872c42d0830",
+      "previousRevision": "2193498892995d17154a928152b018137ae110c8",
+      "engineLibrarySha256": "d181b0c20f89b5deac4e619dce7c7533d1a2fa13742b2db1ce9b4cad633dea5d",
+      "changedCaptures": 6,
+      "unchangedAvailableCaptures": 20,
+      "review": "Fixed display frames and pinned emulator retained. All pixels outside the 8x8 procedural probe match the previous approved ROM. Topdown cadence stays 60 updates per 60 display frames; the platformer fixture improves from 20 to 30. No game artwork."
+    }
   },
   "emulator": {
     "sourceRevision": "0.10.5",
@@ -148,36 +156,36 @@
       {
         "label": "boot",
         "frame": 181,
-        "rgbaSha256": "944273c22a1215460114e472f0c7ec88747767790b48110b28c9ff66365e77cf"
+        "rgbaSha256": "1f374c2a7ed99b571ca89fc4e391b4872d55f06e8a4425ae7deccecbc9330645"
       },
       {
         "label": "idle",
         "frame": 241,
-        "rgbaSha256": "48115f08ad291245f2ceb5d6128db15adec0cce929da0e280ba22c7f8046cad1"
+        "rgbaSha256": "c25ac1ddbad79ee4e77fc4c4cfce049cc896c20c7a451e25ea173cf2f8292c61"
       }
     ],
     "visibility-graphics/paged": [
       {
         "label": "boot",
         "frame": 180,
-        "rgbaSha256": "c25ac1ddbad79ee4e77fc4c4cfce049cc896c20c7a451e25ea173cf2f8292c61"
+        "rgbaSha256": "746b7956c4bbdd2d70a12f00ceecb3dc7e4c3ae20e2f6c6cdeebfdf8517f4ea1"
       },
       {
         "label": "idle",
         "frame": 240,
-        "rgbaSha256": "5d3048ac6c6f77f7f26118cc5d3c737653133514b671e49812b66f9f02a34c9e"
+        "rgbaSha256": "d5895534dec9302862c74113e1f9c8304523c599e2c775eb20aa1f7cd01588e5"
       }
     ],
     "visibility-graphics/platformer": [
       {
         "label": "boot",
         "frame": 180,
-        "rgbaSha256": "c2d9d6422d80ec131368e8759a99174964834c5084396f6085850711f4c9bacd"
+        "rgbaSha256": "0ea95e09d4dbbd28b5660ec69a757eaf1c91b2b69d9491f226d9e92eb6b16461"
       },
       {
         "label": "idle",
         "frame": 240,
-        "rgbaSha256": "2236a5d433f988c3aff6df0d69e07f250573d30017e6b6510d5ac9313024bf7a"
+        "rgbaSha256": "92bee007eb58edb783a7ab564514a51b7f9846ced62c56079327ca899ee581f2"
       }
     ]
   }

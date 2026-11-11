@@ -1,3 +1,4 @@
+import { projectAudioMixingRate, requireAudioMixingRate } from "./audioMixing.js";
 import { isScaleEvent, parseScaleEvent } from "./eventTransforms.js";
 import { parseEventInstruction, sceneEntryPlan, eventWaitFrames, type SceneEntryReason } from "./eventExecutionContract.js";
 import { sceneChangeCommand, sceneChangeCommandParts } from "./sceneChangeCommand.js";
@@ -622,6 +623,7 @@ export interface PreviewRuntimeAudioFadeState {
 }
 
 export interface PreviewRuntimeAudioMixState {
+  mixingRate: number;
   volumes: Record<PreviewRuntimeAudioBus, number>;
   muted: Record<PreviewRuntimeAudioBus, boolean>;
   fades: Record<PreviewRuntimeAudioBus, PreviewRuntimeAudioFadeState | null>;
@@ -2697,8 +2699,9 @@ function roomUsesPagedTacticalSurfaceInPreview(room: PreviewRuntimeRoom | null):
 
 const previewAudioBuses: PreviewRuntimeAudioBus[] = ["music", "sfx", "pcm_music", "pcm_sfx"];
 
-function defaultRuntimeAudioMixState(): PreviewRuntimeAudioMixState {
+function defaultRuntimeAudioMixState(project: GBAProjectData): PreviewRuntimeAudioMixState {
   return {
+    mixingRate: projectAudioMixingRate(project),
     volumes: { music: 15, sfx: 15, pcm_music: 15, pcm_sfx: 15 },
     muted: { music: false, sfx: false, pcm_music: false, pcm_sfx: false },
     fades: { music: null, sfx: null, pcm_music: null, pcm_sfx: null },
@@ -4096,6 +4099,10 @@ function appendRecognizedScript(
       return runEvent(nextState, linkCommand.callbackEvent);
     }
     return nextState;
+  }
+  if (verb === "set_audio_mixing_rate") {
+    const mixingRate = requireAudioMixingRate(Number(parts[1]));
+    return updateDebug(appendLog({ ...state, audioMix: { ...state.audioMix, mixingRate } }, eventName, command, "audio", `${mixingRate} Hz`));
   }
   if (verb === "mute_audio_channel" || verb === "set_audio_volume" || verb === "fade_audio_volume") {
     const selected = previewAudioBus(parts[1]);
@@ -6305,7 +6312,7 @@ export function bootPreviewRuntimeAtRoom(
     activeMusicAsset: audioAssetByReference(project, initialTacticalMusic),
     activeSfx: null,
     activeSfxAsset: null,
-    audioMix: defaultRuntimeAudioMixState(),
+    audioMix: defaultRuntimeAudioMixState(project),
     camera: initialRuntimeCameraStateForRoom(currentRoom),
     sceneTransition: null,
     platformerPhysics: platformerPreviewBodyForRoom(project, currentRoom, initialPlayer),

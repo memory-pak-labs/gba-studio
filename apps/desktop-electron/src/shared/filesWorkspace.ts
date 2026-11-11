@@ -443,6 +443,11 @@ function collectAudioUsages(data: GBAProjectData, usages: AssetUsageMap): void {
   }
   for (const audio of projectArray(data, "audioItems")) {
     const name = nullableString(audio.name);
+    const pcmSfx = audio.pcmSfx && typeof audio.pcmSfx === "object" ? audio.pcmSfx as Record<string, unknown> : null;
+    if (pcmSfx?.source === "sample") {
+      const sample = projectArray(data, "assets").find(asset => asset.id === pcmSfx.sampleAssetID);
+      addUsage(usages, nullableString(sample?.name), { label: `Sample do efeito PCM: ${name}`, workspace: "Audio", targetID: nullableString(audio.id) ?? undefined, targetName: name ?? undefined, usageKind: "audio-sample-instrument" });
+    }
     const assignedScene = nullableString(audio.assignedScene);
     const label = assignedScene && assignedScene !== "Global"
       ? `Audio da cena: ${assignedScene}`

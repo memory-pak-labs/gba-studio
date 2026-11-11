@@ -1,3 +1,5 @@
+import { updatePcmSfxInProject } from "../shared/audioPcm.js";
+import { updateWavEditInProject } from "../shared/wavEditing.js";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import { AppUpdateNotice } from "./AppUpdateNotice";
 import { appUpdateText } from "./appUpdateText";
@@ -278,7 +280,8 @@ import {
 import { PluginCatalogModal } from "./PluginCatalogModal";
 import { saveNewProjectSession } from "./newProjectCreationFlow";
 import { saveExistingProjectSession } from "./projectSaveFlow";
-import { commitProjectAssetReplacement, markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession";
+import { commitEditableTrackerImport, commitProjectAssetReplacement, markProjectSessionSaved, reconcileProjectSessionSaved, restoreProjectSessionHistory, selectProjectSessionRoom, type ProjectSession } from "./projectSession";
+import { editTrackerModuleInProject, type TrackerModuleEdit } from "../shared/trackerModuleEditing.js";
 import { copyName, uniqueDefaultRoomName, droppedFiles, statusText } from "./rendererHelpers";
 import { RoomsWorkspace } from "./roomsWorkspace";
 import { SettingsWorkspace } from "./settingsWorkspace";
@@ -2577,9 +2580,9 @@ function App(): React.ReactElement {
     }
   }
 
-  async function createAudio(kind: "Musica" | "SFX" | "Audio" = "SFX"): Promise<void> {
+  async function createAudio(kind: "Musica" | "SFX" | "Audio" = "SFX", synthesis: "PCM" | "PSG" = "PSG"): Promise<void> {
     if (!session) return;
-    const defaultName = suggestAudioItemName(session.project.data, kind);
+    const defaultName = suggestAudioItemName(session.project.data, kind, synthesis);
     const prompted = window.gbaStudio
       ? defaultName
       : await prompt(`Nome do novo ${kind}`, defaultName);
@@ -2589,10 +2592,12 @@ function App(): React.ReactElement {
     const nextData = createAudioItemInProject(session.project.data, {
       id: globalThis.crypto.randomUUID(),
       name: trimmedName,
-      kind
+      kind, synthesis
     });
     if (nextData !== session.project.data) {
       updateProjectData(nextData);
+      setFocusedAssetRequest({ assetID: "", assetName: trimmedName, kind, label: trimmedName,
+        targetName: trimmedName, workspace: "Audio", requestID: Date.now() });
       setStatus(ui("Áudio criado: {0}.", { 0: trimmedName }));
     }
   }
@@ -2603,6 +2608,30 @@ function App(): React.ReactElement {
     if (name === null) return;
     const next = createAudioInstrumentFromChannel(session.project.data, audioID, channelID, { id: globalThis.crypto.randomUUID(), name });
     if (next !== session.project.data) { updateProjectData(next); setStatus(ui("Instrumento salvo no banco: {0}.", { 0: name.trim() })); }
+  }
+  async function createEditableTracker(audioID: string): Promise<void> {
+    const requested = dialogueSessionRef.current;
+    if (!requested?.path || !window.gbaStudio?.readTrackerModule) { notifyError(ui("Salve o projeto no aplicativo desktop para editar o módulo.")); return; }
+    try {
+      const result = await window.gbaStudio.readTrackerModule({ projectPath: requested.path, data: requested.project.data, audioID });
+      if (!result.song) { notifyError(result.error ?? ui("Não foi possível ler o módulo.")); return; }
+      const current = dialogueSessionRef.current; const id = globalThis.crypto.randomUUID();
+      const next = commitEditableTrackerImport(current, requested, audioID, result.song, id);
+      if (!next || next === current) { setStatus(ui("Leitura cancelada: o projeto ou a fonte mudou.")); return; }
+      projectHistoryGroupRef.current = null; dialogueSessionRef.current = next; setSession(next);
+      const copy = (next.project.data.audioItems as Record<string, unknown>[]).find(item => item.id === id)!;
+      setFocusedAssetRequest({ assetID: id, assetName: String(copy.name), kind: "Musica", label: String(copy.name), targetName: String(copy.name), workspace: "Audio", requestID: Date.now() });
+      setStatus(ui("Cópia editável criada. O original foi preservado."));
+    } catch (cause) { notifyError(cause instanceof Error ? cause.message : String(cause)); }
+  }
+  function updateTrackerModule(audioID: string, edit: TrackerModuleEdit): void {
+    const current = dialogueSessionRef.current; if (!current) return;
+    try {
+      const data = editTrackerModuleInProject(current.project.data, audioID, edit); if (data === current.project.data) return;
+      const history = pushProjectHistory({ present: current.project.data, undoStack: current.undoStack, redoStack: current.redoStack }, data);
+      const next = { ...current, dirty: true, project: { data: history.present, summary: summarizeGBAProject(history.present) }, undoStack: history.undoStack, redoStack: history.redoStack };
+      dialogueSessionRef.current = next; setSession(next); setStatus(ui("Módulo atualizado na cópia editável."));
+    } catch (cause) { notifyError(cause instanceof Error ? cause.message : String(cause)); }
   }
   function updateAudioInstrument(id: string, fields: UpdateAudioInstrumentFields): void {
     if (!session) return;
@@ -2740,6 +2769,18 @@ function App(): React.ReactElement {
   async function createAudioChannel(audioID: string, patternID: string | null): Promise<void> {
     if (!session) return;
     const item = audioPresentation?.items.find(candidate => candidate.id === audioID);
+    if (item?.synthesis === "PCM" && item.kind === "Musica") {
+      const source = (session.project.data.audioItems as Record<string, unknown>[]).find(audio => audio.id === audioID);
+      const pattern = (source?.patterns as Record<string, unknown>[] | undefined)?.find(pattern => pattern.id === patternID);
+      const channels = (pattern?.channels ?? []) as Record<string, unknown>[];
+      if (channels.length >= 16) return;
+      let index = 1;
+      while (channels.some(channel => channel.name === `Faixa ${index}`)) index++;
+      updateProjectData(createAudioChannelInProject(session.project.data, audioID, {
+        id: globalThis.crypto.randomUUID(), name: `Faixa ${index}`, type: "pcm", patternID: patternID ?? undefined
+      }));
+      return;
+    }
     const available = (item?.kind === "SFX" ? ["pulse1", "noise"] : ["pulse1", "pulse2", "wave", "noise"]).filter(type => !item?.previewRows.some(row => audioPhysicalChannel(row.type) === audioPhysicalChannel(type)));
     if (!item || item.previewRows.length >= (item.kind === "SFX" ? 1 : 4) || !available.length) { setStatus(ui("O pattern já usa todas as vozes disponíveis.")); return; }
     const channelName = await prompt("Nome do canal", "Novo canal");
@@ -3709,15 +3750,30 @@ function App(): React.ReactElement {
             />
           ) : selectedWorkspace === "Audio" ? (
             <AudioWorkspace
+              onUpdateWavEdit={(id, edit) => { if (session) updateProjectData(updateWavEditInProject(session.project.data, id, edit)); }}
+              onCreateEditableTracker={createEditableTracker}
+              onUpdateTrackerModule={updateTrackerModule}
               presentation={audioPresentation}
               projectPath={session?.path}
               previewStopRequest={audioPreviewStopRequest}
+              previewRevision={session?.project.data}
               sceneOptions={authoringReferenceOptions.rooms}
               focusedAssetName={focusedAssetRequest?.workspace === "Audio" ? focusedAssetRequest.targetName ?? focusedAssetRequest.assetName : null}
               focusRequestID={focusedAssetRequest?.workspace === "Audio" ? focusedAssetRequest.requestID : 0}
               onCreateAudioInstrument={createAudioInstrument}
               onUpdateAudioInstrument={updateAudioInstrument}
               onRemoveAudioInstrument={removeAudioInstrument}
+              onPrepareEnginePreview={async request => {
+                if (!session || !window.gbaStudio) return { requestID: request.requestID, error: "Abra o projeto no aplicativo desktop para ouvir a engine." };
+                const data = session.project.data;
+                return window.gbaStudio.prepareAudioPreview({ ...request, projectPath: session.path, data: {
+                  settings: data.settings, audioInstruments: data.audioInstruments,
+                  audioItems: (data.audioItems as Record<string, unknown>[]).filter(item => item.id === request.audioID),
+                  assets: (data.assets as Record<string, unknown>[]).filter(asset => ["Audio", "Musica", "SFX"].includes(String(asset.kind)))
+                } });
+              }}
+              onStopEnginePreview={id => window.gbaStudio?.stopAudioPreview(id)}
+              onUpdatePcmSfx={(id, fields) => { if (session) updateProjectData(updatePcmSfxInProject(session.project.data, id, fields)); }}
               onCreateAudio={createAudio}
               onUpdateAudioFields={updateAudioFields}
               onUpdateAudioChannelFields={updateAudioChannelFields}

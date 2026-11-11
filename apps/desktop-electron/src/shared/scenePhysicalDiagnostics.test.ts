@@ -166,7 +166,7 @@ describe("scene physical diagnostics", () => {
 
     const diagnostics = deriveScenePhysicalDiagnostics(data, "Arena");
 
-    expect(diagnostics.metrics.find((metric) => metric.id === "audioBytes")?.estimate).toBe(97);
+    expect(diagnostics.metrics.find((metric) => metric.id === "audioBytes")?.estimate).toBe(157);
   });
 
   it("uses the exporter physical audio plan for the planned scene value", () => {
@@ -190,14 +190,14 @@ describe("scene physical diagnostics", () => {
         schema: 11,
         physical_budget: {
           schema: 1,
-          audio_bytes_by_item: { "theme-id": 69 }
+          audio_bytes_by_item: { "theme-id": 113 }
         }
       }
     });
 
     expect(diagnostics.metrics.find((metric) => metric.id === "audioBytes")).toMatchObject({
-      estimate: 69,
-      planned: 69
+      estimate: 113,
+      planned: 113
     });
   });
 

@@ -529,9 +529,7 @@ function tacticalAudioIssue(
 
 /**
  * Validates the source audio catalog used by the tactical presentation.
- * Tactical audio is intentionally stricter than the general audio pipeline:
- * it must resolve to editor-composed PSG data so the preview, exporter and
- * native runtime consume the same deterministic representation.
+ * Music resolves to a tracker; cues resolve to PSG or native PCM SFX aliases.
  */
 export function validateIsometricTacticalAudioCatalog(
   audioItems: readonly unknown[],
@@ -559,11 +557,12 @@ export function validateIsometricTacticalAudioCatalog(
     }
 
     const format = stringValue(item.format)?.toUpperCase();
-    if (format !== "COMPOSED") {
+    const formats = expectedKind === "Musica" ? ["COMPOSED", "MOD", "S3M"] : ["COMPOSED", "WAV"];
+    if (!format || !formats.includes(format)) {
       issues.push(tacticalAudioIssue(
         "INVALID_TACTICAL_PRESENTATION",
         field,
-        `A referência ${reference} precisa usar format COMPOSED; formatos PCM/importados não são permitidos em tactical_audio.`
+        `Formato de áudio tático incompatível: ${reference}.`
       ));
     }
 

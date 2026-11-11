@@ -46,7 +46,7 @@ describe("visual resource deletion", () => {
   });
 
   it("replaces a source sound by ID without renaming its logical item or breaking a menu cue", () => {
-    const id = "initial-menu-navegar-v1";
+    const id = String(list(example, "audioItems").find(item => item.name === "menu-navegar-v1.wav")!.sourceAssetID);
     const plan = planAssetDeletion(example, [id]);
     expect(plan.canUnlink).toBe(false);
     expect(plan.usages).toEqual(expect.arrayContaining([expect.stringContaining("Fonte de áudio")]));
@@ -54,6 +54,17 @@ describe("visual resource deletion", () => {
     expect(replacement).toBeDefined();
     const next = resolveAssetDeletion(example, [id], replacement.value);
     expect(list(next, "audioItems").find(item => item.name === "menu-navegar-v1.wav")?.sourceAssetID).toBe(replacement.value);
+    expect(() => buildEngineExportProjectContract(next)).not.toThrow();
+  });
+
+  it("removes an archived original without unlinking the renewed source or its menu cues", () => {
+    const archivedID = "initial-menu-navegar-v1";
+    const plan = planAssetDeletion(example, [archivedID]);
+    expect(plan.canUnlink).toBe(true);
+    const next = resolveAssetDeletion(example, [archivedID], null);
+    expect(next.audioItems).toEqual(example.audioItems);
+    expect(next.rooms).toEqual(example.rooms);
+    expect(next.scenas).toEqual(example.scenas);
     expect(() => buildEngineExportProjectContract(next)).not.toThrow();
   });
 

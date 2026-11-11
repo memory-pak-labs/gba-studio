@@ -19,7 +19,7 @@ const supportedFields: Partial<Record<SettingsSectionID, readonly string[]>> = {
   sprites: [],
   // advancedVideoComposition and gbaVideoModes consume these project defaults.
   backgrounds: ["defaultMapSize", "graphicsMode", "affineLayer", "affineAsset", "affineRotation", "affineScaleX", "affineScaleY", "affineOriginX", "affineOriginY", "affineWrap", "bitmapAsset", "bitmapPage"],
-  audio: ["sampleRate"],
+  audio: ["sampleRate", "mixingRate"],
   save: ["saveType", "slots", "autoSave", "manualSave", "selectedSlot", "continueLabel", "loadLabel", "deleteLabel", "menuLayout", "confirmDelete", "showPlayerName", "showPlayTime", "showLocation"],
   projectiles: [],
   preview: [],

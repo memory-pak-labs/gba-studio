@@ -20,6 +20,7 @@ import type { WindowDocumentState } from "../shared/windowDocumentState.js";
 import { cartridgeWriterChannels, type CartridgeProgress } from "../shared/cartridgeWriter.js";
 
 const api: GBAStudioDesktopAPI = {
+  readTrackerModule: request => ipcRenderer.invoke(ipcChannels.readTrackerModule, request),
   cartridgeWriter: {
     status: () => ipcRenderer.invoke(cartridgeWriterChannels.status),
     install: () => ipcRenderer.invoke(cartridgeWriterChannels.install),
@@ -82,6 +83,8 @@ const api: GBAStudioDesktopAPI = {
   saveProject: (request: SaveProjectRequest) => ipcRenderer.invoke(ipcChannels.saveProject, request),
   revealPath: (path: string) => ipcRenderer.invoke(ipcChannels.revealPath, path),
   launchRomInEmulator: (request) => ipcRenderer.invoke(ipcChannels.launchRomInEmulator, request),
+  prepareAudioPreview: request => ipcRenderer.invoke(ipcChannels.prepareAudioPreview, request),
+  stopAudioPreview: requestID => ipcRenderer.invoke(ipcChannels.stopAudioPreview, requestID),
   openRomPlayerWindow: (request) => ipcRenderer.invoke(ipcChannels.openRomPlayerWindow, request),
   controlRomPlayerRecording: (request) => ipcRenderer.invoke(ipcChannels.controlRomPlayerRecording, request),
   selectPath: (request: SelectPathRequest) => ipcRenderer.invoke(ipcChannels.selectPath, request),

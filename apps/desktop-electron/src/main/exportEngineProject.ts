@@ -1,3 +1,5 @@
+import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
+import { isPcmAudio } from "../shared/audioPcm.js";
 import { isScaleEvent, parseScaleEvent, usesSinglePlaneBackground } from "../shared/eventTransforms.js";
 import { actorCommandReferences, sceneChangeCommand, sceneChangeCommandParts } from "../shared/sceneChangeCommand.js";
 import { parseEventInstruction, eventWaitFrames } from "../shared/eventExecutionContract.js";
@@ -271,6 +273,7 @@ export interface EngineExportProjectEventCommand {
   channel?: "music" | "sfx" | "pcm_music" | "pcm_sfx" | "all" | string;
   muted?: boolean;
   volume?: number;
+  rate?: number;
   priority?: number;
   actor?: number;
   other_actor?: number;
@@ -851,6 +854,15 @@ function tacticalAudioAssetReference(
     throw new Error(`Item de áudio tático não está no pacote ${kind}: ${canonical}.`);
   }
   return { asset: audioPack.packAsset.id, index };
+}
+
+function nativeSfxIndex(audioItems: Record<string, unknown>[], audioPack: AssetcAudioPackGeneration | null, reference: string): number {
+  const resolved = resolveAudioPlayback(audioItems, audioPack, reference);
+  const entries = resolved?.op === "play_pcm_sfx" ? audioPack?.document.pcm : resolved?.op === "play_sfx" ? audioPack?.document.sfx : undefined;
+  const name = resolved ? entries?.[resolved.index]?.name : undefined;
+  const index = name ? audioPack?.document.sfx.findIndex(entry => entry.name === name) : undefined;
+  if (index === undefined || index < 0) throw new Error(`Efeito automático requer SFX compilado: ${reference}`);
+  return index;
 }
 
 function tacticalReferenceMatchesBinding(binding: IsoTacticalAssetBinding, reference: string): boolean {
@@ -2322,6 +2334,7 @@ export interface EngineExportAssetPack {
 }
 
 export interface EngineExportProjectContract {
+  audio_mixing_rate: number;
   schema: 1;
   backend: "gbastudio_engine";
   kind: "topdown" | "platformer" | "isometric" | "dungeon_crawler" | "racing" | "battle_rpg" | "luta" | "point_click" | "shmup" | "visual_novel" | "menu" | "cutscene" | "world_map" | "mixed";
@@ -3904,21 +3917,19 @@ function audioIndexByName(audioItems: Record<string, unknown>[], value: string):
   });
 }
 
-// O motor real so toca audio do projeto (arquivos .mod/.wav importados) atraves de
-// EventOp::RunAudioRoutine (project.tracker_assets) e EventOp::PlayPcmSfx (project.pcm_assets) -
-// ver GBAStudioEngine/engine/src/gbs_event.cpp. EventOp::PlayMusic/PlaySfx apontam para uma tabela
-// "sintetizada" (music_assets/sfx_assets) que buildAssetcAudioPackGeneration nunca preenche, entao
-// compilar "play_music"/"play_sfx" para esses ops nunca toca nada no ROM. Resolvemos aqui o audio
-// item para o indice real dentro do audio pack (tracker[]/pcm[]) ja gerado para o projeto.
+// Resolve indices in the compiled audio pack. Authored PCM effects use the
+// native SFX alias to preserve their gain and stop/wait SFX behavior. Explicit
+// per-event gain/priority operands retain the raw PCM playback path.
 interface EngineExportAudioPlaybackResolution {
   op: "run_audio_routine" | "play_pcm_sfx" | "play_sfx";
   index: number;
 }
 
-function resolveAudioPlayback(
+export function resolveAudioPlayback(
   audioItems: Record<string, unknown>[],
   audioPack: AssetcAudioPackGeneration | null,
-  value: string
+  value: string,
+  preferNativeSfx = true
 ): EngineExportAudioPlaybackResolution | null {
   const audioItemIndex = audioIndexByName(audioItems, value);
   if (audioItemIndex < 0 || !audioPack) return null;
@@ -3929,6 +3940,8 @@ function resolveAudioPlayback(
   const trackerIndex = audioPack.document.tracker.findIndex((entry) => entry.name === exportID);
   if (trackerIndex >= 0) return { op: "run_audio_routine", index: trackerIndex };
 
+  const nativeSfxIndex = audioPack.document.sfx.findIndex((entry) => entry.name === exportID);
+  if (preferNativeSfx && isPcmAudio(audio) && audio.kind === "SFX" && nativeSfxIndex >= 0) return { op: "play_sfx", index: nativeSfxIndex };
   const pcmIndex = audioPack.document.pcm.findIndex((entry) => entry.name === exportID);
   if (pcmIndex >= 0) return { op: "play_pcm_sfx", index: pcmIndex };
 
@@ -4698,7 +4711,7 @@ function compileEventStep(
     }
     case "play_music":
     case "play_sfx": {
-      const resolved = resolveAudioPlayback(audioItems, audioPack, operand);
+      const resolved = resolveAudioPlayback(audioItems, audioPack, operand, parts[2] === undefined && parts[3] === undefined);
       if (resolved) {
         if (resolved.op === "play_pcm_sfx" && (parts[2] !== undefined || parts[3] !== undefined)) {
           return [{
@@ -4718,6 +4731,8 @@ function compileEventStep(
     }
     case "mute_audio_channel":
       return [{ op: "mute_audio_channel", channel: operand || "music", muted: booleanPart(parts[2], true) }];
+    case "set_audio_mixing_rate":
+      return [{ op: "set_audio_mixing_rate", rate: requireAudioMixingRate(Number(parts[1])) }];
     case "set_audio_volume":
       return [{ op: "set_audio_volume", channel: operand || "all", volume: hardwareAudioVolume(parts[2]) }];
     case "fade_audio_volume":
@@ -5286,7 +5301,7 @@ function compileEventStep(
     case "set_text_sfx": {
       const resolved = resolveAudioPlayback(audioItems, audioPack, operand);
       if (!resolved) throw new Error(`Evento referencia audio inexistente: ${operand}`);
-      return [{ op: "set_text_sfx", sfx: resolved.index }];
+      return [{ op: "set_text_sfx", sfx: nativeSfxIndex(audioItems, audioPack, operand) }];
     }
     case "choice_event":
       // Binding resolvido em compile-time por buildTopdownChoiceGroups (choice_groups[].choices[].script);
@@ -5744,7 +5759,7 @@ function dialogueUiBootCommands(
   for (const candidate of candidates) {
     const resolved = resolveAudioPlayback(audioItems, audioPack, candidate);
     if (!resolved) continue;
-    commands.push({ op: "set_text_sfx", sfx: resolved.index });
+    commands.push({ op: "set_text_sfx", sfx: nativeSfxIndex(audioItems, audioPack, candidate) });
     break;
   }
   return commands;
@@ -5827,7 +5842,7 @@ function compileDialogueTextSfxCommand(
   if (!textSound) return null;
   const resolved = resolveAudioPlayback(audioItems, audioPack, textSound);
   if (!resolved) return null;
-  return { op: "set_text_sfx", sfx: resolved.index };
+  return { op: "set_text_sfx", sfx: nativeSfxIndex(audioItems, audioPack, textSound) };
 }
 
 function dialogueRecordByKey(
@@ -7846,7 +7861,7 @@ function buildDungeonCrawlerRooms(
           || nullableStringField(playerActor, "name")
           || nullableStringField(projectArray(projectArray(child(data,"settings") ?? {},"hudPresets").find(p=>p.id===room.hudPresetId) ?? {},"components").find(c=>c.kind==="text"),"text") || "Player",
         action_sounds:Object.fromEntries(Object.entries(config.presentation.actionSounds).map(([cue,name])=>{
-        const audio=resolveAudioPlayback(audioItems,audioPack,name);if(audio?.op!=="play_sfx")throw new Error(`Dungeon cue must reference PSG SFX: ${name}`);return [cue,audio.index];
+        return [cue,nativeSfxIndex(audioItems,audioPack,name)];
       }))}} : {}),
       battle_enabled: roomFeatureRuntime.battleEnabled,
       video: buildRoomVideoComposition(data, room, tilesetPack),
@@ -8016,9 +8031,7 @@ function buildRacingRooms(
         throw new Error("Câmera da corrida: aumente a distância ou reduza a altura/perspectiva para manter o carro dentro da tela.");
     }
     const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue,name]) => {
-      const resolved=resolveAudioPlayback(audioItems,audioPack,name);
-      if(resolved?.op !== "play_sfx") throw new Error(`Corrida actionSounds.${cue} requer SFX PSG compilado: ${name}`);
-      return [cue,resolved.index];
+      return [cue,nativeSfxIndex(audioItems,audioPack,name)];
     }));
     const player = playerPositionForRoom(data, room, index);
     const currentRoomName = roomName(room, index);
@@ -8358,9 +8371,7 @@ function buildBattleRpgProject(
         const authored=config.presentation, hudBackground=hudIndices.get(encounterName);
         if(config.hudAssetName && hudBackground===undefined) throw new Error("Battle RPG presentation requer hudAssetName valido");
         const action_sounds=Object.fromEntries(Object.entries(authored.actionSounds).map(([cue,name])=>{
-          const audio=resolveAudioPlayback(audioItems,audioPack,name);
-          if(audio?.op!=="play_sfx") throw new Error(`Battle RPG actionSounds.${cue} requer SFX PSG: ${name}`);
-          return [cue,audio.index];
+          return [cue,nativeSfxIndex(audioItems,audioPack,name)];
         }));
         const victory=resolveAudioPlayback(audioItems,audioPack,authored.victoryMusic);
         if(authored.victoryMusic && victory?.op!=="run_audio_routine") throw new Error("Battle RPG victoryMusic requer musica tracker compilada");
@@ -8474,9 +8485,7 @@ function buildLutaProject(
       const onVictory = hook("onVictory");
       const onDefeat = hook("onDefeat");
       const actionSounds = Object.fromEntries(Object.entries(config?.actionSounds ?? {}).map(([cue, name]) => {
-        const resolved = resolveAudioPlayback(audioItems, audioPack, name);
-        if (resolved?.op !== "play_sfx") throw new Error(`Luta actionSounds.${cue} requer SFX PSG compilado: ${name}`);
-        return [cue, resolved.index];
+        return [cue, nativeSfxIndex(audioItems, audioPack, name)];
       }));
       const participants = projectArray(data, "actors").flatMap((actor): Array<{ side: "player1" | "player2"; fighter: EngineExportLutaFighter }> => {
         if (entitySceneName(actor, "actor") !== stageName) return [];
@@ -11143,6 +11152,15 @@ function buildEngineExportProjectContractUncached(
     if (runtimeKind === "platformer") cameraZoneFeatures.add("platformer_runtime.platformer_camera_zones");
   });
   features.push(...cameraZoneFeatures);
+  if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
+  if (projectArray(data, "audioItems").some(isPcmAudio)) features.push("audio.pcm_composer", "audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain");
+  if (audioPack?.document.sfx.some(asset => asset.pcm)) features.push("audio.pcm_sfx_aliases");
+  if (audioPack?.document.tracker.some(asset => asset.mod || asset.s3m || asset.xm || asset.it)) {
+    features.push("audio.tracker_pcm_16_channels", "audio.pcm_prepared_gain", "audio.tracker_sample_sustain");
+  }
+  if (audioPack?.document.tracker.some(asset => asset.xm)) features.push("audio.tracker_xm_pcm_profile");
+  if (audioPack?.document.tracker.some(asset => asset.it)) features.push("audio.tracker_it_pcm_profile");
+  if (audioPack?.document.tracker.some(asset => asset.xm || asset.it)) features.push("audio.tracker_pcm_controls", "audio.pcm_prepared_interpolation", "audio.pcm_long_interpolation");
   if (audioPack?.document.tracker.some(tracker => tracker.samples?.length)) features.push("audio.tracker_sample_instruments");
   const hasTacticalIsometricRoom = rooms.some((room) => (
     resolveSceneRuntimeExport(roomSceneType(room)).kind === "isometric" &&
@@ -11345,6 +11363,7 @@ function buildEngineExportProjectContractUncached(
     schema: 1,
     backend: "gbastudio_engine",
     kind,
+    audio_mixing_rate: projectAudioMixingRate(data),
     runtime_profile: isMixedRuntime ? "mixed" : resolution.runtimeProfile,
     runtime_contract: runtimeContract,
     runtime_capabilities: runtimeCapabilities,

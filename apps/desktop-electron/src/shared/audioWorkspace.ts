@@ -1,3 +1,4 @@
+import { isPcmAudio, defaultPcmSfx, createPcmPatternChannels, pcmSfxConfig, type PcmSfxConfig } from "./audioPcm.js";
 import { authoredEventCommandRecords } from "./authoredEventCommands.js";
 import { sceneChangeCommand, sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import type { FilesWorkspaceUsageLink } from "./filesWorkspace.js";
@@ -18,6 +19,10 @@ export type AudioWorkspaceMode = "basic" | "complete";
 export type AudioComposerTab = "piano" | "tracker" | "sequence";
 
 export interface AudioWorkspaceItem {
+  sourceAssetID?: string;
+  trackerModule?: import("./trackerModule.js").TrackerModuleMetadata;
+  synthesis?: "PCM" | "PSG";
+  pcmSfx?: PcmSfxConfig;
   id: string;
   name: string;
   kind: string;
@@ -73,7 +78,7 @@ export interface AudioWorkspacePattern {
 }
 
 export function deriveAudioGbaBudget(item: AudioWorkspaceItem | null): AudioGbaBudget {
-  const channelLimit = 4;
+  const channelLimit = item?.synthesis === "PCM" ? 16 : 4;
   const channelCount = item?.channelCount ?? 0;
   const estimatedBytes = item
     ? channelCount * 32 + item.noteCount * 2 + item.stepCount + item.patternCount * 48
@@ -131,6 +136,7 @@ export interface AudioWorkspacePreviewCell {
 }
 
 export interface AudioWorkspacePreviewRow {
+  trackerCells?: import("./trackerModule.js").TrackerModuleCell[];
   instrumentID?: string;
   pan?: number;
   sampleAssetID?: string | null;
@@ -225,7 +231,7 @@ export interface AudioWorkspaceSummaryCard {
 
 export interface AudioWorkspacePresentation {
   instruments?: Array<import("./audioInstruments.js").AudioInstrument & { usageCount: number }>;
-  sampleInstruments?: Array<{ id: string; name: string }>;
+  sampleInstruments?: import("./wavEditing.js").WavEditorSource[];
   items: AudioWorkspaceItem[];
   kindCounts: AudioWorkspaceCount[];
   formatCounts: AudioWorkspaceFormatCount[];
@@ -295,6 +301,7 @@ export interface AudioWorkspaceFilterOptions {
 }
 
 export interface CreateAudioItemOptions {
+  synthesis?: "PCM" | "PSG";
   sourceAssetID?: string;
   id: string;
   name: string;
@@ -696,6 +703,11 @@ function makeAudioItem(options: CreateAudioItemOptions): Record<string, unknown>
     audio.format = "COMPOSED";
   }
 
+  if (options.synthesis === "PCM" && ["Musica", "SFX"].includes(kind)) {
+    audio.synthesis = "PCM";
+    if (kind === "SFX") { audio.pcmSfx = defaultPcmSfx(); audio.patterns = []; audio.patternOrder = []; }
+    else for (const pattern of itemPatterns(audio)) pattern.channels = createPcmPatternChannels(String(pattern.id), true);
+  }
   return audio;
 }
 
@@ -1008,12 +1020,13 @@ export function deriveAudioPreviewRows(
   defaultVolume = 80
 ): AudioWorkspacePreviewRow[] {
   const safeMaxRows = clampedInteger(maxRows, 1, Math.max(16, channels.length));
-  const safeMaxSteps = clampedInteger(maxSteps, 1, 64);
+  const safeMaxSteps = clampedInteger(maxSteps, 1, 1024);
   return channels.slice(0, safeMaxRows).map((channel, index) => {
     const type = stringField(channel.type, "audio");
     const cells = noteCells(channel.notes, safeMaxSteps);
     return {
       id: nullableString(channel.id) ?? `channel-${index + 1}`,
+      ...(Array.isArray(channel.trackerCells) ? { trackerCells: channel.trackerCells as import("./trackerModule.js").TrackerModuleCell[] } : {}),
       label: nullableString(channel.name) ?? `Canal ${index + 1}`,
       type,
       ...(channel.instrumentID ? { instrumentID: String(channel.instrumentID) } : {}),
@@ -1064,7 +1077,7 @@ export function deriveAudioPlaybackExportStatus(item: {
 }): { playbackBadge: AudioWorkspacePlaybackBadge; playbackLabel: string } {
   const format = item.format.toUpperCase();
   if (item.origin === "Importado" && item.source) {
-    if (item.kind === "Musica" && ["MOD", "S3M"].includes(format)) {
+    if (item.kind === "Musica" && ["MOD", "S3M", "XM", "IT"].includes(format)) {
       return {
         playbackBadge: "Compatível",
         playbackLabel: "Formato aceito pelo assetc; a compilação verifica o arquivo."
@@ -1096,7 +1109,7 @@ function formatWarnings(kind: string, format: string, hasComposedContent: boolea
     return [];
   }
 
-  if (kind === "Musica" && !["MOD", "S3M", "VGM", "XM"].includes(format)) {
+  if (kind === "Musica" && !["MOD", "S3M", "VGM", "XM", "IT"].includes(format)) {
     return [`Formato incomum para Musica: ${format}.`];
   }
 
@@ -1111,6 +1124,7 @@ function makeWarnings(item: {
   kind: string;
   format: string;
   hasComposedContent: boolean;
+  nativeModule?: boolean;
   usageCount: number;
   bpm: number | null;
   patternSequence: AudioWorkspacePatternSequenceSlot[];
@@ -1120,8 +1134,10 @@ function makeWarnings(item: {
     warnings.push("Áudio sem uso em cenas ou eventos.");
   }
   warnings.push(...formatWarnings(item.kind, item.format, item.hasComposedContent));
-  if (item.bpm !== null && (item.bpm < 40 || item.bpm > (item.kind === "SFX" ? 360 : 240))) {
-    warnings.push(`BPM fora da faixa 40-${item.kind === "SFX" ? 360 : 240}.`);
+  const minBpm = item.nativeModule ? 32 : 40;
+  const maxBpm = item.nativeModule ? 255 : item.kind === "SFX" ? 360 : 240;
+  if (item.bpm !== null && (item.bpm < minBpm || item.bpm > maxBpm)) {
+    warnings.push(`BPM fora da faixa ${minBpm}-${maxBpm}.`);
   }
   for (const slot of item.patternSequence.filter((slot) => slot.isMissing)) {
     warnings.push(`Sequencia referencia padrao ausente no slot ${slot.index + 1}: ${slot.patternID}.`);
@@ -1140,10 +1156,10 @@ function countBy<T extends string>(values: T[], key: "kind" | "format"): Array<{
     .sort((lhs, rhs) => lhs[key].localeCompare(rhs[key], "pt-BR"));
 }
 
-export function suggestAudioItemName(data: GBAProjectData, kind: string): string {
+export function suggestAudioItemName(data: GBAProjectData, kind: string, synthesis: "PCM" | "PSG" = "PSG"): string {
   const normalized = normalizedKind(kind);
   const stem = normalized === "Musica" ? "nova_musica" : normalized === "SFX" ? "novo_sfx" : "novo_audio";
-  const extension = normalized === "Musica" ? ".mod" : ".wav";
+  const extension = synthesis === "PCM" ? "" : normalized === "Musica" ? ".mod" : ".wav";
   const existing = new Set(
     projectArray(data, "audioItems").map((item, index) => audioName(item, index).toLocaleLowerCase("pt-BR"))
   );
@@ -1244,6 +1260,10 @@ export function createAudioPatternInProject(
   const audio = audioItems[audioIndex];
   if (audio.kind === "SFX") Object.assign(pattern, makeSfxPattern(options));
   const patterns = itemPatterns(audio);
+  if (isPcmAudio(audio) && audio.kind === "Musica") {
+    const source = patterns.find(p => p.id === audio.activePatternID) ?? patterns[0];
+    pattern.channels = source ? patternChannels(source).map((c, i) => ({ ...c, id: `${options.id}-pcm-${i + 1}`, notes: [] })) : createPcmPatternChannels(options.id);
+  }
   if (patterns.some((item, index) => patternID(item, index) === pattern.id || patternName(item, index) === pattern.name)) {
     return data;
   }
@@ -1314,7 +1334,7 @@ export function createAudioChannelInProject(
   options: CreateAudioChannelOptions
 ): GBAProjectData {
   const channel = makeAudioChannel(options);
-  if (!channel || !audioPhysicalChannel(channel.type)) return data;
+  if (!channel) return data;
 
   const next = cloneProjectData(data);
   const audioItems = projectArray(next, "audioItems");
@@ -1322,7 +1342,10 @@ export function createAudioChannelInProject(
   if (audioIndex < 0) return data;
 
   const audio = audioItems[audioIndex];
-  if (audio.kind === "SFX" && ![1, 4].includes(audioPhysicalChannel(channel.type) ?? 0)) return data;
+  const pcm = isPcmAudio(audio);
+  if (pcm ? channel.type !== "pcm" || audio.kind !== "Musica" : !audioPhysicalChannel(channel.type)) return data;
+  if (!pcm && audio.kind === "SFX" && ![1, 4].includes(audioPhysicalChannel(channel.type) ?? 0)) return data;
+  if (pcm) Object.assign(channel, { instrument: "PCM Sine", envelope: "Soft ADSR", volume: 65, pan: 0 });
   const channelIDToAdd = stringField(channel.id, "");
   if (allAudioChannels(audio).some((item, index) => channelID(item, index) === channelIDToAdd)) {
     return data;
@@ -1337,14 +1360,14 @@ export function createAudioChannelInProject(
     if (!pattern) return data;
 
     const channels = patternChannels(pattern);
-    const limit = normalizedKind(audio.kind) === "SFX" ? 1 : 4;
-    if (channels.length >= limit || channels.some(existing => audioPhysicalChannel(existing.type) === audioPhysicalChannel(channel.type))) return data;
+    const limit = pcm ? 16 : normalizedKind(audio.kind) === "SFX" ? 1 : 4;
+    if (channels.length >= limit || !pcm && channels.some(existing => audioPhysicalChannel(existing.type) === audioPhysicalChannel(channel.type))) return data;
     pattern.channels = [...channels, channel];
     audio.patterns = patterns;
   } else {
     if (targetPatternID) return data;
     const channels = itemChannels(audio);
-    if (channels.length >= (normalizedKind(audio.kind) === "SFX" ? 1 : 4) || channels.some(existing => audioPhysicalChannel(existing.type) === audioPhysicalChannel(channel.type))) return data;
+    if (channels.length >= (pcm ? 16 : normalizedKind(audio.kind) === "SFX" ? 1 : 4) || !pcm && channels.some(existing => audioPhysicalChannel(existing.type) === audioPhysicalChannel(channel.type))) return data;
     audio.channels = [...channels, channel];
   }
 
@@ -1568,7 +1591,7 @@ function previewChannelsForAudio(audio: Record<string, unknown>): { channels: Re
     const steps = integerField(activePattern.steps) ?? 64;
     return {
       channels: patternChannels(activePattern),
-      maxSteps: clampedInteger(steps, 1, 64)
+      maxSteps: clampedInteger(steps, 1, audio.trackerModule ? 1024 : 64)
     };
   }
 
@@ -1592,7 +1615,7 @@ function activePatternPresentation(audio: Record<string, unknown>, patterns: Aud
   const patternIndex = patternRecords.indexOf(activePattern);
   const activePatternID = patternID(activePattern, patternIndex >= 0 ? patternIndex : 0);
   const activePatternName = patternName(activePattern, patternIndex >= 0 ? patternIndex : 0);
-  const stepCount = clampedInteger(integerField(activePattern.steps) ?? 64, 1, 64);
+  const stepCount = clampedInteger(integerField(activePattern.steps) ?? 64, 1, audio.trackerModule ? 1024 : 64);
   return { activePatternID, activePatternName, stepCount };
 }
 
@@ -2043,7 +2066,7 @@ export function updateAudioChannelFieldsInProject(
   if (fields.type !== undefined) {
     const physical = audioPhysicalChannel(fields.type);
     const group = [itemChannels(audio), ...itemPatterns(audio).map(patternChannels)].find(channels => channels.some(channel => channel.id === channelIDToUpdate));
-    if (!physical || audio.kind === "SFX" && physical !== 1 && physical !== 4 || group?.some(channel => channel.id !== channelIDToUpdate && audioPhysicalChannel(channel.type) === physical)) return data;
+    if (isPcmAudio(audio) ? fields.type !== "pcm" : !physical || audio.kind === "SFX" && physical !== 1 && physical !== 4 || group?.some(channel => channel.id !== channelIDToUpdate && audioPhysicalChannel(channel.type) === physical)) return data;
   }
   const didUpdate = updatePatternChannelFields(audio, channelIDToUpdate, fields) ||
     updateDirectChannelFields(audio, channelIDToUpdate, fields);
@@ -2214,7 +2237,7 @@ export function normalizeAudioInProject(
 function audioPlaybackFamily(data: GBAProjectData, audio: Record<string, unknown>): string {
   if (audioComposed(audio)) return "psg";
   const format = audioSourceFormat(data, audio);
-  if (format === "MOD" || format === "S3M") return "tracker";
+  if (["MOD", "S3M", "XM", "IT"].includes(format)) return "tracker";
   return format;
 }
 
@@ -2268,7 +2291,8 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
       const warnings = makeWarnings({
         kind,
         format,
-        hasComposedContent: patternCount(audio) > 0 || previewChannels.length > 0,
+        hasComposedContent: audioComposed(audio),
+        nativeModule: Boolean(audio.trackerModule),
         usageCount: usages.length,
         bpm: normalizedBPM,
         patternSequence
@@ -2280,7 +2304,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
       const compiledTracker = kind === "Musica"
         ? compileComposedMusicaToTracker(audio, stringField(audio.exportID, defaultExportID(name)))
         : null;
-      const compiledSfx = kind === "SFX"
+      const compiledSfx = kind === "SFX" && !isPcmAudio(audio)
         ? compileComposedSfxToAssetc(audio, stringField(audio.exportID, defaultExportID(name)))
         : null;
 
@@ -2288,6 +2312,9 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         id: nullableString(audio.id) ?? `audio-${index + 1}`,
         name,
         kind,
+        synthesis: isPcmAudio(audio) ? "PCM" : "PSG",
+        ...(audio.trackerModule ? { trackerModule: audio.trackerModule as import("./trackerModule.js").TrackerModuleMetadata } : {}),
+        ...(isPcmAudio(audio) && kind === "SFX" ? { pcmSfx: pcmSfxConfig(audio.pcmSfx) } : {}),
         format,
         assignedScene: nullableString(audio.assignedScene),
         loops: booleanField(audio.loops, false),
@@ -2295,7 +2322,8 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         exportID: stringField(audio.exportID, defaultExportID(name)),
         volume: integerField(audio.volume),
         source,
-        origin: originForAudio(kind, patternCount(audio) > 0 || previewChannels.length > 0 ? null : source),
+        ...(sourceAsset ? { sourceAssetID: String(sourceAsset.id) } : {}),
+        origin: isPcmAudio(audio) ? "Composto" : originForAudio(kind, patternCount(audio) > 0 || previewChannels.length > 0 ? null : source),
         runtimeCommand: runtimeCommand(kind, name),
         usageCount: usages.length,
         usageLabels: usages,
@@ -2340,7 +2368,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
   return {
     items,
     instruments: audioInstrumentBank(data).map(item => ({ ...item, usageCount: audioInstrumentUsageCount(data, item.id) })),
-    sampleInstruments: audioSampleAssets(data).map(asset => ({ id: String(asset.id), name: String(asset.name) })),
+    sampleInstruments: audioSampleAssets(data).map(asset => ({ id: String(asset.id), name: String(asset.name), source: String((asset.metadata as Record<string, unknown>).source), ...((asset.metadata as Record<string, unknown>).wavEdit ? { edit: (asset.metadata as Record<string, unknown>).wavEdit as import("./wavEditing.js").WavEdit } : {}) })),
     kindCounts: countBy(items.map((item) => item.kind), "kind"),
     formatCounts: countBy(items.map((item) => item.format), "format"),
     summary,

@@ -10,7 +10,7 @@ import {
   updateAudioChannelNoteInProject,
   updateAudioPatternOrderSlotInProject
 } from "./audioWorkspace.js";
-import { generateEngineProjectExport } from "./engineProjectExport.js";
+import { buildAssetcAudioPackGeneration, generateEngineProjectExport } from "./engineProjectExport.js";
 import { buildFunctionalP0Project } from "./functionalP0Project.js";
 import { createPreviewRuntime } from "./previewRuntime.js";
 
@@ -58,6 +58,27 @@ function buildAudioRuntimeExportProject() {
 }
 
 describe("Audio runtime/export smoke", () => {
+  it.each(["MOD", "S3M", "XM", "IT"])("requires multichannel playback for imported %s", (format) => {
+    const project = buildFunctionalP0Project();
+    project.assets = (project.assets as Record<string, unknown>[]).map(asset => asset.id === "asset-theme"
+      ? { ...asset, name: `channels.${format.toLowerCase()}`, metadata: { source: `Assets/audio/channels.${format.toLowerCase()}` } } : asset);
+    project.audioItems = (project.audioItems as Record<string, unknown>[]).map(item => item.id === "audio-theme"
+      ? { id: "audio-theme", name: "intro_theme.mod", kind: "Musica", format,
+          sourceAssetID: "asset-theme", loops: true } : item);
+    const currentSettings = project.settings as Record<string, unknown>;
+    project.settings = { ...currentSettings, audio: { ...(currentSettings.audio as Record<string, unknown>), musicVolume: 80 } };
+    const before = JSON.stringify(project);
+    const contract = buildEngineExportProjectContract(project);
+    expect(contract.requires.features).toContain("audio.tracker_pcm_16_channels");
+    expect(contract.requires.features).toContain("audio.pcm_prepared_gain");
+    expect(contract.requires.features).toContain("audio.tracker_sample_sustain");
+    if (format === "XM" || format === "IT") expect(contract.requires.features).toContain(`audio.tracker_${format.toLowerCase()}_pcm_profile`);
+    if (format === "XM" || format === "IT") expect(contract.requires.features).toContain("audio.tracker_pcm_controls");
+    const generated = buildAssetcAudioPackGeneration(project)!;
+    expect(generated.document.tracker).toContainEqual(expect.objectContaining({ [format.toLowerCase()]: expect.any(String), native_primary_volume: 12 }));
+    expect(JSON.stringify(project)).toBe(before);
+  });
+
   it("proves composed music and SFX across workspace, preview and generated export", () => {
     const project = buildAudioRuntimeExportProject();
     const audio = deriveAudioWorkspacePresentation(project);

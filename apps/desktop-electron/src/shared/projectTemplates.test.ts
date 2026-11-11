@@ -218,7 +218,7 @@ describe("projectTemplates", () => {
     expect(authoredAudio.filter(item => String(item.id).startsWith("initial-menu-"))).toHaveLength(5);
     expect(authoredAudio.some(item => item.name === "farol_sfx_cursor")).toBe(false);
     expect(authoredAudio).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "mapa_mar_aberto", bpm: 84 })
+      expect.objectContaining({ name: "mapa_mar_aberto", bpm: 100 })
     ]));
     expect(JSON.stringify(project)).not.toContain("gb_builtin_crash");
     const audioNames = new Set(authoredAudio.map((item) => String(item.name)));

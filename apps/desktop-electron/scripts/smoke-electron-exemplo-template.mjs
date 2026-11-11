@@ -1817,9 +1817,35 @@ async function main() {
       uiP0Checked.push("editor-cena-dialogos-edit-text");
       await assertWorkspace(cdp, "Áudio", [`${canonicalAudioCount} de ${canonicalAudioCount} visíveis`, "Músicas", "Efeitos sonoros", "farol_tema_principal", "farol_sfx_texto"]);
       await selectAudioLibraryItem(cdp, "farol_tema_principal");
-      await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor de áudio canônico");
+      await waitForText(cdp, text => text.includes("Áudio importado"), "módulo original no workspace de Áudio");
+      await clickButtonByAriaLabel(cdp, "Ouvir farol_tema_principal");
+      await waitForText(cdp, text => text.includes("Tocando farol_tema_principal")
+        && /Prévia da engine · Pico [1-9]\d*%/.test(text), "reprodução do módulo pela engine", 60_000);
+      await captureScreenshot(cdp, join(evidenceRoot, "exemplo_template_audio_imported.png"));
+      await clickButtonByAriaLabel(cdp, "Parar áudio");
+      await waitForText(cdp, text => text.includes("Parado") && !text.includes("Tocando farol_tema_principal"), "parada do módulo importado");
+      await selectAudioLibraryItem(cdp, "farol_sfx_vitoria");
+      await clickButtonByAriaLabel(cdp, "Ouvir farol_sfx_vitoria");
+      await waitForText(cdp, text => text.includes("Tocando farol_sfx_vitoria"), "reprodução do WAV renovado na cópia salva");
+      await clickButtonByAriaLabel(cdp, "Parar áudio");
+      // Imported modules keep their source. Exercise the composer on a new item
+      // created through the real UI, instead of replacing the approved soundtrack.
+      await clickButtonByAriaLabel(cdp, "Criar áudio");
+      await clickButtonByAriaLabel(cdp, "Música em loop");
+      await waitForText(cdp, text => text.includes("Áudio criado:"), "criação de música na cópia do projeto");
+      await selectAudioLibraryItem(cdp, "nova_musica.mod");
+      await waitForText(cdp, (text) => text.includes("Piano Roll") && text.includes("Prévia"), "compositor da música nova");
+      uiP0Checked.push("workspace-audio-imported-mod", "workspace-audio-wav-audition", "workspace-audio-create-music");
       await evaluate(cdp, `document.querySelector('.audio-groove-details-button').click()`);
-      await waitForText(cdp, (text) => text.includes("Validação GBA · OK"), "validação do áudio canônico");
+      await waitForText(cdp, text => text.includes("Validação GBA · Atenção"), "aviso de uso da composição nova");
+      const compositionWarnings = await evaluate(cdp, `(() => {
+        const section = Array.from(document.querySelectorAll('.audio-groove-details details'))
+          .find(item => item.querySelector('summary')?.textContent?.includes('Validação GBA'));
+        return Array.from(section?.querySelectorAll('li') ?? []).map(item => item.textContent?.trim());
+      })()`);
+      if (JSON.stringify(compositionWarnings) !== JSON.stringify(["Áudio sem uso em cenas ou eventos."])) {
+        throw new Error(`A composição nova apresentou bloqueios ou avisos inesperados: ${JSON.stringify(compositionWarnings)}`);
+      }
       const audioEdit = await editAudioInWorkspace(cdp);
       uiP0Checked.push("workspace-audio", "workspace-audio-edit-bpm", "workspace-audio-edit-note");
       await assertWorkspace(cdp, "Arquivos", [
@@ -1872,11 +1898,20 @@ async function main() {
       await waitForText(cdp, (text) => text.includes("Salvo") && !text.includes("Alterado"), "projeto salvo");
 
       const saved = await inspectSavedTemplate(projectPath);
-      const expectedCounts = { ...initial.counts, assets: initial.counts.assets + 1 };
+      const expectedCounts = { ...initial.counts, assets: initial.counts.assets + 1, audioItems: initial.counts.audioItems + 1 };
       if (JSON.stringify(saved.counts) !== JSON.stringify(expectedCounts)) {
         throw new Error(
           `Contagens do projeto divergiram durante save/reopen: esperado=${JSON.stringify(expectedCounts)} salvo=${JSON.stringify(saved.counts)}`
         );
+      }
+      const originalAudioIDs = new Set(initial.project.audioItems.map(item => item.id));
+      const retainedAudio = saved.project.audioItems.filter(item => originalAudioIDs.has(item.id));
+      if (JSON.stringify(retainedAudio) !== JSON.stringify(initial.project.audioItems)) {
+        throw new Error("A edição de uma composição nova alterou a trilha importada original.");
+      }
+      const savedComposition = saved.project.audioItems.find(item => item.name === "nova_musica.mod");
+      if (savedComposition?.format !== "COMPOSED" || savedComposition.bpm !== audioEdit.afterBpm) {
+        throw new Error("A composição criada/editada no workspace não foi persistida.");
       }
       if (saved.project.settings?.debug?.developerMode !== true) {
         throw new Error("O template salvo não preservou developerMode=true.");

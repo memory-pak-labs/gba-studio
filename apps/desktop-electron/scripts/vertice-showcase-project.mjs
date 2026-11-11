@@ -1,3 +1,4 @@
+import { preserveExemploCoastalAudio } from "./exemplo-coastal-audio.mjs";
 import { materializeExampleAuthoring } from "./example-authoring-library.mjs";
 import { promoteApprovedCouncilV13 } from "./council-v13-promotion.mjs";
 import { promoteLostSignalMission } from './lost-signal-mission.mjs';
@@ -9035,7 +9036,7 @@ function buildExemploGBAVerticeCampaign(data) {
 
 export function promoteExemploGBAVerticeCampaign(data) {
   const generated = silenceInitialMenuMusic(preserveExampleEncore(data, preserveCoastDepthCampaign(data, integrateApprovedPlayerWalk(refineExampleTopdownMovement(preserveApprovedCampaignEvolutions(data, reviewExemploLocalization(promoteFarolRelay(pruneUnusedExampleAssets(promoteApprovedCouncilV13(promoteShowcaseSystems(promoteLostSignalMission(materializeExampleAuthoring(buildExemploGBAVerticeCampaign(data))))))))))))));
-  const result = preserveApprovedInitialMenuAudio(data, preserveTideAnnex(data, generated));
+  const result = preserveExemploCoastalAudio(data, preserveApprovedInitialMenuAudio(data, preserveTideAnnex(data, generated)));
   const extraScenes = (data.scenas ?? []).filter(scene => APPROVED_EXTRA_MENU_SCENES.has(scene?.name));
   if (!extraScenes.length) return result;
   const merge = (rows, additions, key) => {
@@ -9103,7 +9104,7 @@ export function promoteExemploGBAVerticeCampaign(data) {
     ...(data.editorState?.scenaConnections ?? []).filter(preservesConnection).map(connection => structuredClone(connection))
   ];
   // Restore authored campaign routes first, then enforce the reviewed arena presentation.
-  return pruneUnusedExampleAssets(promoteApprovedArena(result));
+  return pruneUnusedExampleAssets(preserveExemploCoastalAudio(data, promoteApprovedArena(result)));
 }
 
 const invokedPath = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

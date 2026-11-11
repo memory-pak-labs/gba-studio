@@ -1,3 +1,4 @@
+import { preserveExemploCoastalAudio } from "./exemplo-coastal-audio.mjs";
 const OLD_THEME = "farol_tema_principal";
 const INITIAL_SCENES = new Set([
   "logo", "abertura", "titulo", "menu_inicial", "escolha_genero",
@@ -80,10 +81,11 @@ export function integrateApprovedInitialMenuAudio(source, manifest) {
   });
   const references = JSON.stringify({ ...project, audioItems: [] });
   if (!references.includes('"farol_sfx_cursor"')) project.audioItems = project.audioItems.filter(item => item.name !== "farol_sfx_cursor");
-  return project;
+  return preserveExemploCoastalAudio(source, project);
 }
 
 export function preserveApprovedInitialMenuAudio(source, generated) {
+  if ((source.assets ?? []).some(asset => asset.metadata?.coastalBank === "coastal-v1")) return preserveExemploCoastalAudio(source, generated);
   const assets = (source.assets ?? []).filter(asset => asset.id?.startsWith("initial-menu-"));
   if (!assets.length) return generated;
   return integrateApprovedInitialMenuAudio(generated, {

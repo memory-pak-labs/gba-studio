@@ -760,6 +760,22 @@ void test_audio_volume_commands_update_runtime_state() {
     assert(state.audio_fade_frames == 90);
 }
 
+void test_audio_mixing_rate_request_validates_supported_rates() {
+    gbs::EventState state {};
+    gbs::init_event_state(state);
+    assert(!state.audio_mixing_rate_changed);
+    const int16_t rates[] = {10512, 21024, 31536};
+    for (const int16_t rate : rates) {
+        const gbs::EventCommand commands[] = {{gbs::EventOp::SetAudioMixingRate, rate, 0, 0}};
+        gbs::run_event_script(state, commands, 1);
+        assert(state.audio_mixing_rate_changed && state.audio_mixing_rate_hz == rate);
+        state.audio_mixing_rate_changed = false;
+    }
+    const gbs::EventCommand invalid[] = {{gbs::EventOp::SetAudioMixingRate, 16000, 0, 0}};
+    gbs::run_event_script(state, invalid, 1);
+    assert(!state.audio_mixing_rate_changed && state.audio_mixing_rate_hz == 31536);
+}
+
 void test_run_audio_routine_command_updates_tracker_runtime_state() {
     gbs::EventState state {};
     gbs::init_event_state(state);
@@ -2345,6 +2361,7 @@ void test_decrement_one_crosses_zero_without_changing_other_variables() {
 }
 
 int main() {
+    test_audio_mixing_rate_request_validates_supported_rates();
     test_actor_scale_events_are_per_instance_and_interruptible();
     test_legacy_projectile_request_is_observable_before_another_launch();
     test_actor_activation_reenables_a_disabled_player();

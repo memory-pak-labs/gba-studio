@@ -1249,6 +1249,17 @@
       "emote_assets"
     ],
     "audio": [
+      "tracker_pcm_16_channels",
+      "tracker_sample_sustain",
+      "tracker_xm_pcm_profile",
+      "tracker_it_pcm_profile",
+      "tracker_pcm_controls",
+      "pcm_sfx_aliases",
+      "pcm_composer",
+      "pcm_prepared_gain",
+      "pcm_prepared_interpolation",
+      "pcm_long_interpolation",
+      "configurable_mixing_rate",
       "psg_square_sfx",
       "psg_noise_sfx",
       "psg_square_music",

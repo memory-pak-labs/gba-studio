@@ -136,6 +136,12 @@ function assetSlots(data: GBAProjectData, source: RecordValue): Slot[] {
     for (const [key, field] of Object.entries(owner)) {
       if (key === "metadata" || key === "command" || key === "commands" || (context === "audioItems" && key === "sourceAssetID")) continue;
       const kind = referenceKind(field);
+      if (kind && context === "pcmSfx" && key === "sampleAssetID") {
+        slots.push({ label: `${label} · sample PCM`, compatible: asset => fileExtension(asset) === ".wav",
+          replace(asset) { owner.sampleAssetID = asset.id; },
+          unlink() { owner.sampleAssetID = null; owner.source = "synth"; } });
+        continue;
+      }
       const isAudio = audioFields.has(key) || audioMaps.has(context);
       if (kind && isAudio && soundNames.has(field)) continue;
       if (kind) {

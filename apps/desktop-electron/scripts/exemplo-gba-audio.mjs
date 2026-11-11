@@ -1,3 +1,4 @@
+import { preserveExemploCoastalAudio } from "./exemplo-coastal-audio.mjs";
 import { readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -160,6 +161,7 @@ function replaceAudioCommand(command, replacements) {
 }
 
 export function promoteExemploGBAAudio(data) {
+  if ((data?.assets ?? []).some(asset => asset.metadata?.coastalBank === "coastal-v1")) return structuredClone(data);
   if ((data?.assets ?? []).some((asset) => asset?.metadata?.generatedBy === "canonical-scene-showcases-v1")) {
     return structuredClone(data);
   }
@@ -303,7 +305,7 @@ export function promoteExemploGBAAudio(data) {
   appendEventSfx("circuito_reiniciar", "farol_sfx_motor");
   appendEventSfx("arena_derrota", "farol_sfx_alarme");
 
-  return promoted;
+  return preserveExemploCoastalAudio(data, promoted);
 }
 
 async function runCLI(paths) {

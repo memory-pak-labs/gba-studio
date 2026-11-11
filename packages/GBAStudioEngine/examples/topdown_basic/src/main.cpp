@@ -1848,15 +1848,18 @@ void sync_runtime_telemetry() {
     runtime_telemetry.player_direction = player.direction;
     const size_t actor_count = current_npc_count();
     runtime_telemetry.actor_count = static_cast<uint32_t>(actor_count);
-    runtime_telemetry.first_actor_x = -1;
-    runtime_telemetry.first_actor_y = -1;
-    runtime_telemetry.first_actor_direction = -1;
-    runtime_telemetry.first_actor_visible = 0;
+    // A video-frame observer may sample between stores. Do not clear a visible
+    // actor's telemetry before publishing its current values.
     if (actor_count > 0) {
         runtime_telemetry.first_actor_x = npc_runtimes[0].actor.position_pixels.x;
         runtime_telemetry.first_actor_y = npc_runtimes[0].actor.position_pixels.y;
         runtime_telemetry.first_actor_direction = npc_runtimes[0].actor.direction;
         runtime_telemetry.first_actor_visible = npc_runtimes[0].visible ? 1u : 0u;
+    } else {
+        runtime_telemetry.first_actor_x = -1;
+        runtime_telemetry.first_actor_y = -1;
+        runtime_telemetry.first_actor_direction = -1;
+        runtime_telemetry.first_actor_visible = 0;
     }
     runtime_telemetry.last_music = event_state.last_music;
     runtime_telemetry.last_sfx = event_state.last_sfx >= 0 ? event_state.last_sfx : event_state.last_pcm_sfx;
@@ -2897,6 +2900,10 @@ void consume_event_outputs(bool trigger_room_enter) {
             event_state.audio_mute_enabled
         );
         event_state.audio_mute_changed = false;
+    }
+    if (event_state.audio_mixing_rate_changed) {
+        gbs::set_audio_mixing_rate(static_cast<uint32_t>(event_state.audio_mixing_rate_hz));
+        event_state.audio_mixing_rate_changed = false;
     }
     if (event_state.audio_volume_changed) {
         gbs::set_audio_channel_volume(
