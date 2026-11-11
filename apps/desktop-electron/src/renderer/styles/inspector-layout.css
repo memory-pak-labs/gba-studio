@@ -494,3 +494,11 @@
 input[aria-invalid="true"] { border-color: var(--studio-color-danger-text); }
 .project-problem-technical { grid-column: 1 / -1; padding: 0 12px 10px; overflow-wrap: anywhere; }
 .project-problem-technical summary { cursor: pointer; font-size: 12px; }
+.inspector-editing-scope { display: grid; gap: 2px; font-size: 11px; color: var(--studio-color-text-secondary); overflow-wrap: anywhere; }
+.inspector-editing-scope strong { color: var(--studio-color-text-primary); }
+.inspector-actions-menu { position: relative; }
+.inspector-actions-menu > summary { display: flex; cursor: pointer; list-style: none; padding: 6px; border: 1px solid var(--studio-color-border); border-radius: 6px; }
+.inspector-actions-menu > summary::-webkit-details-marker { display: none; }
+.inspector-actions-menu [role="menu"] { position: absolute; right: 0; top: 100%; width: 160px; z-index: 30; padding: 6px; display: grid; gap: 4px; background: var(--studio-color-surface); border: 1px solid var(--studio-color-border); border-radius: 8px; box-shadow: var(--studio-shadow-control); }
+.inspector-actions-menu [role="menuitem"] { width: 100%; text-align: left; }
+.dialogue-editing-scope { position: sticky; top: 0; z-index: 2; background: var(--studio-color-surface-muted); padding-block: 8px; }

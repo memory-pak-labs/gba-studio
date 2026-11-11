@@ -167,10 +167,10 @@ export function RoomDialoguesInspector({
 
       {selectedDialogue ? (
         <section className="room-dialogue-editor" aria-label={ui("Editar diálogo {0}", { 0: selectedDialogue.key })}>
-          <div className="room-dialogue-editor-heading">
+          <div className="room-dialogue-editor-heading dialogue-editing-scope">
             <div>
               <strong>{ui("Editar diálogo")}</strong>
-              <small>{selectedDialogue.key}</small>
+              <small>{selectedDialogue.key} · {ui("Catálogo do projeto")}</small>
             </div>
             <span>{selectedDialogue.sceneUsages?.map(usageLabel).filter((value, index, values) => values.indexOf(value) === index).join(" · ") || ui("Referência da cena")}</span>
           </div>
