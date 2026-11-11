@@ -6,6 +6,7 @@ namespace gbs {
 
 constexpr uint8_t multiplayer_send_capacity = 8;
 constexpr uint8_t multiplayer_receive_capacity = 16;
+constexpr uint8_t multiplayer_poll_budget = 8;
 
 enum class MultiplayerBaud : uint8_t { Bps9600, Bps38400, Bps57600, Bps115200 };
 enum class MultiplayerConnectionState : uint8_t { Closed, Connecting, Connected, Recovering };
@@ -28,6 +29,8 @@ struct MultiplayerMessage { uint16_t value = 0; uint8_t player_id = 0; };
 struct MultiplayerTransport {
     bool (*open)(void*, MultiplayerBaud) = nullptr;
     bool (*begin)(void*, uint16_t) = nullptr;
+    // 0: empty; 1: completed local send; 2: incoming clock without a new
+    // local word; negative: error. A received-only clock never advances TX.
     int (*poll)(void*, uint16_t[4], uint8_t&, uint8_t&) = nullptr;
     void (*close)(void*) = nullptr;
     void* user_data = nullptr;
@@ -61,7 +64,7 @@ struct MultiplayerQueue {
 
 bool multiplayer_queue_open(MultiplayerQueue&, const MultiplayerConfig& = {}, const MultiplayerTransport& = {});
 void multiplayer_queue_close(MultiplayerQueue&);
-// Bounded, non-blocking update: at most one poll and one begin per invocation.
+// Bounded, non-blocking update: at most eight polls and one begin per call.
 // Reconnects automatically, retaining queued messages and duplicate detection.
 void multiplayer_queue_update(MultiplayerQueue&);
 // Broadcast a full 16-bit value to every configured peer. False means closed

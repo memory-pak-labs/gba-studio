@@ -1402,14 +1402,8 @@ int gbs_hw_sio_multiplayer_async_poll(uint16_t received[4], uint8_t* player_id, 
         capture_multiplayer_async();
         REG_IF = 0x80u;
     }
-    int result = 0;
-    if (sio_multiplayer_async.complete) {
-        result = sio_multiplayer_async.result;
-        for (unsigned i = 0; i < 4; ++i) received[i] = sio_multiplayer_async.received[i];
-        *player_id = sio_multiplayer_async.player_id;
-        *connected_mask = sio_multiplayer_async.connected_mask;
-        sio_multiplayer_async.complete = 0;
-    } else gbs_sio_multiplayer_async_try_start(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS);
+    const int result = gbs_sio_multiplayer_async_poll(&sio_multiplayer_async, received, player_id, connected_mask);
+    if (!result) gbs_sio_multiplayer_async_try_start(&sio_multiplayer_async, SIO_MULTIPLAYER_REGS);
     REG_IME = ime;
     return result;
 }

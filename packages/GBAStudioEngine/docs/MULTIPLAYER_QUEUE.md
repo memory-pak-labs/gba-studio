@@ -2,8 +2,16 @@
 
 `gbs/multiplayer.hpp` oferece uma conexão com filas para dois a quatro GBAs.
 O transporte padrão usa SIO Multiplayer com conclusão por IRQ; cada atualização
-faz no máximo um poll e inicia uma transferência. Não há espera ocupada,
+faz no máximo oito polls e inicia uma transferência. Não há espera ocupada,
 alocação dinâmica ou execução de roteiros no interrupt handler.
+
+A IRQ guarda até oito snapshots em ordem, inclusive clocks recebidos entre o
+poll e o próximo envio. Um resultado de entrada não avança a palavra de saída;
+somente a conclusão do envio local faz isso. Se o filho prepara uma palavra
+enquanto a transferência do pai está ocupada, a IRQ carrega essa palavra para
+o próximo clock. Overflow do buffer solicita recuperação em vez de sobrescrever
+dados ainda não lidos. Palavras intermediárias repetidas mantêm a fase do parser
+e continuam sujeitas ao CRC do pacote completo.
 
 ```cpp
 gbs::MultiplayerQueue connection;
@@ -96,7 +104,8 @@ sem alterar o tamanho do comando nativo.
 
 `make multiplayer-async-test multiplayer-queue-test` verifica a fronteira MMIO,
 papéis determinados pelo pino SI, conclusão por IRQ, filas, backpressure,
-sequência circular, perda/corrupção e recuperação com dois/quatro participantes.
+sequência circular, perda/corrupção e recuperação com dois/quatro participantes,
+incluindo terminais que atualizam em cadências diferentes.
 O cabo desses testes é um modelo determinístico, não emulação de dois GBAs.
 
 Em `apps/desktop-electron`,

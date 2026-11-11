@@ -1,12 +1,14 @@
 #include <cassert>
 #include <cstdio>
 #include <initializer_list>
+#include <deque>
 #include "gbs/multiplayer.hpp"
 
 // The real protocol runs on every node. Only the serial registers/IRQ are
 // replaced by a deterministic four-terminal cable with loss/error injection.
 struct Cable;
 struct Port {
+    struct Snapshot { uint16_t values[4]; uint8_t mask; int result; };
     Cable* cable;
     unsigned id;
     bool opened = false, armed = false, ready = false;
@@ -15,12 +17,15 @@ struct Port {
     int result = 1;
     uint16_t outgoing = 0, incoming[4] = {};
     uint8_t mask = 0;
+    std::deque<Snapshot> snapshots {};
 };
 struct Cable {
     Port port[4];
     gbs::MultiplayerQueue queue[4] {};
     uint8_t present;
     unsigned count, tick = 0, corrupt = 0, errors = 0, lose = 0;
+    bool free_running = false;
+    unsigned update_every[4] = {1, 1, 1, 1};
     explicit Cable(unsigned players, unsigned timeout=8) : present((1u << players)-1), count(players) {
         for (unsigned i=0;i<count;++i) {
             port[i] = Port{this,i};
@@ -47,6 +52,12 @@ struct Cable {
     static int poll(void* data,uint16_t values[4],uint8_t& id,uint8_t& mask) {
         auto& p=*static_cast<Port*>(data);++p.polls;
         if(!p.opened)return -1;
+        if (!p.snapshots.empty()) {
+            const auto snapshot = p.snapshots.front(); p.snapshots.pop_front();
+            id=p.id;mask=snapshot.mask;
+            for(unsigned i=0;i<4;++i)values[i]=snapshot.values[i];
+            return snapshot.result;
+        }
         if(!p.ready)return 0;
         p.ready=false;id=p.id;mask=p.mask;
         for(unsigned i=0;i<4;++i)values[i]=p.incoming[i];
@@ -54,19 +65,36 @@ struct Cable {
     }
     static void close(void* data) {
         auto& p=*static_cast<Port*>(data);p.opened=p.armed=p.ready=false;
+        p.snapshots.clear();
     }
     void frame() {
         ++tick;
         for(unsigned i=0;i<count;++i) {
+            if (tick % update_every[i]) continue;
             unsigned before=port[i].polls;
             gbs::multiplayer_queue_update(queue[i]);
-            assert(port[i].polls-before <= 1); // Bounded work even with no cable.
+            assert(port[i].polls-before <= gbs::multiplayer_poll_budget);
         }
         uint8_t active=0;
         for(unsigned i=0;i<count;++i)
             if((present&(1u<<i)) && port[i].armed)active|=1u<<i;
-        if(active != present || !(present&1))return;
+        if (free_running) {
+            // A hardware parent can clock a child before its next game
+            // update. The child keeps transmitting its last register value;
+            // an unarmed child delivers incoming data, not a local TX completion.
+            if (!(active & 1)) return;
+        } else if(active != present || !(present&1))return;
         if(lose) {--lose;return;}
+        if (free_running) {
+            for(unsigned i=0;i<count;++i)if(present&(1u<<i)) {
+                auto& p=port[i];
+                Port::Snapshot snapshot {};
+                snapshot.mask=present;snapshot.result=p.armed?1:2;
+                for(unsigned j=0;j<4;++j)snapshot.values[j]=(present&(1u<<j))?port[j].outgoing:0xFFFF;
+                p.snapshots.push_back(snapshot);p.armed=false;
+            }
+            return;
+        }
         for(unsigned i=0;i<count;++i)if(active&(1u<<i)) {
             auto& p=port[i];p.armed=false;p.ready=true;p.mask=active;
             p.result=errors?-1:1;
@@ -196,6 +224,25 @@ int main() {
                 while(gbs::multiplayer_queue_receive(c.queue[1],m)) {assert(m.value==value);++received;}
             }
             assert(received==1 && gbs::multiplayer_queue_pending_send(c.queue[0])==0);
+        }
+    }
+    for (unsigned players : {2u,4u}) {
+        Cable c(players);
+        c.free_running = true;
+        for (unsigned i=0;i<players;++i) c.update_every[i]=i+1;
+        for (unsigned sender=0;sender<players;++sender)
+            for (unsigned value=0;value<3;++value)
+                assert(gbs::multiplayer_queue_send(c.queue[sender], 100*sender+value));
+        c.frames(4000);
+        for (unsigned receiver=0;receiver<players;++receiver) {
+            assert(gbs::multiplayer_queue_pending_send(c.queue[receiver])==0);
+            gbs::MultiplayerMessage message;
+            unsigned next[4]={};
+            while(gbs::multiplayer_queue_receive(c.queue[receiver],message)) {
+                assert(message.player_id != receiver);
+                assert(message.value==100*message.player_id+next[message.player_id]++);
+            }
+            for(unsigned sender=0;sender<players;++sender) assert(next[sender]==(sender==receiver?0u:3u));
         }
     }
     {

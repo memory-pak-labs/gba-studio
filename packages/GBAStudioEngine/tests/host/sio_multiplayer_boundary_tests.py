@@ -34,6 +34,13 @@ int main(void) {
     assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == 1);
     assert(id == 1 && mask == 3 && data[0] == 0x1111);
     assert(!gbs_hw_sio_multiplayer_async_poll(data, &id, &mask));
+    // A serial completion between main-loop poll and begin must be retained.
+    REG_IME = 0;
+    registers.multi[0] = 0xD001;
+    REG_IF = 0x80;
+    assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == 2);
+    assert(data[0] == 0xD001 && REG_IME == 0 && REG_IE == 0x92);
+    REG_IF = 0;
     // Recovery retains original ownership, unrelated IE bits and caller IME.
     REG_IME = 0; REG_IE |= 4;
     assert(gbs_hw_sio_multiplayer_async_open(2));

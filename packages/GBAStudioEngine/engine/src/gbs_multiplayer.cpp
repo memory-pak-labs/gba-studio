@@ -93,6 +93,12 @@ void consume(MultiplayerQueue& q, uint8_t sender, uint16_t word) {
         if (value) q.connected_mask |= static_cast<uint8_t>(1u << sender);
         return;
     }
+    // A child may run its main loop after the parent's next transfer. Its
+    // send register then repeats a word already consumed. Keep the current
+    // parser phase for identical middle words; CRC still checks the frame.
+    if ((kind == 9 && peer.phase == 2 && value == peer.sequence) ||
+            (kind == 10 && peer.phase == 3 && value == peer.value) ||
+            (kind == 13 && peer.phase == 5 && value == peer.epoch)) return;
     if (kind == 9 && peer.phase == 1 && value <= 1023) { peer.sequence = value; peer.phase = 2; return; }
     if (kind == 10 && peer.phase == 2) { peer.value = value; peer.phase = 3; return; }
     if (kind == 11 && peer.phase == 3) {
@@ -189,13 +195,18 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
         }
         return;
     }
-    uint16_t values[4] {};
-    uint8_t id = 0, mask = 0;
-    const int result = q.transport.poll(q.transport.user_data, values, id, mask);
-    if (result < 0 || (result > 0 && id >= q.config.players)) { recover(q); return; }
-    if (result > 0) {
-        q.waiting = false;
-        q.waiting_frames = 0;
+    bool received_any = false;
+    for (unsigned poll = 0; poll < multiplayer_poll_budget; ++poll) {
+        uint16_t values[4] {};
+        uint8_t id = 0, mask = 0;
+        const int result = q.transport.poll(q.transport.user_data, values, id, mask);
+        if (result < 0 || (result > 0 && id >= q.config.players)) { recover(q); return; }
+        if (!result) break;
+        received_any = true;
+        if (result == 1) {
+            q.waiting = false;
+            q.waiting_frames = 0;
+        }
         // A role change invalidates ACK routing; retained messages are retried.
         if (id != q.player_id) { q.acknowledged_mask = 0; for (auto& p : q.peers) p.phase = 0; }
         q.player_id = id;
@@ -210,7 +221,7 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
             q.ever_connected = true;
             q.missing_frames = 0;
         } else q.state = q.ever_connected ? MultiplayerConnectionState::Recovering : MultiplayerConnectionState::Connecting;
-        if (q.packet_size && ++q.packet_index == q.packet_size) q.packet_size = 0;
+        if (result == 1 && q.packet_size && ++q.packet_index == q.packet_size) q.packet_size = 0;
         if (q.in_flight && (q.acknowledged_mask & remote_players(q)) == remote_players(q)) {
             q.send_head = (q.send_head + 1) % multiplayer_send_capacity;
             --q.send_count;
@@ -220,7 +231,7 @@ void multiplayer_queue_update(MultiplayerQueue& q) {
             q.packet_size = 0;
         }
     }
-    if (result > 0 && q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
+    if (received_any && q.connected_mask != all_players(q) && ++q.missing_frames >= q.config.timeout_frames) { recover(q); return; }
     if (q.waiting) {
         if (++q.waiting_frames >= q.config.timeout_frames) recover(q);
         return;
