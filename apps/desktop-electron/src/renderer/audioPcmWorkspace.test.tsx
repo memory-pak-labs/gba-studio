@@ -49,12 +49,39 @@ describe("visual PCM composer", () => {
       expect(screen.getByRole("heading", { name: "Bell" })).toBeInTheDocument();
     }
   });
-  it("offers PCM music and effects as explicit creation choices", async () => {
+  it.each([
+    ["Música PCM", "Musica", "PCM", false],
+    ["Efeito PCM", "SFX", "PCM", false],
+    ["Música PSG", "Musica", "PSG", true],
+    ["Efeito PSG", "SFX", "PSG", true]
+  ] as const)("creates %s from the appropriate menu group", async (label, kind, synthesis, secondary) => {
+    const user = userEvent.setup();
     const create = vi.fn();
     render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(blank())} {...handlers({ onCreateAudio: create })} />);
-    await userEvent.click(screen.getByRole("button", { name: "Criar música" }));
-    await userEvent.click(screen.getByRole("button", { name: "Música PCM" }));
-    expect(create).toHaveBeenCalledWith("Musica", "PCM");
+    await user.click(screen.getByRole("button", { name: "Criar música" }));
+    const menu = within(screen.getByRole("dialog", { name: "Assistente de criação de áudio" }));
+    for (const name of ["Música PCM", "Efeito PCM", "Importar áudio"]) {
+      expect(menu.getByRole("button", { name })).toBeVisible();
+    }
+    expect(menu.getByRole("button", { name: "Música PSG", hidden: true })).not.toBeVisible();
+    expect(menu.getByRole("button", { name: "Efeito PSG", hidden: true })).not.toBeVisible();
+    if (secondary) await user.click(menu.getByText("Mais opções"));
+    await user.click(menu.getByRole("button", { name: label }));
+    expect(create).toHaveBeenCalledExactlyOnceWith(kind, synthesis);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Criar música" }));
+    expect(screen.getByRole("button", { name: "Música PSG", hidden: true })).not.toBeVisible();
+  });
+  it("opens audio import from the primary menu and closes the assistant", async () => {
+    const onImportAudio = vi.fn();
+    const project = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });
+    render(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(project)} {...handlers({ onImportAudio })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Criar áudio" }));
+    const menu = within(screen.getByRole("dialog", { name: "Assistente de criação de áudio" }));
+    expect(fireEvent.keyDown(menu.getByText("Mais opções"), { key: " ", code: "Space" })).toBe(true);
+    await userEvent.click(menu.getByRole("button", { name: "Importar áudio" }));
+    expect(onImportAudio).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
   it("keeps sixteen lanes reachable while editing one full piano at a time", async () => {
     const data = createAudioItemInProject(blank(), { id: "song", name: "Tema", kind: "Musica", synthesis: "PCM" });

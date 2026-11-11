@@ -2210,24 +2210,43 @@
 }
 
 .audio-creation-assistant > div,
-.audio-creation-assistant > button {
+.audio-creation-assistant > button,
+.audio-creation-more button {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--studio-space-3);
 }
 
-.audio-creation-assistant > button {
+.audio-creation-assistant > button,
+.audio-creation-more button {
   align-items: flex-start;
   flex-direction: column;
   text-align: start;
   padding: var(--studio-space-3);
 }
 
-.audio-creation-assistant > button span,
+.audio-creation-assistant button span,
 .audio-shortcuts,
 .audio-narrative-placement span {
   color: var(--studio-color-text-muted);
+}
+
+.audio-creation-more {
+  padding-block-start: var(--studio-space-2);
+  border-block-start: 1px solid var(--studio-color-border);
+}
+
+.audio-creation-more > summary {
+  padding-block: var(--studio-space-2);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.audio-creation-more > div {
+  display: grid;
+  gap: var(--studio-space-2);
+  margin-block-start: var(--studio-space-2);
 }
 
 .audio-card.selected {

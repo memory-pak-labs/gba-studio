@@ -267,8 +267,9 @@ describe("AudioWorkspace React", () => {
     expect(screen.getByText(/Espaço.*tocar.*parar/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Criar áudio" }));
-    await user.click(screen.getByRole("button", { name: "Música em loop" }));
-    expect(onCreateAudio).toHaveBeenCalledWith("Musica");
+    await user.click(screen.getByText("Mais opções"));
+    await user.click(screen.getByRole("button", { name: "Música PSG" }));
+    expect(onCreateAudio).toHaveBeenCalledWith("Musica", "PSG");
   });
 
   it("atribui musica a uma cena escolhida pelo nome", async () => {

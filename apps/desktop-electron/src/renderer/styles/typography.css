@@ -618,7 +618,7 @@
 .event-node-title {
   font-size: var(--studio-font-size-md);
 }
-.audio-creation-assistant > button span,
+.audio-creation-assistant button span,
 .audio-shortcuts,
 .audio-narrative-placement span,
 .settings-search label,

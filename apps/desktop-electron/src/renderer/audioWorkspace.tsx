@@ -604,19 +604,24 @@ export function AudioWorkspace({
         </div>
         <p>{ui("Escolha um ponto de partida. Você poderá ajustar tudo depois.")}</p>
         <button aria-label={ui("Música PCM")} onClick={() => createFromAssistant("Musica", "PCM")} type="button"><strong>{ui("Música PCM")}</strong><span>{ui("Até 16 faixas com instrumentos e samples WAV.")}</span></button>
-        <button aria-label={ui("SFX PCM")} onClick={() => createFromAssistant("SFX", "PCM")} type="button"><strong>{ui("SFX PCM")}</strong><span>{ui("Desenhe efeitos com síntese, samples e envelope.")}</span></button>
-        <button aria-label={ui("Música em loop")} onClick={() => createFromAssistant("Musica")} type="button">
-          <strong>{ui("Música em loop")}</strong>
-          <span>{ui("4 canais GBA, pattern inicial e notas de exemplo.")}</span>
-        </button>
-        <button aria-label={ui("SFX curto")} onClick={() => createFromAssistant("SFX")} type="button">
-          <strong>{ui("SFX curto")}</strong>
-          <span>{ui("Efeito one-shot pronto para receber ou importar som.")}</span>
-        </button>
-        <button aria-label={ui("Importar arquivo")} onClick={() => { onImportAudio(); setCreationAssistantOpen(false); }} type="button">
-          <strong>{ui("Importar arquivo")}</strong>
+        <button aria-label={ui("Efeito PCM")} onClick={() => createFromAssistant("SFX", "PCM")} type="button"><strong>{ui("Efeito PCM")}</strong><span>{ui("Desenhe efeitos com síntese, samples e envelope.")}</span></button>
+        <button aria-label={ui("Importar áudio")} onClick={() => { onImportAudio(); setCreationAssistantOpen(false); }} type="button">
+          <strong>{ui("Importar áudio")}</strong>
           <span>{ui("Use um MOD, WAV ou SoundFont SF2 como fonte.")}</span>
         </button>
+        <details className="audio-creation-more">
+          <summary>{ui("Mais opções")}</summary>
+          <div>
+            <button aria-label={ui("Música PSG")} onClick={() => createFromAssistant("Musica", "PSG")} type="button">
+              <strong>{ui("Música PSG")}</strong>
+              <span>{ui("4 canais de síntese do GBA, com notas de exemplo.")}</span>
+            </button>
+            <button aria-label={ui("Efeito PSG")} onClick={() => createFromAssistant("SFX", "PSG")} type="button">
+              <strong>{ui("Efeito PSG")}</strong>
+              <span>{ui("Crie efeitos com os canais de síntese do GBA.")}</span>
+            </button>
+          </div>
+        </details>
       </section>
     );
   }
@@ -911,7 +916,7 @@ export function AudioWorkspace({
       aria-label={ui("Workspace Áudio")}
       onKeyDown={(event) => {
         const target = event.target as HTMLElement;
-        if (target.closest(".wav-sample-editor")) return;
+        if (target.closest(".wav-sample-editor, .audio-creation-assistant")) return;
         if (target.matches("input, textarea, select") || target.isContentEditable || target.closest(".audio-groove-details")) return;
         if (event.key === " ") {
           event.preventDefault();
