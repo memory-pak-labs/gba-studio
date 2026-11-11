@@ -57,8 +57,13 @@ for (const name of modes) {
     const limit = Math.abs(state().player.x - target) * 8 + 120;
     for (let i = 0; i < limit && state().player.x !== target; ++i)
       run(1, state().player.x < target ? 16 : 32);
+    // Release at the observed target without advancing another simulation
+    // step; callers test this position and the following input drives on.
+    run(0);
+    const reachedX = state().player.x;
+    assert.equal(reachedX, target, 'movement reaches the requested position');
     run(2);
-    assert.equal(state().player.x, target, 'movement reaches the requested position');
+    return reachedX;
   }
   function capture(label) {
     const pixels = core.HEAPU8.slice(core._gba_framebuffer(), core._gba_framebuffer() + 153600);
@@ -104,8 +109,8 @@ for (const name of modes) {
     } else {
       moveToX(startX + 48);
       assert.ok(state().player.x > startX + 32, 'explicit free permits crossing');
-      moveToX(startX);
-      assert.equal(state().player.x, startX, 'returned before closing');
+      assert.equal(moveToX(startX), startX, 'returned before closing');
+      assert.ok(state().player.x <= startX, 'released movement stays before the closed door');
       tapA(); assertColor(capture('closed-again'), true);
       assert.equal(state().variables[0], 0);
       run(32, 16); run(2);
@@ -115,8 +120,7 @@ for (const name of modes) {
       moveToX(startX + (direction === 16 ? 272 : -272));
       const screenX = fixture.x * 8 - read32(cameraAddress);
       assert.ok(screenX < -8 || screenX >= 240, 'edited tile left the viewport');
-      moveToX(startX);
-      assert.equal(state().player.x, startX);
+      assert.equal(moveToX(startX), startX, 'returned after scrolling');
       assertColor(capture('after-scrolling'), false);
     }
     report.ok = true;
