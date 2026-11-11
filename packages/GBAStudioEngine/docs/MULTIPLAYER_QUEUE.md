@@ -236,3 +236,63 @@ ativas e nenhum underrun nas janelas. O áudio usa os mapas preparados descritos
 em [Volume e samples PCM longos](PCM_PREPARED_VOLUMES.md). A latência de uma
 mensagem inclui a espera pela fila e pelas confirmações: cadência do jogo não
 equivale à frequência de sincronização de controles ou de um mundo completo.
+
+### Movimento e controles com áudio
+
+O mesmo teste possui um modo de controles, ativado por
+`GBA_LINK_CONTROLS_QA`. Ele usa cópias exportadas das três cenas acima, com dois
+e quatro terminais. Cada terminal assume alternadamente o controle da mesma
+Nara; o Exemplo original continua sendo um jogo de um jogador. Isso não adiciona
+avatares independentes nem sincronização automática de jogos no editor.
+
+O runner aciona os botões reais de cada núcleo. A cópia da ROM lê a entrada do
+terminal responsável, transmite-a pela fila de produção e aplica o comando nos
+demais terminais. Entradas locais conflitantes nos receptores não devem alterar
+o movimento replicado. Há doze ações: direções e corrida com R em Porto Lúmen,
+direções e saltos com A em Penedos do Vento, direções e diagonais em Mercado
+Suspenso. Cada ação mantém os botões por oito passos e solta-os por doze passos
+(48 na plataforma, para observar a aterrissagem). O movimento, a física e os
+roteiros continuam sendo os gerados pelo exportador; posições não são injetadas.
+
+Uma tentativa de aplicar cada comando assim que recebido divergiu um pixel em
+Porto Lúmen. Portanto, este modo de QA usa passos comuns de simulação e uma
+barreira de confirmação entre ações. Enquanto espera, mantém renderização,
+áudio e serviço de comunicação ativos, mas suspende o update do mundo na cópia
+exportada. O resultado compara posições exatamente após cada ação, bordas de
+pressionar/soltar, corrida mais rápida que caminhada, saltos e ausência de
+interferência das entradas locais. Não prova igualdade do mundo inteiro nem
+movimento contínuo sem essas barreiras.
+
+```sh
+# Em apps/desktop-electron; fontes/build do mGBA preparados como acima:
+GBA_LINK_CONTROLS_QA=CAMINHO_DAS_EVIDENCIAS \
+GBA_LINK_MGBA_SOURCE=CAMINHO_DAS_FONTES_MGBA \
+GBA_LINK_MGBA_BUILD=CAMINHO_DO_BUILD_MGBA \
+  npm run test:all -- src/main/multiplayerSceneRom.integration.test.ts
+```
+
+`GBA_LINK_SCENES=porto_lumen` e `GBA_LINK_PLAYERS=2` permitem uma regressão
+filtrada; sem filtros são executados os seis casos. Evidências incluem ROM hash,
+histórico de entradas/posições, capturas e áudio. O export e seu cache de build
+são removidos ao terminar, usando a mesma política do modo anterior.
+
+Resultado local em 11/11/2026, com os mesmos 16 canais PCM, samples longos e
+efeitos contínuos:
+
+| Cena | Atraso máximo, 2 / 4 terminais | Passos de simulação/s, 2 / 4 terminais |
+| --- | --- | --- |
+| Porto Lúmen | 134 / 184 ms | 23,6 / 23,7 |
+| Penedos do Vento | 117 / 151 ms | 46,6 / 45,4 |
+| Mercado Suspenso | 100 / 151 ms | 33,0 / 32,7 |
+
+O atraso vai da entrada no terminal responsável até o início do comando na
+instrumentação de cada ROM, com resolução de um quadro de vídeo; não mede o
+primeiro pixel exibido. A cadência considera os passos efetivos entre a primeira
+entrada e o fim da última ação, incluindo esperas de rede. O contador geral da
+engine também avança nessas esperas e não substitui essa medida.
+
+Os seis casos passaram, com 216 checkpoints de posição coincidentes, nenhum
+underrun, nenhuma recuperação de conexão e nenhuma corrupção registrada.
+Porto Lúmen ainda não sustenta 30 passos/s neste protocolo de ações com
+barreiras. Reduzir essa espera, validar entradas contínuas, avatares
+independentes e o cabo físico permanecem etapas distintas.
