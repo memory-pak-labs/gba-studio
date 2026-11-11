@@ -12,7 +12,7 @@ import { Play, Square, Plus, Minus, Search, Upload, Music2, AudioLines, ListFilt
 import { AudioGroovePiano, grooveTrackName, grooveHardwareLabel, grooveTrackTone } from "./AudioGroovePiano";
 import type { UpdateAudioInstrumentFields } from "../shared/audioInstruments.js";
 import { editedWavPreviewBytes, resolveAudioPreviewSourceURL, startComposedAudioPreview } from "./audioPreviewPlayback";
-import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   deriveAudioChannelMixing,
   deriveAudioExportSummary,
@@ -452,6 +452,50 @@ export function AudioWorkspace({
   const [playbackStepIndex, setPlaybackStepIndex] = useState<number | null>(null);
   const [auditionAudioID, setAuditionAudioID] = useState<string | null>(null);
   const [creationAssistantOpen, setCreationAssistantOpen] = useState(false);
+  const creationAnchorRef = useRef<HTMLButtonElement | null>(null);
+  const creationPanelRef = useRef<HTMLElement | null>(null);
+  const creationPanelID = useId();
+  const [creationPosition, setCreationPosition] = useState<CSSProperties | null>(null);
+  useLayoutEffect(() => {
+    if (!creationAssistantOpen) return;
+    const anchor = creationAnchorRef.current, panel = creationPanelRef.current;
+    if (!anchor || !panel) return;
+    const position = () => {
+      const rect = anchor.getBoundingClientRect(), margin = 12, gap = 8;
+      const width = Math.min(360, Math.max(0, window.innerWidth - margin * 2));
+      const below = Math.max(0, window.innerHeight - rect.bottom - gap - margin);
+      const above = Math.max(0, rect.top - gap - margin);
+      const placeAbove = below < 240 && above > below;
+      const maxHeight = Math.min(680, placeAbove ? above : below);
+      const height = Math.min(panel.scrollHeight || panel.getBoundingClientRect().height || 240, maxHeight);
+      const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+      const top = Math.max(margin, placeAbove ? rect.top - gap - height : rect.bottom + gap);
+      setCreationPosition(previous => previous?.left === left && previous.top === top && previous.maxHeight === maxHeight
+        ? previous : { left, top, maxHeight });
+    };
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !panel.contains(event.target) && !anchor.contains(event.target)) setCreationAssistantOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault(); event.stopPropagation(); setCreationAssistantOpen(false); anchor.focus();
+    };
+    position();
+    panel.querySelector<HTMLButtonElement>("button")?.focus();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(position);
+    observer?.observe(panel); observer?.observe(anchor);
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    window.addEventListener("pointerdown", outside);
+    window.addEventListener("keydown", escape, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+      window.removeEventListener("pointerdown", outside);
+      window.removeEventListener("keydown", escape, true);
+    };
+  }, [creationAssistantOpen]);
   const [creatingModuleCopy, setCreatingModuleCopy] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsID = useId();
@@ -595,13 +639,19 @@ export function AudioWorkspace({
     setCreationAssistantOpen(false);
   }
 
+  function openCreationAssistant(event: React.MouseEvent<HTMLButtonElement>): void {
+    creationAnchorRef.current = event.currentTarget;
+    setCreationPosition(null);
+    setCreationAssistantOpen(!creationAssistantOpen);
+  }
+
   function audioCreationAssistant(): React.ReactElement | null {
     if (!creationAssistantOpen) return null;
     return (
-      <section aria-label={ui("Assistente de criação de áudio")} className="audio-creation-assistant" role="dialog">
+      <section aria-label={ui("Assistente de criação de áudio")} className="audio-creation-assistant" id={creationPanelID} ref={creationPanelRef} role="dialog" style={creationPosition ?? { visibility: "hidden" }}>
         <div>
           <strong>{ui("Novo áudio")}</strong>
-          <button aria-label={ui("Fechar assistente")} onClick={() => setCreationAssistantOpen(false)} type="button">×</button>
+          <button aria-label={ui("Fechar assistente")} onClick={() => { setCreationAssistantOpen(false); creationAnchorRef.current?.focus(); }} type="button">×</button>
         </div>
         <p>{ui("Escolha um ponto de partida. Você poderá ajustar tudo depois.")}</p>
         <button aria-label={ui("Música PCM")} onClick={() => createFromAssistant("Musica", "PCM")} type="button"><strong>{ui("Música PCM")}</strong><span>{ui("Até 16 faixas com instrumentos e samples WAV.")}</span></button>
@@ -653,8 +703,8 @@ export function AudioWorkspace({
               <p>{ui("Crie uma música ou SFX para começar a compor.")}</p>
               {presentation.instruments?.length ? <p>{ui("Banco do projeto: {0} instrumentos disponíveis ao criar uma música.", { 0: presentation.instruments.length })}</p> : null}
               <div>
-                <button onClick={() => setCreationAssistantOpen(true)} type="button">{ui("Criar música")}</button>
-                <button onClick={() => setCreationAssistantOpen(true)} type="button">{ui("Criar SFX")}</button>
+                <button onClick={openCreationAssistant} type="button">{ui("Criar música")}</button>
+                <button onClick={openCreationAssistant} type="button">{ui("Criar SFX")}</button>
                 <button onClick={onImportAudio} type="button">{ui("Importar MOD/WAV/SF2")}</button>
               </div>
               {audioCreationAssistant()}
@@ -989,7 +1039,7 @@ export function AudioWorkspace({
       <div className="audio-layout audio-groove-layout">
         <aside className="audio-rail audio-groove-library" aria-label={ui("Biblioteca de áudio")}>
           <div className="audio-rail-header"><h4>{ui("Biblioteca")}</h4><div className="audio-groove-library-actions">
-            <button aria-label={ui("Criar áudio")} title={ui("Criar áudio")} onClick={() => setCreationAssistantOpen(true)} type="button"><Plus size={18} /></button>
+            <button aria-label={ui("Criar áudio")} title={ui("Criar áudio")} aria-controls={creationPanelID} aria-expanded={creationAssistantOpen} aria-haspopup="dialog" onClick={openCreationAssistant} type="button"><Plus size={18} /></button>
             <button aria-label={ui("Importar áudio")} title={ui("Importar áudio")} onClick={onImportAudio} type="button"><Upload size={16} /></button>
           </div></div>
           <label className="audio-groove-search"><span className="studio-visually-hidden">{ui("Buscar áudio")}</span><Search size={15} /><input type="search" aria-label={ui("Buscar áudio")} placeholder={ui("Buscar…")} value={searchQuery} onChange={event => setSearchQuery(event.currentTarget.value)} /></label>

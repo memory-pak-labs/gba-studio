@@ -2195,11 +2195,11 @@
 }
 
 .audio-creation-assistant {
-  position: absolute;
+  position: fixed;
   z-index: 20;
-  inset-block-start: 64px;
-  inset-inline-end: 24px;
-  width: min(360px, calc(100% - 48px));
+  width: min(360px, calc(100vw - 24px));
+  box-sizing: border-box;
+  overflow-y: auto;
   display: grid;
   gap: var(--studio-space-2);
   padding: var(--studio-space-4);
@@ -3009,7 +3009,6 @@
 .pcm-sfx-control > span { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 8px; }
 .pcm-sfx-control output { opacity: .7; white-space: nowrap; }
 .pcm-sfx-control input[type="number"] { width: 72px; }
-.audio-creation-assistant { max-height: min(680px, 85vh); overflow-y: auto; }
 @media (max-width: 1100px) { .pcm-composer { grid-template-columns: 148px minmax(0, 1fr); gap: 6px; } }
 
 .pcm-piano .audio-groove-page-controls > span { display: none; }
