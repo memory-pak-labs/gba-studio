@@ -187,3 +187,52 @@ a partida; os 20 cenários não comprovam esses fluxos. A seleção de janelas,
 atalhos e comandos da interface Qt também não faz parte desta evidência.
 
 Referência de registradores: [GBATEK, SIO Multi-Player Mode](https://mgba-emu.github.io/gbatek/#sio-multi-player-mode).
+
+### Cenas completas com áudio
+
+O teste opt-in `multiplayerSceneRom.integration.test.ts` exporta o Exemplo GBA
+completo para Porto Lúmen, Penedos do Vento e Mercado Suspenso. Cada cena é
+executada com conexão fechada, dois e quatro participantes. A carga de áudio
+é uma XM autoral de QA, com 16 vozes, quatro samples de 16.384 posições,
+efeitos contínuos e mixagem em 31.536 Hz. O volume preparado acompanha a
+configuração do projeto. Nenhum asset ou roteiro do template original é alterado.
+
+A instrumentação usa o callback `RuntimeServices.on_frame` somente na cópia
+exportada. As rotinas de entrada originais executam antes de iniciar a faixa
+controlada; a medição começa após um aquecimento fixo. Há três janelas
+consecutivas de 240 quadros de vídeo por terminal, sem escolher as mais rápidas.
+O jogador fica parado; atores e roteiros da cena continuam ativos. Nos casos
+conectados, cada terminal transmite 64 mensagens, verificando valor, ordem,
+deduplicação, confirmação e encerramento. O runner apenas lê a ROM, captura
+imagem/PCM e aciona L para fechar a conexão; não injeta RAM ou confirmações.
+
+Em `apps/desktop-electron`, com as fontes/build nativos preparados como acima:
+
+```sh
+GBA_LINK_SCENES_QA=CAMINHO_DAS_EVIDENCIAS \
+GBA_LINK_MGBA_SOURCE=CAMINHO_DAS_FONTES_MGBA \
+GBA_LINK_MGBA_BUILD=CAMINHO_DO_BUILD_MGBA \
+  npm run test:all -- src/main/multiplayerSceneRom.integration.test.ts
+```
+
+`GBA_TRACKER_ENGINE_PACK` permite selecionar um pacote candidato. O teste remove
+seu export e cache de build próprios mesmo ao falhar. Fonte/build mGBA são
+entradas externas. Para diagnóstico, `GBA_LINK_SCENES_KEEP_TEMP=1` preserva os
+intermediários e registra seus caminhos em `retained-export.json`; remova apenas
+esses diretórios ao concluir. Os resultados não abrangem movimento do jogador,
+trocas de cena, entrada de um novo participante ou cabo físico.
+
+Resultado local em 11/11/2026, em atualizações publicadas pela engine por
+segundo, considerando todas as janelas de todos os terminais:
+
+| Cena | Conexão fechada | Dois jogadores | Quatro jogadores |
+| --- | --- | --- | --- |
+| Porto Lúmen | 31,4–32,1 | 30,6–31,4 | 30,4–30,9 |
+| Penedos do Vento | 56,0–56,7 | 54,8–56,5 | 55,0–55,2 |
+| Mercado Suspenso | 54,5–55,2 | 53,0–55,2 | 51,8–54,0 |
+
+Os nove casos concluíram, com 2.688 entregas direcionadas verificadas, 16 vozes
+ativas e nenhum underrun nas janelas. O áudio usa os mapas preparados descritos
+em [Volume e samples PCM longos](PCM_PREPARED_VOLUMES.md). A latência de uma
+mensagem inclui a espera pela fila e pelas confirmações: cadência do jogo não
+equivale à frequência de sincronização de controles ou de um mundo completo.
