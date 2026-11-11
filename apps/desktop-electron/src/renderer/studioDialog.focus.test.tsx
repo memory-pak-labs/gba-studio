@@ -1,6 +1,7 @@
 /** @vitest-environment happy-dom */
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioI18nProvider } from "./i18n";
 import { StudioDialogProvider, useStudioDialog } from "./studioDialog";
@@ -26,6 +27,25 @@ function setup() {
 }
 
 afterEach(cleanup);
+
+it("keeps consecutive prompts queued in StrictMode", async () => {
+  const result = vi.fn(), user = userEvent.setup();
+  function Sequence() {
+    const dialog = useStudioDialog();
+    return <button onClick={async () => {
+      const id = await dialog.prompt("ID da HUD", "hud_qa");
+      const name = await dialog.prompt("Nome da HUD", "HUD QA");
+      result({ id, name });
+    }}>Criar HUD</button>;
+  }
+  render(<StrictMode><StudioI18nProvider><StudioDialogProvider><Sequence /></StudioDialogProvider></StudioI18nProvider></StrictMode>);
+  await user.click(screen.getByRole("button", { name: "Criar HUD" }));
+  await user.click(screen.getByRole("button", { name: "OK" }));
+  expect(await screen.findByText("Nome da HUD")).toBeInTheDocument();
+  expect(screen.getByRole("textbox")).toHaveValue("HUD QA");
+  await user.click(screen.getByRole("button", { name: "OK" }));
+  await waitFor(() => expect(result).toHaveBeenCalledWith({ id: "hud_qa", name: "HUD QA" }));
+});
 
 describe("keyboard isolation of studio dialogs", () => {
   it("wraps Tab from Cancel when the destructive action is disabled", async () => {

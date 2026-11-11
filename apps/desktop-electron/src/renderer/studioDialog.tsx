@@ -233,12 +233,16 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
   const ui = useStudioUiText();
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
   const queueRef = useRef<DialogState[]>([]);
+  const activeDialogRef = useRef<DialogState | null>(null);
+  const dialogSequenceRef = useRef(0);
 
   const pumpQueue = useCallback(() => {
-    setDialogState((current) => {
-      if (current) return current;
-      return queueRef.current.shift() ?? null;
-    });
+    if (activeDialogRef.current) return;
+    // Dequeue once in the action, never in a state updater replayed by StrictMode.
+    const next = queueRef.current.shift() ?? null;
+    activeDialogRef.current = next;
+    if (next) dialogSequenceRef.current++;
+    setDialogState(next);
   }, []);
 
   const enqueueDialog = useCallback((state: DialogState) => {
@@ -247,6 +251,7 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
   }, [pumpQueue]);
 
   const closeDialog = useCallback(() => {
+    activeDialogRef.current = null;
     setDialogState(null);
     window.setTimeout(() => pumpQueue(), 0);
   }, [pumpQueue]);
@@ -275,7 +280,7 @@ export function StudioDialogProvider({ children }: { children: React.ReactNode }
   return (
     <StudioDialogContext.Provider value={value.current}>
       {children}
-      {dialogState ? <StudioDialogSurface state={dialogState} onClose={closeDialog} /> : null}
+      {dialogState ? <StudioDialogSurface key={dialogSequenceRef.current} state={dialogState} onClose={closeDialog} /> : null}
     </StudioDialogContext.Provider>
   );
 }
