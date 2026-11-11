@@ -4397,8 +4397,12 @@ def prepare_multichannel_tracker_samples(patterns, source_samples, native_primar
         long_sample = len(prepared_samples[index]["samples"]) > 128
         if long_sample: settings = {(volume, gain, 0) for volume, gain, _ in settings}
         for volume, gain, pan in sorted(settings)[:256]:
-            prepared = build_pcm_interpolation_map(prepared_samples[index], volume, native_primary_volume, 15, gain, pan, not long_sample, pre_pan=long_sample)
-            if prepared is not None: maps.append(prepared)
+            # Keep the native gain's compact intervals plus a lossless unity
+            # pre-pan representation for subsequent bus-volume changes.
+            primaries = {native_primary_volume, 15} if long_sample else {native_primary_volume}
+            for primary in sorted(primaries):
+                prepared = build_pcm_interpolation_map(prepared_samples[index], volume, primary, 15, gain, pan, not long_sample, pre_pan=long_sample)
+                if prepared is not None: maps.append(prepared)
         if maps: prepared_samples[index]["interpolation_maps"] = sorted(maps, key=lambda m: m["key"])
     return prepared_patterns, prepared_samples
 

@@ -85,6 +85,16 @@ def tick_controls(format, data):
 
 
 class TrackerReplayTests(unittest.TestCase):
+    def test_long_samples_keep_native_and_volume_independent_prepan_maps(self):
+        sample = {"samples": [-64] * 128 + [64] * 128, "sample_rate_hz": 8363,
+                  "loop_start_sample": 0, "loop_end_sample": 256}
+        patterns = [{"steps": [{"channel": 1, "volume": 15, "sample_only": True,
+                     "sample_index": 0, "sample_rate_hz": 8363, "sample_linear_pan": True}]}]
+        _, samples = ASSETC.prepare_multichannel_tracker_samples(patterns, [sample], 12)
+        maps = samples[0]["interpolation_maps"]
+        self.assertEqual({(item["key"] >> 20) & 15 for item in maps}, {12, 15})
+        self.assertTrue(all(item["key"] & (1 << 29) for item in maps))
+
     def test_xm_volume_sustain_releases_without_restarting_the_sample(self):
         song = convert("xm", xm_song({0: [49, 1, 0, 0, 0], 2: [97, 0, 0, 0, 0]}, volume_env={"points": [(0, 0), (2, 64), (4, 32), (8, 0)], "sustain": 1}, fadeout=256))
         steps = notes(song)
