@@ -62,7 +62,8 @@ export function prepareCartridgeTools({ platform = process.platform, arch = proc
   copyFileSync(path.join(work, "LICENSE"), path.join(directory, "COPYING"));
   copyFileSync(patchPath, path.join(work, "GBA-STUDIO-STM.patch"));
   writeFileSync(path.join(work, "GBA-STUDIO-SOURCE.json"), JSON.stringify(source, null, 2));
-  run("tar", ["--exclude=.git", "--exclude=target", "-czf", path.join(directory, "corresponding-source.tar.gz"), "-C", work, "."]);
+  // GNU tar interprets a Windows drive prefix in an archive name as a remote host.
+  run("tar", ["--exclude=.git", "--exclude=target", "-czf", "corresponding-source.tar.gz", "-C", work, "."], directory);
   const files = Object.fromEntries([binary, "COPYING", "corresponding-source.tar.gz"].map(name => {
     const bytes = readFileSync(path.join(directory, name)); return [name, { bytes: bytes.length, sha256: digest(bytes) }];
   }));
