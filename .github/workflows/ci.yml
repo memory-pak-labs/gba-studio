@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -79,6 +79,7 @@ jobs:
         run: node scripts/smoke-electron-welcome.mjs
       - name: Preserve editor evidence
         if: always()
+        timeout-minutes: 3
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: CI-editor-${{ matrix.platform }}

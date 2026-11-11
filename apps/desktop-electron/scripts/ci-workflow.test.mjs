@@ -35,6 +35,14 @@ describe('CI platform coverage and evidence', () => {
       expect(new Set(names).size).toBe(names.length);
     }
   });
+  it('bounds editor evidence upload inside the job budget and keeps failure blocking', () => {
+    const job = workflow().jobs.editor;
+    const evidence = steps(job).find(step => step.name === 'Preserve editor evidence');
+    expect(Number.isFinite(evidence?.['timeout-minutes'])).toBe(true);
+    expect(evidence['timeout-minutes']).toBeGreaterThan(0);
+    expect(evidence['timeout-minutes']).toBeLessThan(job['timeout-minutes']);
+    expect(evidence['continue-on-error'] ?? false).toBe(false);
+  });
   it('covers macOS host engine tests while preserving the native MSYS Windows suite', () => {
     const jobs = workflow().jobs;
     expect(jobs.engine.strategy.matrix.include.map(e => e.runner)).toContain('macos-15');
