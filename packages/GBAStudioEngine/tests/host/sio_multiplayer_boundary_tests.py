@@ -13,8 +13,9 @@ boundary = source[start:end].replace(
 program = r'''
 #include <assert.h>
 #include "sio_multiplayer_async.h"
-static uint16_t REG_IME, REG_IE, REG_IF, REG_RCNT, REG_SIOCNT;
+static uint16_t REG_IME, REG_IE, REG_IF, REG_RCNT;
 static GbsSioMultiplayerRegisters registers;
+#define REG_SIOCNT registers.control
 ''' + boundary + r'''
 int main(void) {
     REG_IME = 1; REG_IE = 0x12;
@@ -22,6 +23,7 @@ int main(void) {
     assert(REG_IME == 1 && REG_IE == 0x12);
     assert(gbs_hw_sio_multiplayer_async_open(3));
     assert(REG_IME == 1 && REG_IE == 0x92 && REG_IF == 0x80);
+    assert(REG_RCNT == 0 && REG_SIOCNT == 0x6003 && registers.send == 0xFFFF);
     REG_IF = 0; // MMIO IF is write-one-to-clear on the device.
     registers.control = 0x600E;
     assert(gbs_hw_sio_multiplayer_async_begin(0x8888));
@@ -45,8 +47,10 @@ int main(void) {
     REG_IME = 0; REG_IE |= 4;
     assert(gbs_hw_sio_multiplayer_async_open(2));
     assert(REG_IME == 0);
+    assert(REG_SIOCNT == 0x6002);
     gbs_hw_sio_multiplayer_async_close();
     assert(REG_IME == 0 && REG_IE == 0x16);
+    assert(REG_RCNT == 0 && REG_SIOCNT == 0);
     assert(gbs_hw_sio_multiplayer_async_poll(data, &id, &mask) == -1);
     const uint16_t words[4] = {0x8001,0x9000,0xA123,0xB045};
     assert(!gbs_hw_sio_multiplayer_async_begin_batch(words,4));
@@ -62,6 +66,7 @@ int main(void) {
     for (unsigned word=0;word<4;++word) assert(gbs_hw_sio_multiplayer_async_poll(data,&id,&mask)==1);
     gbs_hw_sio_multiplayer_async_close();
     assert(REG_IE == 0x81 && REG_IME == 1);
+    assert(REG_RCNT == 0 && REG_SIOCNT == 0);
 }
 '''
 with tempfile.TemporaryDirectory(prefix="gba-sio-boundary-") as tmp:
