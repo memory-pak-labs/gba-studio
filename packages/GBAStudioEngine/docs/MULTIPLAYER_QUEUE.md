@@ -112,8 +112,56 @@ Em `apps/desktop-electron`,
 `node scripts/verify-multiplayer-queue-rom.mjs ENGINE_PACK EVIDENCE` compila e
 executa uma ROM no mGBA sem cabo: verifica avanço dos quadros, recuperação,
 retenção do envio e liberação de SIO. Remove sua compilação temporária ao sair.
-Entrega com múltiplas instâncias no mGBA e com GBAs físicos permanece uma
-validação separada. O teste opt-in `multiplayerQueueRom.integration.test.ts`
+O teste opt-in `multiplayerQueueRom.integration.test.ts`
 exporta os eventos do editor, compila e verifica a recuperação sem cabo no mGBA.
+
+### Núcleos nativos conectados
+
+`scripts/verify-multiplayer-linked-rom.mjs ENGINE_PACK MGBA_SOURCE MGBA_NATIVE_BUILD EVIDENCE`
+compila ROMs com os eventos do SDK e executa 20 cenários em núcleos nativos do
+mGBA 0.10.5, ligados pelo SIO lockstep oficial. Abrange dois/quatro participantes,
+9600/38400/57600/115200 bps, pressão na fila, ordem, valores limite, duplicatas,
+desconexão/reconexão do último participante no mesmo slot e encerramento com
+restauração de IE. Cada terminal envia 64 mensagens; o runner não injeta dados,
+ACKs ou alterações na RAM da ROM. Ele usa entrada de botão apenas para encerrar.
+
+As fontes devem estar limpas no commit `26b7884bc25a5933960f3cdcd98bac1ae14d42e2`.
+Exemplo de preparo em diretórios temporários novos, com CMake e compilador C:
+
+```sh
+mgbaQaRoot=$(mktemp -d)
+git clone --depth 1 --branch 0.10.5 https://github.com/mgba-emu/mgba.git "$mgbaQaRoot/source"
+cmake -S "$mgbaQaRoot/source" -B "$mgbaQaRoot/build" \
+  -DLIBMGBA_ONLY=ON -DM_CORE_GBA=ON -DM_CORE_GB=OFF \
+  -DBUILD_STATIC=ON -DBUILD_SHARED=OFF -DBUILD_LTO=OFF \
+  -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_GL=OFF -DBUILD_GLES2=OFF \
+  -DENABLE_FFMPEG=OFF -DENABLE_LIBZIP=OFF -DENABLE_SQLITE3=OFF \
+  -DENABLE_LZMA=OFF -DENABLE_PNG=OFF -DENABLE_ELF=OFF \
+  -DBUILD_TEST=OFF -DBUILD_SUITE=OFF -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake --build "$mgbaQaRoot/build" --target mgba -j 4
+# Em apps/desktop-electron; informe um destino persistente para as evidências:
+node scripts/verify-multiplayer-linked-rom.mjs \
+  ../../packages/GBAStudioEngine/dist/GBAStudioEnginePack \
+  "$mgbaQaRoot/source" "$mgbaQaRoot/build" CAMINHO_DAS_EVIDENCIAS
+```
+
+O verificador remove seus executáveis e projetos temporários, inclusive em
+falhas; fonte/build mGBA são entradas externas e permanecem intactos. Nesta
+validação local, o diretório temporário criado para fonte/build também foi
+removido ao terminar. Receita validada no macOS Apple Silicon, sem janelas Qt.
+
+Resultado de referência, fila saturada a 115200 bps: cerca de 7,5 broadcasts/s
+por terminal com dois participantes e 2,3 com quatro. O tempo médio de entrada
+na fila até a confirmação de todos foi 60,5 e 194–200 updates, respectivamente,
+incluindo espera atrás de outras mensagens. Esses números medem uma ROM de QA
+pequena, não o desempenho do Exemplo completo, áudio ou de um aparelho físico.
+A vazão continua limitada a um novo clock por update; mensagens de controle
+frequentes exigem uma etapa própria de otimização, mantendo confirmação e CRC.
+
+A prova de cabo, reconexão e entrega em GBAs físicos continua pendente. Troca
+de host/IDs, reinício do console e entrada de outro jogador exigem ressincronizar
+a partida; os 20 cenários não comprovam esses fluxos. A seleção de janelas,
+atalhos e comandos da interface Qt também não faz parte desta evidência.
 
 Referência de registradores: [GBATEK, SIO Multi-Player Mode](https://mgba-emu.github.io/gbatek/#sio-multi-player-mode).

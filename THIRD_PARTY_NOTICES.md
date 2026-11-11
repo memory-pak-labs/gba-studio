@@ -13,6 +13,12 @@ avisos de componentes e recursos de terceiros.
 
 ## mGBA e disponibilidade do código-fonte
 
+O runner de QA `apps/desktop-electron/scripts/fixtures/multiplayer-linked-runner.c`
+adapta os callbacks de coordenação de `src/platform/qt/MultiplayerController.cpp`
+do mGBA 0.10.5 (Copyright 2013–2015 Jeffrey Pfau). Esse arquivo permanece sob
+MPL-2.0, conforme seu cabeçalho. Ele usa a biblioteca nativa externa e não faz
+parte do aplicativo distribuído.
+
 O manifest do core registra o commit upstream e o SHA-256 do WASM.
 O wrapper do projeto está em
 `apps/desktop-electron/third_party/mgba-web/mgba_web.c`, e o comando

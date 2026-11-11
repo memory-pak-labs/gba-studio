@@ -35,7 +35,7 @@ readiness isoladamente.
 | Exemplos | Parcial | exemplos basicos, production smoke, stress ROMs verificaveis por `smoke_mgba --stress` e evidencias parciais `readiness_evidence` para smoke mGBA manual, hardware/CI e rollout privado da engine primaria | Usar ROMs isoladas para reproducao e stress depois que o projeto completo identificar o gargalo. |
 | Docs | Parcial | README, roadmap, smoke, integration, Electron | Manter esta matriz sincronizada por release. |
 | Integracao GBA Studio | Parcial | `smoke:exemplo-template` cobre autoria, persistencia, export mixed, build da ROM e Play Window do projeto completo; a fronteira Electron agora rejeita build sem ROM materializada e publica o artefato no root do projeto antes de abrir o Play | Executar o smoke completo e confirmar materializacao, abertura do Play e consumo da telemetria; `verify-stress` e mGBA complementam a decisao. |
-| Multiplayer/Link | Parcial | SIO Normal 8/32-bit e Multiplayer 2-4; transporte por IRQ, filas fixas, CRC, confirmacoes e recuperacao com backpressure; cinco eventos visuais integrados ao ciclo da engine; host cobre cabo modelado com 2/4 terminais e ROM exportada sem cabo preserva os envios | Medir throughput e validar entrega com duas instancias no mGBA multiplayer e depois com 2+ GBAs/link cable. Uma palavra por update limita a taxa de mensagens. Ver `MULTIPLAYER_QUEUE.md`. |
+| Multiplayer/Link | Parcial | SIO Normal 8/32-bit e Multiplayer 2-4; transporte por IRQ com FIFO, filas fixas, CRC, confirmacoes e recuperacao com backpressure; cinco eventos visuais; 20 cenarios de entrega/reconexao em nucleos nativos mGBA 0.10.5 com 2/4 terminais nas quatro velocidades | Aumentar vazao: fila saturada a 115200 bps mediu cerca de 7,5 broadcasts/s por terminal com dois participantes e 2,3 com quatro. Validar cabo fisico e ressincronizacao apos troca de host/IDs. Ver `MULTIPLAYER_QUEUE.md`. |
 | Rumble | Experimental | Timer/eventos e `RumbleProvider`; ChisFlash v1.2 selecionado em Exportar > Hardware GBA, com hook do projeto, escritas em IWRAM e default indisponivel; barramento host e estado/tempo na ROM emulada verificados | Validar o motor na placa identificada. Outros cartuchos precisam de providers proprios. Ver `RUMBLE_CHISFLASH.md`. |
 | Pseudo-3D | Parcial | A cena de racing possui contrato autoravel, preview do editor, exportacao de panorama/chao/minimapa e runtime affine com raster por scanline; `pseudo_3d.hpp` continua sendo um utilitario de estrada independente | Unificar o utilitario de estrada com o contrato racing e medir frame rate no mGBA Web. |
 | Containers STL-like | API | `Optional<T>`, `FixedString<N>`, `Vector<T,N>` sem heap, cobertos por testes | Adotar em contratos novos quando reduzirem duplicacao; nao e recurso autoravel. |
@@ -64,8 +64,8 @@ readiness isoladamente.
 - O panning do PSG aceita `pan` em SFX, musica e tracker; como o hardware
   oferece enable por canal, a implementacao usa roteamento discreto por lado
   e mantem a validacao audivel em mGBA/hardware como evidencia pendente.
-- Multiplayer 2-4 jogadores usa o modo SIO dedicado e permanece pendente de
-  validacao com link cable real ou mGBA multiplayer mode.
+- Multiplayer 2-4 jogadores usa o modo SIO dedicado e passou em nucleos nativos
+  mGBA ligados por lockstep; cabo real e mudanca de host/IDs permanecem pendentes.
 - Rumble e opt-in por provider; nao existe deteccao GPIO generica segura.
 - HBE presets (water, wave, mode7) implementados; requerem validacao visual
   em mGBA para frame accuracy e custo por scanline. O dispatcher interno
