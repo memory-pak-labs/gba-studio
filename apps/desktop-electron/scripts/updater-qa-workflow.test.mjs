@@ -18,4 +18,16 @@ describe('installed updater QA workflow', () => {
     expect(qa.steps.some((step) => step.name === 'Upload validated installer candidates')).toBe(false);
     expect(qa.steps.find((step) => step.name === 'Upload updater evidence').if).toBe('always()');
   });
+
+  it('runs the published updater against the four native platforms in a read-only workflow', () => {
+    const qa = workflow.jobs['published-updater-qa'];
+    expect(qa.strategy.matrix.include.map(({ runner }) => runner)).toEqual([
+      'windows-2022', 'ubuntu-24.04', 'macos-15-intel', 'macos-15'
+    ]);
+    expect(workflow.permissions.contents).toBe('read');
+    expect(workflow.jobs['engine-pack'].if).toContain('!inputs.updater_qa_published');
+    expect(qa.env.GBA_UPDATER_QA_ROOT).toContain('github.workspace');
+    expect(qa.steps.map(step => step.run).filter(Boolean).join('\n')).toContain('scripts/prepare-published-updater-qa.mjs');
+    expect(qa.steps.find(step => step.name === 'Upload updater evidence').with.path).toMatch(/\/evidence\/$/);
+  });
 });

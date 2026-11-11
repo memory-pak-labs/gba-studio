@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { cdpSession, copySmokeProject, createElectronSmokeEnv, prepareElectronSmokeLocale, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
 import { findLinuxUpdatedProcess, findWindowsUpdatedProcess } from './updater-qa-fixture.mjs';
+import { macBundleFiles, startPublishedUpdaterFixture, verifyPublishedMacBundle } from './prepare-published-updater-qa.mjs';
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const asar = createRequire(import.meta.url)('@electron/asar');
@@ -32,7 +33,8 @@ const targetSize = (await stat(fixture.targetInstaller)).size;
 const targetName = path.basename(fixture.targetInstaller);
 const feed = JSON.stringify({ version: fixture.targetVersion, files: [{ url: targetName, sha512: targetSha512, size: targetSize }], path: targetName, sha512: targetSha512, releaseDate: new Date().toISOString() });
 const requests = [];
-const server = createServer((req, res) => {
+const published = fixture.published ? await startPublishedUpdaterFixture(root, fixture, requests) : null;
+const server = published?.server ?? createServer((req, res) => {
   const name = new URL(req.url, 'http://127.0.0.1').pathname;
   requests.push(name);
   if (name.endsWith('.yml')) { res.writeHead(200, { 'Content-Type': 'application/yaml' }); res.end(feed); return; }
@@ -42,7 +44,8 @@ const server = createServer((req, res) => {
   }
   res.writeHead(404); res.end();
 });
-await new Promise((resolve, reject) => { server.once('error', reject); server.listen(fixture.port, '127.0.0.1', resolve); });
+if (!published) await new Promise((resolve, reject) => { server.once('error', reject); server.listen(fixture.port, '127.0.0.1', resolve); });
+const requestedInstaller = () => requests.some(request => request.endsWith(`/${targetName}`));
 let port = fixture.port + 1;
 const env = createElectronSmokeEnv({
   GBA_STUDIO_SMOKE_CDP_PORT: String(port), GBA_STUDIO_SMOKE_USER_DATA_DIR: path.join(root, 'profile'),
@@ -53,7 +56,7 @@ let child;
 let logs = '';
 let exited = false;
 let cdp;
-const checks = [];
+const checks = fixture.checks ?? [];
 function launchForInspection(executable = fixture.sourceExecutable, afterUpdate = false) {
   if (afterUpdate) {
     // The original debugger can retain its listening port briefly after the update.
@@ -61,7 +64,10 @@ function launchForInspection(executable = fixture.sourceExecutable, afterUpdate 
     env.GBA_STUDIO_SMOKE_CDP_PORT = String(port);
   }
   exited = false;
-  child = spawn(executable, fixture.platform === 'linux' ? ['--no-sandbox'] : [], { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  const args = fixture.platform === 'linux' ? ['--no-sandbox'] : [];
+  if (published) args.push(`--user-data-dir=${env.GBA_STUDIO_SMOKE_USER_DATA_DIR}`, ...published.args);
+  child = spawn(executable, args, { cwd: appRoot, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  child.on('error', error => { logs += String(error); });
   child.stdout.on('data', (data) => { logs += data; });
   child.stderr.on('data', (data) => { logs += data; });
   child.once('exit', () => { exited = true; });
@@ -99,12 +105,13 @@ try {
   await prepareElectronSmokeLocale(cdp, 'pt-BR');
   const initial = await evaluate('window.gbaStudio.getAppUpdateState()');
   assert(initial.status !== 'disabled' && initial.currentVersion === fixture.version, 'Installed updater is enabled at the source version');
-  await evaluate('window.gbaStudio.checkAppUpdates()');
+  const available = await evaluate('window.gbaStudio.checkAppUpdates()');
+  if (published) assert(available.status === 'available' && available.version === fixture.targetVersion, `GitHub provider found RC6: ${JSON.stringify(available)}`);
   await waitFor("document.body.innerText.includes('Uma nova versão está disponível')", 'available update');
-  assert(!requests.includes(`/${targetName}`), 'Checking does not download without confirmation');
+  assert(!requestedInstaller(), 'Checking does not download without confirmation');
   await click('Baixar atualização');
   await waitFor("document.body.innerText.includes('Atualização pronta para instalar')", 'downloaded update', 300_000);
-  assert(requests.includes(`/${targetName}`), 'Target installer was downloaded from the local feed');
+  assert(requestedInstaller(), 'Target installer was downloaded from the local feed');
   await screenshot('update-downloaded.png');
   await click('Reiniciar e atualizar');
   await waitFor("Boolean(document.querySelector('.studio-dialog-card'))", 'restart confirmation');
@@ -126,7 +133,8 @@ try {
   await screenshot('update-save-confirmation.png');
   await click('Salvar e reiniciar', "document.querySelector('.studio-dialog-card')");
   await poll(() => exited, 'source application exits', 180_000);
-  const saved = JSON.parse(await readFile(project, 'utf8'));
+  const savedText = await readFile(project, 'utf8');
+  const saved = JSON.parse(savedText);
   assert(saved.dialogues.some((item) => !dialogueKeys.has(item.key) && item.text === 'Nova fala.'), 'New dialogue is saved before the update completes');
   cdp.close();
   if (fixture.platform === 'win32') {
@@ -145,6 +153,33 @@ try {
     await poll(async () => {
       const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', `if (Get-Process -Id ${restartedPid} -ErrorAction SilentlyContinue) { 'running' } else { 'exited' }; exit 0`]);
       return stdout.trim() === 'exited';
+    }, 'updated instance exits', 30_000);
+    launchForInspection(fixture.sourceExecutable, true);
+  } else if (fixture.platform === 'darwin') {
+    const contents = path.dirname(path.dirname(fixture.sourceExecutable));
+    const bundle = path.dirname(contents);
+    const restartedPid = await poll(async () => {
+      const archive = path.join(contents, 'Resources', 'app.asar');
+      asar.uncache(archive);
+      if (JSON.parse(asar.extractFile(archive, 'package.json').toString()).version !== fixture.targetVersion) return null;
+      const { stdout } = await execFileAsync('/bin/ps', ['-ww', '-axo', 'pid=,command=']);
+      for (const line of stdout.split('\n')) {
+        const match = line.trim().match(/^(\d+)\s+(.+)$/);
+        if (match && (match[2] === fixture.sourceExecutable || match[2].startsWith(`${fixture.sourceExecutable} `))) {
+          return Number(match[1]);
+        }
+      }
+      return null;
+    }, 'macOS installation and automatic restart', 240_000);
+    assert(Boolean(restartedPid), 'macOS installed and automatically restarted the updated bundle');
+    checks.push(await verifyPublishedMacBundle(bundle));
+    const actualHashes = await Promise.all(macBundleFiles
+      .map(file => hash(path.join(contents, file), 'sha256', 'hex')));
+    assert(JSON.stringify(actualHashes) === JSON.stringify(fixture.targetBundleHashes), 'Installed app matches the signed and notarized RC6 bundle');
+    process.kill(restartedPid);
+    await poll(() => {
+      try { process.kill(restartedPid, 0); return false; }
+      catch (error) { if (error.code !== 'ESRCH') throw error; return true; }
     }, 'updated instance exits', 30_000);
     launchForInspection(fixture.sourceExecutable, true);
   } else {
@@ -180,12 +215,17 @@ try {
   const updated = await evaluate('window.gbaStudio.getAppUpdateState()');
   assert(updated.currentVersion === fixture.targetVersion, 'Updated application restarted at the target version');
   assert(!await evaluate("Boolean(document.querySelector('.topbar-project em.dirty'))"), 'Saved project reopens without pending changes');
+  if (published) {
+    assert(await evaluate("Boolean(document.querySelector('.topbar-project'))"), 'Updated editor reopened the saved project');
+    assert(await readFile(project, 'utf8') === savedText, 'Project bytes match the version saved before updating');
+    await writeFile(path.join(evidence, 'tested-feed.json'), `${JSON.stringify(published.feed, null, 2)}\n`);
+  }
   if (fixture.platform === 'linux') {
     const installedImage = path.join(path.dirname(fixture.sourceExecutable), targetName);
     assert(await hash(installedImage, 'sha256', 'hex') === targetHash, 'Installed AppImage matches the downloaded target');
   }
   await screenshot('updated-editor.png');
-  await writeFile(path.join(evidence, 'result.json'), `${JSON.stringify({ ok: true, platform: fixture.platform, sourceVersion: fixture.version, targetVersion: fixture.targetVersion, localFeed: true, checks, requests }, null, 2)}\n`);
+  await writeFile(path.join(evidence, 'result.json'), `${JSON.stringify({ ok: true, platform: fixture.platform, architecture: process.arch, sourceVersion: fixture.version, targetVersion: fixture.targetVersion, localFeed: true, sourcePackage: fixture.sourceFile, targetPackage: fixture.targetFile, checks, requests }, null, 2)}\n`);
 } catch (error) {
   let diagnostics = '';
   if (fixture.platform === 'linux') {
@@ -202,5 +242,6 @@ try {
   if (cdp) { try { void cdp.send('Runtime.evaluate', { expression: 'window.close()' }).catch(() => {}); } catch { /* Renderer already closed. */ } cdp.close(); }
   if (!exited) await terminateChild(child);
   server.close();
+  server.closeAllConnections();
   await writeFile(path.join(evidence, 'electron.log'), logs.slice(-30000));
 }
