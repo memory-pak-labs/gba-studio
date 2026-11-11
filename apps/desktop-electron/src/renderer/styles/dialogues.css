@@ -39,7 +39,7 @@
 .dialogue-authoring-fields .hud-authoring-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .dialogue-authoring-fields .hud-authoring-actions select { width: auto; max-width: 100%; }
 .dialogue-composer-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; margin: 16px 0; align-items: start; }
-.dialogue-scope-notice { color: var(--studio-color-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.dialogue-scope-notice { color: var(--studio-color-text-secondary); overflow-wrap: anywhere; }
 .event-dialogue-parameter { display: grid; gap: 8px; min-width: 0; grid-column: 1 / -1; }
 .event-dialogue-editor { display: grid; gap: 12px; min-width: 0; }
 .event-dialogue-editor .scene-dialogue-preview { max-width: 100%; overflow: hidden; }
