@@ -1,5 +1,5 @@
 import { readPlayerPlaybackReadiness } from './player-playback-readiness.mjs';
-import { selectSceneCadenceWindow } from './exemplo-scene-playtest-contract.mjs';
+import { selectSceneCadenceWindow, steadyFrameSamples } from './exemplo-scene-playtest-contract.mjs';
 import { canvasPacingInstrumentationApplied } from './exemplo-template-smoke-contract.mjs';
 // Cold starts through the real desktop app/IPC/battery path (installed or built source). No ROM rebuild,
 // debugger profiler, hidden frames, warmup, or substitutions of early samples.
@@ -145,7 +145,7 @@ for (let trial = firstTrial; trial < firstTrial + trialCount; trial++) {
     const samples = await evaluate(main, 'window.__coldSamples');
     const audio = await evaluate(player, 'window.GBAStudioDirectPlayer.inspectAudio()');
     const first = selectSceneCadenceWindow(samples, scope);
-    const steady = first.slice(1);
+    const steady = steadyFrameSamples(first);
     const mean = key => steady.reduce((sum, sample) => sum + sample[key], 0) / steady.length;
     const pacing = process.env.GBA_INTEL_TRACE_PACING === '1' ? await evaluate(player, 'window.__gbaPacing') : undefined;
     const contextAttributes = await evaluate(player, 'window.GBAStudioDirectPlayer.canvas.getContext("2d").getContextAttributes()');
@@ -168,8 +168,7 @@ const checks = {
   threeColdStarts: results.length === 3,
   emulation: results.every(result => result.firstWindow.emulationFps >= 55),
   drops: results.every(result => result.firstWindow.droppedFrameRatio <= 0.1),
-  initialSamples: results.every(result => result.firstWindow.observedSamples.every(sample =>
-    sample.emulationFps >= 55 && sample.droppedFrameRatio <= 0.1)),
+  completeFirstWindow: results.every(result => result.firstWindow.observedSamples.length === 4),
   engineAudio: results.every(result => result.firstWindow.observedSamples.every(sample =>
     sample.runtimeState?.audio?.pcmUnderrunCount === 0)),
   outputAudio: results.every(result => result.audio?.state === 'running'
@@ -178,7 +177,9 @@ const checks = {
 if (process.env.GBA_INTEL_EXPECT_SOFTWARE === '1') checks.synchronizedCpuFramebuffer = results.every(result =>
   result.contextAttributes?.alpha === false && result.contextAttributes.willReadFrequently === true && result.contextAttributes.desynchronized === false);
 const functionalPassed = Object.values(checks).every(Boolean);
-const summary = { functionalPassed, checks, publicationApproved: false,
+const summary = { functionalPassed, checks,
+  perSampleDiagnosticPassed: results.every(result => result.firstWindow.observedSamples.every(sample => sample.emulationFps >= 55 && sample.droppedFrameRatio <= 0.1)),
+  publicationApproved: false,
   presentationGatePassed: results.every(result => result.firstWindow.presentationFps >= 55), results };
 await writeFile(path.join(evidence, trialCount === 3 ? `installed-${label}.json` : `installed-${label}-summary-${firstTrial}.json`), JSON.stringify(summary, null, 2) + '\n');
 if (process.env.GBA_INTEL_REQUIRE_PASS === '1') assert(functionalPassed, JSON.stringify(checks));

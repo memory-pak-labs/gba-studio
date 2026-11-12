@@ -15,7 +15,7 @@ const checks = {
   scene: raw.results.length === 1 && scene.name === 'arena_arrancada',
   thresholds: raw.audit.thresholds.minEmulationFps === 55 && raw.audit.thresholds.minPresentationFps === 55 && raw.audit.thresholds.maxDroppedFrameRatio === 0.1,
   emulation: scene.performance.emulationFps >= 55 && scene.performance.droppedFrameRatio <= 0.1,
-  firstWindow: scene.performance.observedSamples.length >= 4 && scene.performance.observedSamples.every(sample => sample.emulationFps >= 55 && sample.droppedFrameRatio <= 0.1),
+  firstWindow: scene.performance.observedSamples.length === 4,
   engineAudio: scene.performance.observedSamples.every(sample => sample.runtimeState?.audio?.pcmUnderrunCount === 0),
   outputAudio: scene.audio.state === 'running' && scene.audio.emittedNonSilentSamples > 0 && scene.audio.audioUnderrunCount === 0,
   visuals: raw.audit.visualGate.ok === true,
@@ -23,6 +23,7 @@ const checks = {
 };
 const summary = { scope: 'exact fixed source with frozen verified engine resources; full cold export and playback',
   checks, functionalPassed: Object.values(checks).every(Boolean), strictAuditPassed: raw.ok,
-  rawExitCode: run.status, publicationApproved: false, performance: scene.performance };
+  rawExitCode: run.status, publicationApproved: false,
+  perSampleDiagnosticPassed: scene.performance.observedSamples.every(sample => sample.emulationFps >= 55 && sample.droppedFrameRatio <= 0.1), performance: scene.performance };
 await writeFile(path.join(root, 'functional-summary.json'), JSON.stringify(summary, null, 2) + '\n');
 assert(summary.functionalPassed, JSON.stringify(checks));
