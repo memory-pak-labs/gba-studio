@@ -44,4 +44,15 @@ describe('installed updater QA workflow', () => {
     expect(workflow.permissions.contents).toBe('read');
     expect(qa.steps.some(step => /gh release (create|edit|upload)/.test(step.run ?? ''))).toBe(false);
   });
+  it('validates the installed updated product, bundled toolchain and scene ROMs on each native host', () => {
+    const qa = workflow.jobs['published-updater-qa'];
+    const step = qa.steps.find(item => item.name === 'Validate updated installed editor and ROM on the native host');
+    for (const script of ['smoke-macos-app-bundle.mjs', 'smoke-electron-welcome.mjs', 'smoke-electron-exemplo-template.mjs', 'smoke-electron-exemplo-scenes.mjs']) {
+      expect(step.run).toContain(script);
+    }
+    expect(step.run).toContain('fixture.sourceExecutable');
+    expect(step.run).toContain("GBA_STUDIO_OFFLINE_SMOKE: '1'");
+    expect(step.run).toContain('assert.equal(result.status, 0');
+    expect(qa['timeout-minutes']).toBeGreaterThanOrEqual(45);
+  });
 });
