@@ -300,7 +300,9 @@ jobs:
     name: Published updater QA (${{ matrix.platform }})
     if: inputs.updater_qa_published
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    # Full installed update plus authoring and 18 scene ROMs; Linux packaging
+    # measured over an hour, so retain the tests with a realistic host budget.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
