@@ -2620,13 +2620,11 @@ function App(): React.ReactElement {
     try {
       const result = await window.gbaStudio.readTrackerModule({ projectPath: requested.path, data: requested.project.data, audioID });
       if (!result.song) { notifyError(result.error ?? ui("Não foi possível ler o módulo.")); return; }
-      const current = dialogueSessionRef.current; const id = globalThis.crypto.randomUUID();
-      const next = commitEditableTrackerImport(current, requested, audioID, result.song, id);
+      const current = dialogueSessionRef.current;
+      const next = commitEditableTrackerImport(current, requested, audioID, result.song);
       if (!next || next === current) { setStatus(ui("Leitura cancelada: o projeto ou a fonte mudou.")); return; }
       projectHistoryGroupRef.current = null; dialogueSessionRef.current = next; setSession(next);
-      const copy = (next.project.data.audioItems as Record<string, unknown>[]).find(item => item.id === id)!;
-      setFocusedAssetRequest({ assetID: id, assetName: String(copy.name), kind: "Musica", label: String(copy.name), targetName: String(copy.name), workspace: "Audio", requestID: Date.now() });
-      setStatus(ui("Cópia editável criada. O original foi preservado."));
+      setStatus(ui("Música pronta para editar."));
     } catch (cause) { notifyError(cause instanceof Error ? cause.message : String(cause)); }
   }
   function updateTrackerModule(audioID: string, edit: TrackerModuleEdit): void {
@@ -2635,7 +2633,7 @@ function App(): React.ReactElement {
       const data = editTrackerModuleInProject(current.project.data, audioID, edit); if (data === current.project.data) return;
       const history = pushProjectHistory({ present: current.project.data, undoStack: current.undoStack, redoStack: current.redoStack }, data);
       const next = { ...current, dirty: true, project: { data: history.present, summary: summarizeGBAProject(history.present) }, undoStack: history.undoStack, redoStack: history.redoStack };
-      dialogueSessionRef.current = next; setSession(next); setStatus(ui("Módulo atualizado na cópia editável."));
+      dialogueSessionRef.current = next; setSession(next); setStatus(ui("Música atualizada."));
     } catch (cause) { notifyError(cause instanceof Error ? cause.message : String(cause)); }
   }
   function updateAudioInstrument(id: string, fields: UpdateAudioInstrumentFields): void {

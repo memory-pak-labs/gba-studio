@@ -1,13 +1,13 @@
 /** @vitest-environment happy-dom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { createHash } from "node:crypto";
 import type { ComponentProps } from "react";
 import { AudioWorkspace } from "./audioWorkspace.js";
 import { deriveAudioWorkspacePresentation } from "../shared/audioWorkspace.js";
 import { parseTrackerModule } from "../shared/trackerModule.js";
 import { makeEditableModFixture, makeEditableS3mFixture } from "../shared/trackerModuleFixtures.js";
-import { createEditableTrackerCopyInProject } from "../shared/trackerModuleEditing.js";
+import { prepareTrackerModuleForEditingInProject, createEditableTrackerCopyInProject } from "../shared/trackerModuleEditing.js";
 
 afterEach(cleanup);
 const handlers = (overrides = {}) => ({ ...Object.fromEntries([
@@ -26,11 +26,26 @@ function setup(format: "MOD" | "S3M" = "MOD", editable = true) {
 }
 function selectEditable() { fireEvent.click(screen.getByRole("button", { name: "Selecionar áudio Tema (editável)" })); }
 describe("native MOD/S3M workspace", () => {
-  it("offers an explicit editable copy while retaining the imported source", () => {
+  it("offers editing of the selected item while retaining the imported source file", () => {
     const create = vi.fn(); render(<AudioWorkspace presentation={setup("MOD", false).presentation} projectPath="/project/p.gba-project" {...handlers({ onCreateEditableTracker: create })} />);
-    fireEvent.click(screen.getByRole("button", { name: "Criar cópia editável" }));
+    fireEvent.click(screen.getByRole("button", { name: "Editar música" }));
     expect(create).toHaveBeenCalledWith("original");
-    expect(screen.getByText("O arquivo original permanece intacto." )).toBeInTheDocument();
+    expect(screen.getByText("As alterações são salvas no projeto e atualizam os usos desta música. O arquivo importado é preservado." )).toBeInTheDocument();
+  });
+  it("retains the imported selection and search and moves focus to the editor after preparation", async () => {
+    const { data, song, presentation } = setup("MOD", false);
+    const prepare = vi.fn(); const props = handlers({ onCreateEditableTracker: prepare });
+    const view = render(<AudioWorkspace presentation={presentation} projectPath="/project/p.gba-project" {...props} />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar áudio" }), { target: { value: "Tema" } });
+    fireEvent.click(screen.getByRole("button", { name: "Editar música" }));
+    await waitFor(() => expect(prepare).toHaveBeenCalledTimes(1));
+    const next = prepareTrackerModuleForEditingInProject(data, "original", song);
+    view.rerender(<AudioWorkspace presentation={deriveAudioWorkspacePresentation(next)} projectPath="/project/p.gba-project" {...props} />);
+    expect(screen.getByRole("searchbox", { name: "Buscar áudio" })).toHaveValue("Tema");
+    expect(screen.getByRole("button", { name: "Selecionar áudio Tema" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "Tema" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Selecionar canal Canal 16" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar música" })).not.toBeInTheDocument();
   });
   it("edits a module note in the Piano Roll with all sixteen source channels reachable", () => {
     const update = vi.fn(); const { presentation, song } = setup();

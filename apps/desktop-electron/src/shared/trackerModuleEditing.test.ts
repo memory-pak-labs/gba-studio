@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { makeEditableModFixture, makeEditableS3mFixture } from "./trackerModuleFixtures.js";
 import { parseTrackerModule, writeTrackerModule } from "./trackerModule.js";
-import { createEditableTrackerCopyInProject, editTrackerModuleInProject, trackerModuleSong } from "./trackerModuleEditing.js";
+import { prepareTrackerModuleForEditingInProject, createEditableTrackerCopyInProject, editTrackerModuleInProject, trackerModuleSong } from "./trackerModuleEditing.js";
+import { makeXmFixture, makeItFixture } from "./extendedTrackerFixtures.js";
 import { deriveAudioWorkspacePresentation } from "./audioWorkspace.js";
 
 function setup(channels = 16) {
@@ -14,6 +15,24 @@ function setup(channels = 16) {
   return { data, copy, song: trackerModuleSong((copy.audioItems as Record<string, unknown>[])[1]) };
 }
 describe("editable tracker project commands", () => {
+  it.each(["MOD", "S3M", "XM", "IT"] as const)("edits the same %s item, retaining source identity, metadata and game references", format => {
+    const bytes = format === "MOD" ? makeEditableModFixture(16) : format === "S3M" ? makeEditableS3mFixture() : format === "XM" ? makeXmFixture() : makeItFixture();
+    const song = parseTrackerModule(bytes, format, createHash("sha256").update(bytes).digest("hex"));
+    const source = { id: "original", name: "Tema", kind: "Musica", exportID: "theme", sourceAssetID: "asset", volume: 86, loops: false, metadata: { userNote: "Keep" } };
+    const data = { rooms: [{ music: "Tema" }], events: [{ steps: [{ command: "play_music Tema" }] }], audioItems: [source],
+      assets: [{ id: "asset", name: `source.${format.toLowerCase()}`, kind: "Audio", metadata: { source: `Assets/source.${format.toLowerCase()}` } }] };
+    const before = JSON.stringify(data);
+    const prepared = prepareTrackerModuleForEditingInProject(data, "original", song);
+    expect(prepared.audioItems).toHaveLength(1);
+    expect((prepared.audioItems as unknown[])[0]).toMatchObject({ ...source, trackerModule: { sourceSha256: song.trackerModule.sourceSha256, projectOverlay: true } });
+    expect(prepared.assets).toBe(data.assets); expect(prepared.rooms).toBe(data.rooms); expect(prepared.events).toBe(data.events);
+    expect(deriveAudioWorkspacePresentation(prepared).items[0]).toMatchObject({ id: "original", origin: "Importado", name: "Tema", format });
+    const edited = editTrackerModuleInProject(prepared, "original", { type: "cell", patternID: song.patterns[0].id, channelID: song.patterns[0].channels[0].id, row: 0, fields: { note: "D4" } });
+    const reopened = JSON.parse(JSON.stringify(edited));
+    expect(prepareTrackerModuleForEditingInProject(reopened, "original", song)).toBe(reopened);
+    expect(trackerModuleSong(reopened.audioItems[0]).patterns[0].channels[0].notes[0]).toBe("D4");
+    expect(JSON.stringify(data)).toBe(before);
+  });
   it("does not reuse a S3M channel carrying preserved hidden commands", () => {
     const bytes = makeEditableS3mFixture(); const digest = createHash("sha256").update(bytes).digest("hex");
     const song = parseTrackerModule(bytes, "S3M", digest);

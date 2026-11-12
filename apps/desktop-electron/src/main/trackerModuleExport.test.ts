@@ -14,6 +14,18 @@ afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, {
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 describe("editable native module export", () => {
+  it("keeps the prepared PCM cache volume aligned with the game bus when an imported item becomes editable", () => {
+    const bytes = makeEditableModFixture(16);
+    const song = parseTrackerModule(bytes, "MOD", hash(bytes));
+    const item = { id: "original", name: "Theme", kind: "Musica", sourceAssetID: "source", volume: 86, loops: true };
+    const data = { settings: { audio: { musicVolume: 80 } }, audioItems: [item],
+      assets: [{ id: "source", name: "source.mod", kind: "Audio", metadata: { source: "source.mod" } }] };
+    const before = buildAssetcAudioPackGeneration(data)!;
+    const after = buildAssetcAudioPackGeneration({ ...data, audioItems: [{ ...item, ...song }] })!;
+    expect(after.document.tracker[0].native_primary_volume).toBe(before.document.tracker[0].native_primary_volume);
+    expect(after.document.tracker[0].native_primary_volume).toBe(12);
+  });
+
   it.each(["MOD", "S3M", "XM", "IT"] as const)("exports edited %s through its native importer and leaves the source intact", async format => {
     const root = await mkdtemp(path.join(os.tmpdir(), "tracker-edit-export-")); roots.push(root);
     const original = format === "MOD" ? makeEditableModFixture(16) : format === "S3M" ? makeEditableS3mFixture() : format === "XM" ? makeXmFixture() : makeItFixture();
