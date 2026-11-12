@@ -2,12 +2,39 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { runInNewContext } from 'node:vm';
+import nativeAssert from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const workflow = require('js-yaml').load(readFileSync(new URL('../../../.github/workflows/desktop-packages.yml', import.meta.url), 'utf8'));
 
+function nativeHosts(platform = 'all') {
+  const include = workflow.jobs['published-updater-qa'].strategy.matrix.include;
+  if (Array.isArray(include)) return include;
+  return runInNewContext(include.trim().slice(3, -2), { inputs: { updater_qa_platform: platform }, fromJSON: JSON.parse });
+}
+
 describe('installed updater QA workflow', () => {
+  it('retries only a selected operating system without repeating already validated native hosts', () => {
+    expect(nativeHosts('linux').map(item => item.platform)).toEqual(['linux']);
+    expect(nativeHosts('windows').map(item => item.platform)).toEqual(['windows']);
+    expect(nativeHosts().map(item => item.platform)).toEqual(['windows', 'linux', 'macos-intel', 'macos-arm64']);
+  });
+  it('tests the exact updated Linux payload offline without requiring the AppImage shell launcher', () => {
+    const step = workflow.jobs['published-updater-qa'].steps.find(item => item.name === 'Validate updated installed editor and ROM on the native host');
+    const setup = step.run.match(/((?:let|const) app = [\s\S]*?)\n\s*const env/)[1];
+    const calls = [];
+    const resolved = runInNewContext(`(() => { ${setup}; return app; })()`, {
+      process: { platform: 'linux', env: { PATH: '/usr/bin:/bin' } }, root: '/qa', path,
+      fixture: { sourceExecutable: '/qa/rc6.AppImage', targetInstaller: '/qa/rc7.AppImage' },
+      mkdirSync: () => {}, assert: nativeAssert,
+      spawnSync: (file, args, options) => { calls.push({ file, args, options }); return { status: 0 }; }
+    });
+    expect(resolved).toBe('/qa/installed-appimage-payload/squashfs-root/gba-studio');
+    expect(calls[0].file).toBe('/qa/rc7.AppImage');
+    expect(calls[0].args).toEqual(['--appimage-extract']);
+    expect(calls[0].options.env.PATH).toBe('/usr/bin:/bin');
+  });
   it.each([['win32', 'x64', undefined], ['linux', 'x64', undefined], ['darwin', 'x64', 'x86_64'], ['darwin', 'arm64', 'arm64']])(
     'selects an Electron architecture only on macOS: %s %s', (platform, arch, expected) => {
       const step = workflow.jobs['published-updater-qa'].steps.find(item => item.name === 'Validate updated installed editor and ROM on the native host');
@@ -33,10 +60,10 @@ describe('installed updater QA workflow', () => {
 
   it('runs the updater on native hosts with draft visibility scoped to its manual QA job', () => {
     const qa = workflow.jobs['published-updater-qa'];
-    expect(qa.strategy.matrix.include.map(({ runner }) => runner)).toEqual([
+    expect(nativeHosts().map(({ runner }) => runner)).toEqual([
       'windows-2022', 'ubuntu-24.04', 'macos-15-intel', 'macos-15'
     ]);
-    expect(qa.strategy.matrix.include.map(({ architecture }) => architecture)).toEqual(['x64', 'x64', 'x64', 'arm64']);
+    expect(nativeHosts().map(({ architecture }) => architecture)).toEqual(['x64', 'x64', 'x64', 'arm64']);
     expect(qa.steps.find(step => step.name === 'Verify QA changes preserve the frozen candidate').run).toContain("assert.equal(process.arch, '${{ matrix.architecture }}'");
     expect(workflow.permissions.contents).toBe('read');
     expect(qa.permissions.contents).toBe('write');

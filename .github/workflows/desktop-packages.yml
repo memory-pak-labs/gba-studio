@@ -310,19 +310,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows
-            runner: windows-2022
-            architecture: x64
-          - platform: linux
-            runner: ubuntu-24.04
-            architecture: x64
-          - platform: macos-intel
-            runner: macos-15-intel
-            architecture: x64
-          - platform: macos-arm64
-            runner: macos-15
-            architecture: arm64
+        include: >-
+          ${{ fromJSON(
+            inputs.updater_qa_platform == 'linux' && '[{"platform":"linux","runner":"ubuntu-24.04","architecture":"x64"}]' ||
+            inputs.updater_qa_platform == 'windows' && '[{"platform":"windows","runner":"windows-2022","architecture":"x64"}]' ||
+            '[{"platform":"windows","runner":"windows-2022","architecture":"x64"},{"platform":"linux","runner":"ubuntu-24.04","architecture":"x64"},{"platform":"macos-intel","runner":"macos-15-intel","architecture":"x64"},{"platform":"macos-arm64","runner":"macos-15","architecture":"arm64"}]'
+          ) }}
     defaults:
       run:
         working-directory: apps/desktop-electron
@@ -388,13 +381,23 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
-          import { readFileSync } from 'node:fs';
+          import { readFileSync, mkdirSync } from 'node:fs';
           import path from 'node:path';
           import { spawnSync } from 'node:child_process';
           const root = process.env.GBA_UPDATER_QA_ROOT;
           const fixture = JSON.parse(readFileSync(path.join(root, 'fixture.json'), 'utf8'));
-          const app = process.platform === 'darwin' ? path.dirname(path.dirname(path.dirname(fixture.sourceExecutable)))
+          let app = process.platform === 'darwin' ? path.dirname(path.dirname(path.dirname(fixture.sourceExecutable)))
             : process.platform === 'linux' ? path.join(path.dirname(fixture.sourceExecutable), path.basename(fixture.targetInstaller)) : fixture.sourceExecutable;
+          if (process.platform === 'linux') {
+            // The updater already exercised the real AppImage and verified its
+            // installed hash. Run that payload directly when offline smokes
+            // clear PATH; the AppImage shell launcher needs the host's bash.
+            const extraction = path.join(root, 'installed-appimage-payload');
+            mkdirSync(extraction, { recursive: true });
+            const unpack = spawnSync(app, ['--appimage-extract'], { cwd: extraction, env: process.env, stdio: 'ignore' });
+            assert.equal(unpack.status, 0, 'Extract the exact installed AppImage for offline validation');
+            app = path.join(extraction, 'squashfs-root', 'gba-studio');
+          }
           const env = { ...process.env, GBA_STUDIO_PACKAGED_APP_PATH: app, GBA_STUDIO_OFFLINE_SMOKE: '1',
             APPIMAGE_EXTRACT_AND_RUN: '1', ELECTRON_DISABLE_SANDBOX: '1',
             ...(process.platform === 'darwin' ? {
