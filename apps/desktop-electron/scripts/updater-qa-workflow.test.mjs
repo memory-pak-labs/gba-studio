@@ -39,6 +39,8 @@ describe('installed updater QA workflow', () => {
     const qa = workflow.jobs['published-updater-qa'];
     expect(qa.env.GBA_UPDATER_QA_TARGET_SHA).toContain('inputs.updater_qa_target_sha');
     expect(qa.env.GBA_UPDATER_QA_TARGET_DRAFT).toContain('inputs.updater_qa_target_draft');
+    expect(qa.steps.find(step => step.name === 'Verify QA changes preserve the frozen candidate').if).toBe('inputs.updater_qa_target_draft');
+    expect(qa.steps.find(step => step.uses?.startsWith('actions/checkout')).with['fetch-depth']).toBe(0);
     expect(workflow.permissions.contents).toBe('read');
     expect(qa.steps.some(step => /gh release (create|edit|upload)/.test(step.run ?? ''))).toBe(false);
   });

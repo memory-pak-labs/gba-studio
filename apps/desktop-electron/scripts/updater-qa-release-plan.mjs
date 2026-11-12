@@ -25,6 +25,20 @@ export function validateUpdaterQaRelease(release, plan, role) {
   return release;
 }
 
+export async function loadUpdaterQaRelease(plan, role, request = fetch, token = process.env.GH_TOKEN) {
+  const version = role === 'source' ? plan.sourceVersion : plan.targetVersion;
+  const draft = role === 'target' && plan.targetDraft;
+  const endpoint = draft ? 'releases?per_page=100' : `releases/tags/v${version}`;
+  const response = await request(`https://api.github.com/repos/memory-pak-labs/gba-studio/${endpoint}`, {
+    redirect: 'error', headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  if (!response.ok) throw new Error(`GitHub release ${role} returned ${response.status}`);
+  const body = await response.json();
+  const matches = draft && Array.isArray(body) ? body.filter(item => item.tag_name === `v${version}`) : [body];
+  if (matches.length !== 1) throw new Error('Missing or ambiguous draft candidate');
+  return validateUpdaterQaRelease(matches[0], plan, role);
+}
+
 export function updaterQaAtom(xml, release, plan) {
   if (!plan.targetDraft) {
     if (!xml.includes(`/tag/v${plan.targetVersion}"`) && !xml.includes(`/tag/v${plan.targetVersion}'`)) throw new Error('Published target absent from the GitHub Atom feed');

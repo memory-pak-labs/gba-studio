@@ -326,6 +326,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
@@ -337,6 +338,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev libfuse2t64
       - run: npm ci
+      - name: Verify QA changes preserve the frozen candidate
+        if: inputs.updater_qa_target_draft
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          const sha = process.env.GBA_UPDATER_QA_TARGET_SHA;
+          assert.match(sha, /^[a-f0-9]{40}$/);
+          execFileSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD']);
+          const allowed = new Set(['.github/workflows/desktop-packages.yml',
+            'apps/desktop-electron/scripts/updater-qa-release-plan.mjs',
+            'apps/desktop-electron/scripts/updater-qa-release-plan.test.mjs',
+            'apps/desktop-electron/scripts/updater-qa-workflow.test.mjs',
+            'apps/desktop-electron/scripts/prepare-published-updater-qa.mjs',
+            'apps/desktop-electron/scripts/smoke-installed-update.mjs']);
+          const files = execFileSync('git', ['diff', '--name-only', sha, 'HEAD'], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+          assert(files.every(file => allowed.has(file)), 'QA revision changes the frozen product sources');
+          console.log('Frozen candidate product sources preserved');
+          JS
       - name: Verify and prepare the published packages
         shell: bash
         env:

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom } from './updater-qa-release-plan.mjs';
+import { updaterQaReleasePlan, loadUpdaterQaRelease, updaterQaAtom } from './updater-qa-release-plan.mjs';
 
 const run = promisify(execFile);
 const repo = 'memory-pak-labs/gba-studio';
@@ -38,17 +38,6 @@ async function hashFile(file, algorithm, encoding) {
   const hash = createHash(algorithm);
   for await (const block of createReadStream(file)) hash.update(block);
   return hash.digest(encoding);
-}
-
-async function releaseMetadata(tag, plan, role) {
-  const token = process.env.GH_TOKEN;
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/v${tag}`, {
-    redirect: 'error',
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
-  });
-  if (!response.ok) throw new Error(`GitHub release v${tag} returned ${response.status}`);
-  const release = await response.json();
-  return validateUpdaterQaRelease(release, plan, role);
 }
 
 function assetFor(release, name) {
@@ -91,7 +80,7 @@ async function prepare() {
   }[`${platform}-${architecture}`];
   if (!packageName) throw new Error(`Unsupported updater QA host: ${platform}-${architecture}`);
   await mkdir(root, { recursive: true });
-  const [previous, candidate] = await Promise.all([releaseMetadata(version, plan, 'source'), releaseMetadata(targetVersion, plan, 'target')]);
+  const [previous, candidate] = await Promise.all([loadUpdaterQaRelease(plan, 'source'), loadUpdaterQaRelease(plan, 'target')]);
   const sourceAsset = assetFor(previous, packageName(version));
   const targetAsset = assetFor(candidate, packageName(targetVersion));
   const source = path.join(root, sourceAsset.name);

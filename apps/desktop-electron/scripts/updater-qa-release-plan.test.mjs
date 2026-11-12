@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom } from './updater-qa-release-plan.mjs';
+import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom, loadUpdaterQaRelease } from './updater-qa-release-plan.mjs';
 
 const sha = 'a'.repeat(40);
 const environment = {
@@ -23,6 +23,26 @@ describe('immutable release pair for installed updater QA', () => {
   it('never accepts a draft as the installed public source', () => {
     const plan = updaterQaReleasePlan(environment);
     expect(() => validateUpdaterQaRelease({ ...release, tag_name: 'v0.1.0-rc.6' }, plan, 'source')).toThrow(/published/);
+  });
+  it('finds an unpublished candidate in authenticated releases without publishing its tag', async () => {
+    const calls = [];
+    const request = async (url, options) => {
+      calls.push({ url, options });
+      return url.endsWith('/releases?per_page=100')
+        ? { ok: true, json: async () => [release] }
+        : { ok: false, status: 404 };
+    };
+    await expect(loadUpdaterQaRelease(updaterQaReleasePlan(environment), 'target', request, 'fixture-token')).resolves.toEqual(release);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].options.headers.Authorization).toBe('Bearer fixture-token');
+  });
+  it('loads the public source from its immutable published tag', async () => {
+    const source = { ...release, tag_name: 'v0.1.0-rc.6', draft: false };
+    const request = async url => {
+      expect(url).toBe('https://api.github.com/repos/memory-pak-labs/gba-studio/releases/tags/v0.1.0-rc.6');
+      return { ok: true, json: async () => source };
+    };
+    await expect(loadUpdaterQaRelease(updaterQaReleasePlan(environment), 'source', request)).resolves.toEqual(source);
   });
   it.each([
     { GBA_UPDATER_QA_TARGET_SHA: '' }, { GBA_UPDATER_QA_TARGET_SHA: 'develop' },
