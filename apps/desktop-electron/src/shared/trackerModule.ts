@@ -25,6 +25,8 @@ export interface TrackerModulePattern {
   trackerHiddenChannels?: Record<string, TrackerModuleChannel>;
 }
 export interface TrackerModuleMetadata {
+  /** Notes and effects override this imported item while its file remains untouched. */
+  projectOverlay?: boolean;
   version: 1;
   format: TrackerModuleFormat;
   sourceSha256: string;

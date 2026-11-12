@@ -2323,7 +2323,7 @@ export function deriveAudioWorkspacePresentation(data: GBAProjectData): AudioWor
         volume: integerField(audio.volume),
         source,
         ...(sourceAsset ? { sourceAssetID: String(sourceAsset.id) } : {}),
-        origin: isPcmAudio(audio) ? "Composto" : originForAudio(kind, patternCount(audio) > 0 || previewChannels.length > 0 ? null : source),
+        origin: (audio.trackerModule as { projectOverlay?: boolean } | undefined)?.projectOverlay ? "Importado" : isPcmAudio(audio) ? "Composto" : originForAudio(kind, patternCount(audio) > 0 || previewChannels.length > 0 ? null : source),
         runtimeCommand: runtimeCommand(kind, name),
         usageCount: usages.length,
         usageLabels: usages,

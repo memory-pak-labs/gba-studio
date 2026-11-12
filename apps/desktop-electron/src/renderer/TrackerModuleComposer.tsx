@@ -89,7 +89,7 @@ export function TrackerModuleComposer({ item, mode, onMode, selectedCell, onSele
         {([['piano', 'Piano Roll'], ['tracker', 'Tracker'], ['sequence', 'Sequência']] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={mode === id} onClick={() => onMode(id)}>{ui(label)}</button>)}
       </div>
     </div>
-    <p className="audio-native-source-note">{ui("Cópia editável · samples e comandos nativos preservados.")}
+    <p className="audio-native-source-note">{ui(meta.projectOverlay ? "Edição no projeto · samples e comandos nativos preservados." : "Cópia editável · samples e comandos nativos preservados.")}
       {meta.format === "MOD" ? ` ${ui("No MOD, ajuste Fxx no Tracker para mudar velocidade e andamento.")}` : ""}</p>
     {meta.format === "XM" || meta.format === "IT" ? <p className="audio-native-source-note">{ui("Prévia e ROM: perfil PCM básico. Envelopes e efeitos incompatíveis são informados ao gerar o áudio.")}</p> : null}
     <div className="audio-native-view">

@@ -7,7 +7,7 @@ import type { ReadTrackerModuleRequest, ReadTrackerModuleResult } from "../share
 
 export async function readTrackerModuleForEditing(request: ReadTrackerModuleRequest): Promise<ReadTrackerModuleResult> {
   try {
-    if (!request.projectPath) throw new Error("Salve o projeto antes de criar a cópia editável.");
+    if (!request.projectPath) throw new Error("Salve o projeto antes de editar a música.");
     const audio = audioRecords(request.data.audioItems).find(item => item.id === request.audioID);
     const asset = audio && audioSourceAsset(request.data, audio);
     const source = (asset?.metadata as Record<string, unknown> | undefined)?.source;
