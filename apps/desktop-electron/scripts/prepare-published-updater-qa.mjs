@@ -7,9 +7,10 @@ import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import yaml from 'js-yaml';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom } from './updater-qa-release-plan.mjs';
+import { updaterQaReleasePlan, loadUpdaterQaRelease, updaterQaAtom, validateUpdaterQaFeed } from './updater-qa-release-plan.mjs';
 
 const run = promisify(execFile);
 const repo = 'memory-pak-labs/gba-studio';
@@ -40,18 +41,7 @@ async function hashFile(file, algorithm, encoding) {
   return hash.digest(encoding);
 }
 
-async function releaseMetadata(tag, plan, role) {
-  const token = process.env.GH_TOKEN;
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/v${tag}`, {
-    redirect: 'error',
-    headers: token ? { Authorization: `Bearer ${token}` } : {}
-  });
-  if (!response.ok) throw new Error(`GitHub release v${tag} returned ${response.status}`);
-  const release = await response.json();
-  return validateUpdaterQaRelease(release, plan, role);
-}
-
-function assetFor(release, name) {
+export function assetFor(release, name) {
   const asset = release.assets.find(item => item.name === name && item.state === 'uploaded');
   const expectedUrl = `${github}/download/${release.tag_name}/${name}`;
   if (!asset || (!release.draft && asset.browser_download_url !== expectedUrl) || !/^sha256:[a-f0-9]{64}$/.test(asset.digest)) {
@@ -60,7 +50,7 @@ function assetFor(release, name) {
   return asset;
 }
 
-async function fetchPackage(asset, file, draft = false) {
+export async function fetchPackage(asset, file, draft = false) {
   if (draft) {
     if (!process.env.GH_TOKEN || !Number.isSafeInteger(asset.id) || asset.id <= 0) throw new Error('Authenticated draft asset ID is required');
     const response = await fetch(`https://api.github.com/repos/${repo}/releases/assets/${asset.id}`, {
@@ -91,7 +81,7 @@ async function prepare() {
   }[`${platform}-${architecture}`];
   if (!packageName) throw new Error(`Unsupported updater QA host: ${platform}-${architecture}`);
   await mkdir(root, { recursive: true });
-  const [previous, candidate] = await Promise.all([releaseMetadata(version, plan, 'source'), releaseMetadata(targetVersion, plan, 'target')]);
+  const [previous, candidate] = await Promise.all([loadUpdaterQaRelease(plan, 'source'), loadUpdaterQaRelease(plan, 'target')]);
   const sourceAsset = assetFor(previous, packageName(version));
   const targetAsset = assetFor(candidate, packageName(targetVersion));
   const source = path.join(root, sourceAsset.name);
@@ -105,7 +95,12 @@ async function prepare() {
     targetFiles.push(await fetchPackage(other, path.join(root, other.name), targetDraft));
     targetFiles.sort((a, b) => a.url.localeCompare(b.url));
   }
+  const channel = { darwin: 'latest-mac.yml', linux: 'latest-linux.yml', win32: 'latest.yml' }[platform];
+  const feedPath = path.join(root, channel);
+  const updateFeedPackage = await fetchPackage(assetFor(candidate, channel), feedPath, targetDraft);
+  const updateFeed = validateUpdaterQaFeed(yaml.load(await readFile(feedPath, 'utf8')), targetVersion, targetFiles);
   const checks = [`Verified exact ${version} published source and ${targetVersion} ${targetDraft ? 'draft candidate' : 'published target'} package bytes`];
+  checks.push('Verified the final release update feed against all installer bytes and architectures');
   let sourceExecutable;
   let targetBundleHashes;
   if (platform === 'win32') {
@@ -135,7 +130,7 @@ async function prepare() {
     '-addext', 'subjectAltName=DNS:github.com,DNS:api.github.com', '-keyout', 'qa-key.pem', '-out', 'qa-cert.pem'], { cwd: root });
   const fixture = { published: !targetDraft, githubProvider: true, candidateDraft: targetDraft,
     sourceCommit: previous.target_commitish, targetCommit: candidate.target_commitish, platform, architecture, version, targetVersion, sourceExecutable,
-    sourceFile, targetFile, targetFiles, targetInstaller, targetBundleHashes, releaseDate: candidate.created_at, checks, port: 9758 };
+    sourceFile, targetFile, targetFiles, targetInstaller, targetBundleHashes, updateFeed, updateFeedPackage, releaseDate: candidate.created_at, checks, port: 9758 };
   await writeFile(path.join(root, 'fixture.json'), JSON.stringify(fixture, null, 2));
 }
 
@@ -145,8 +140,7 @@ export async function startPublishedUpdaterFixture(root, fixture, requests) {
   const spki = createHash('sha256').update(new X509Certificate(cert).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
   const channel = { darwin: 'latest-mac.yml', linux: 'latest-linux.yml', win32: 'latest.yml' }[fixture.platform];
   const target = fixture.targetFile;
-  const files = fixture.targetFiles.map(({ url, size, sha512 }) => ({ url, size, sha512 }));
-  const feed = { version: fixture.targetVersion, files, path: files[0].url, sha512: files[0].sha512, releaseDate: fixture.releaseDate };
+  const feed = validateUpdaterQaFeed(fixture.updateFeed, fixture.targetVersion, fixture.targetFiles);
   const downloadPath = `${releasePath}/download/v${fixture.targetVersion}`;
   const server = createServer({ cert, key }, (req, res) => {
     const name = new URL(req.url, 'https://github.com').pathname;
