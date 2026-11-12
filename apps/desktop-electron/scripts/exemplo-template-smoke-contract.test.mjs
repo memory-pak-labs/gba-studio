@@ -1,7 +1,43 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { activeBuildRomPaths, fullProjectRuntimeEvidence, exemploSceneBuildTimeoutMs } from "./exemplo-template-smoke-contract.mjs";
+import { activeBuildRomPaths, fullProjectRuntimeEvidence, exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline } from "./exemplo-template-smoke-contract.mjs";
+
+describe('independent moving-scene pixel baseline', () => {
+  const scope = { runtimeKind: 7, currentRoom: 0 };
+  const evidence = frame => ({ ok: true, framebufferRgbaBase64: 'actual pixels',
+    runtimeState: { ...scope, frame }, presentedRuntimeState: { ...scope, frame } });
+  it.each(['shmup', 'racing'])('captures %s at startup only after the completed cadence window', async runtime => {
+    const calls = [];
+    const result = await captureMovingSceneVisualBaseline({ runtime, scope,
+      performance: { observedSamples: [{ runtimeState: { frame: 8 } }, { runtimeState: { frame: 140 } }] },
+      reset: async () => calls.push('reset'),
+      capture: async () => { calls.push('capture'); return evidence(10); } });
+    expect(calls).toEqual(['reset', 'capture']);
+    expect(result.runtimeState.frame).toBe(10);
+    expect(result.visualBaseline).toEqual({ source: 'independent-startup-after-cadence', cadenceFinalFrame: 140, capturedFrame: 10 });
+  });
+  it.each([0, 7, 61, 140])('rejects a stale, unready or late visual frame: %s', async frame => {
+    await expect(captureMovingSceneVisualBaseline({ runtime: 'racing', scope,
+      performance: { observedSamples: [{ runtimeState: { frame: 140 } }] },
+      reset: async () => {}, capture: async () => evidence(frame) })).rejects.toThrow(/visual baseline/);
+  });
+  it('rejects a different scene and requires real pixel data', async () => {
+    for (const bad of [{ ...evidence(10), framebufferRgbaBase64: null },
+      { ...evidence(10), presentedRuntimeState: { ...scope, frame: 10, currentRoom: 1 } }]) {
+      await expect(captureMovingSceneVisualBaseline({ runtime: 'shmup', scope,
+        performance: { observedSamples: [{ runtimeState: { frame: 140 } }] },
+        reset: async () => {}, capture: async () => bad })).rejects.toThrow(/visual baseline/);
+    }
+  });
+  it('does not reset or recapture other runtimes or an unfinished cadence measurement', async () => {
+    let called = false;
+    const reset = async () => { called = true; };
+    await expect(captureMovingSceneVisualBaseline({ runtime: 'topdown', reset })).rejects.toThrow(/moving runtime/);
+    await expect(captureMovingSceneVisualBaseline({ runtime: 'shmup', reset, performance: { observedSamples: [] } })).rejects.toThrow(/completed cadence/);
+    expect(called).toBe(false);
+  });
+});
 
 describe("Exemplo template full-project smoke contract", () => {
   it('bounds cold scene compilation separately from ROM performance and fidelity', () => {

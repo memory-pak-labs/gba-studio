@@ -23,6 +23,27 @@ export function exemploSceneBuildTimeoutMs(value) {
   return timeout;
 }
 
+// Autonomous actors can leave the viewport or blink after damage during the
+// uninterrupted cadence window. Audit their authored initial pixels in a
+// separate real startup, never by replacing cadence samples or masking pixels.
+export async function captureMovingSceneVisualBaseline({ runtime, scope, performance, reset, capture }) {
+  if (!['shmup', 'racing'].includes(runtime)) throw new Error('Expected a moving runtime');
+  const cadenceFinalFrame = performance?.observedSamples?.at(-1)?.runtimeState?.frame;
+  if (!Number.isInteger(cadenceFinalFrame) || cadenceFinalFrame <= 60) {
+    throw new Error('A completed cadence measurement is required before the visual baseline');
+  }
+  await reset();
+  const evidence = await capture();
+  const frames = [evidence?.runtimeState, evidence?.presentedRuntimeState];
+  if (!evidence?.ok || typeof evidence.framebufferRgbaBase64 !== 'string' || !evidence.framebufferRgbaBase64
+    || !frames.every(state => Number.isInteger(state?.frame) && state.frame >= 8 && state.frame <= 60
+      && state.runtimeKind === scope.runtimeKind && state.currentRoom === scope.currentRoom)) {
+    throw new Error('Invalid initial visual baseline after the independent startup');
+  }
+  return { ...evidence, visualBaseline: { source: 'independent-startup-after-cadence',
+    cadenceFinalFrame, capturedFrame: evidence.presentedRuntimeState.frame } };
+}
+
 export function activeBuildRomPaths(files) {
   return files.filter((file) => file.endsWith(".gba") && !file.split(/[\\/]/).includes(".gba-cache"));
 }

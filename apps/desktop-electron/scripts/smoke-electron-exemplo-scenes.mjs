@@ -1,5 +1,5 @@
 import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
-import { exemploSceneBuildTimeoutMs } from './exemplo-template-smoke-contract.mjs';
+import { exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline } from './exemplo-template-smoke-contract.mjs';
 import { findIsometricRoute, isometricDirectionButtons } from "./exemplo-isometric-route.mjs";
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -511,7 +511,7 @@ async function waitForPlayerPlaybackReady(cdp) {
   })`, true);
 }
 
-async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
+async function waitForPlayerEvidence(cdp, captureFramebuffer = false, maximumRuntimeFrame = null) {
   const evidence = await evaluate(cdp, `
     new Promise((resolve) => {
       const captureFramebuffer = ${captureFramebuffer ? "true" : "false"};
@@ -530,7 +530,8 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
           intrinsicWidth: canvas.width,
           reportedScale: Number(canvas.dataset.integerScale)
         } : null;
-        if (frame?.meaningful && Number(audio?.emittedAudioFrames) > 0 && Number(runtimeState?.frame) >= 8) {
+        if (frame?.meaningful && Number(audio?.emittedAudioFrames) > 0 && Number(runtimeState?.frame) >= 8
+          && (${JSON.stringify(maximumRuntimeFrame)} === null || Number(runtimeState.frame) <= ${JSON.stringify(maximumRuntimeFrame)})) {
           // The runtime publishes telemetry before the canvas paint. Wait for
           // the next browser frame so the presented state and framebuffer are
           // sampled from the same render pass; otherwise a transient previous
@@ -5706,7 +5707,13 @@ async function main() {
           await wait(200);
         }
       }
-      playerEvidence = await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
+      playerEvidence = ['shmup', 'racing'].includes(scene.runtime)
+        ? await captureMovingSceneVisualBaseline({
+          runtime: scene.runtime, scope: cadenceScope, performance,
+          reset: () => evaluate(playerCdp, 'window.GBAStudioDirectPlayer.reset()'),
+          capture: () => waitForPlayerEvidence(playerCdp, true, 60)
+        })
+        : await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
       if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
         playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
       }
@@ -6304,6 +6311,7 @@ async function main() {
         presentedRuntimeState: playerEvidence.presentedRuntimeState,
         romBytes,
         runtimeState: playerEvidence.runtimeState,
+        visualBaseline: playerEvidence.visualBaseline ?? null,
         screenshotPath,
         nameInputScreenshotPath,
         shmupInput,
