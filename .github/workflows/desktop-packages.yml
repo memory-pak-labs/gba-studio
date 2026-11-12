@@ -39,7 +39,7 @@ on:
       updater_qa_native_platform:
         description: 'Native updater host to validate; all retains the existing platform selection'
         type: choice
-        options: [all, windows, linux, macos-intel, macos-arm64]
+        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display]
         default: all
       updater_qa_scene_build_timeout_ms:
         description: 'Bounded cold scene export wait (300000-900000 ms); ROM performance checks remain unchanged'
@@ -307,7 +307,7 @@ jobs:
 
   published-updater-qa:
     name: Published updater QA (${{ matrix.platform }})
-    if: inputs.updater_qa_published
+    if: inputs.updater_qa_published && inputs.updater_qa_native_platform != 'macos-intel-display'
     # GitHub hides drafts from contents:read tokens. This manual QA job reads
     # the pinned draft and its assets; it contains no release publication steps.
     permissions:
@@ -442,3 +442,7 @@ jobs:
           path: ${{ github.workspace }}/.published-updater-qa/evidence/
           if-no-files-found: ignore
           retention-days: 7
+
+  display-qa:
+    if: inputs.updater_qa_native_platform == 'macos-intel-display'
+    uses: ./.github/workflows/native-display-qa.yml

@@ -15,6 +15,12 @@ function nativeHosts(platform = 'both', nativePlatform = 'all') {
 }
 
 describe('installed updater QA workflow', () => {
+  it('runs the read-only Intel display probe through the existing registered workflow', () => {
+    expect(workflow.on.workflow_dispatch.inputs.updater_qa_native_platform.options).toContain('macos-intel-display');
+    expect(workflow.jobs['published-updater-qa'].if).toContain("inputs.updater_qa_native_platform != 'macos-intel-display'");
+    expect(workflow.jobs['display-qa'].uses).toBe('./.github/workflows/native-display-qa.yml');
+    expect(workflow.jobs['display-qa'].if).toContain("inputs.updater_qa_native_platform == 'macos-intel-display'");
+  });
   it('retries only a selected operating system without repeating already validated native hosts', () => {
     expect(nativeHosts('linux').map(item => item.platform)).toEqual(['linux']);
     expect(nativeHosts('windows').map(item => item.platform)).toEqual(['windows']);
