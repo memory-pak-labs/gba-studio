@@ -98,6 +98,7 @@
           .catch(() => null) : null;
         window.GBAStudioDirectPlayer = await startMGBAPlayer({
           container,
+          softwareFramebuffer: parameters.get("framebuffer") === "cpu",
           romUrl,
           storageKey: `gba-studio:${parameters.get("title") || "game"}:state`,
           replay,
