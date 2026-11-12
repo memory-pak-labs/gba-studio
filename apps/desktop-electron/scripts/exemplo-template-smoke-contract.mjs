@@ -109,8 +109,9 @@ export function fullProjectRuntimeEvidence(contract) {
 }
 
 // A context lost during navigation cannot establish a canvas comparison.
-export function canvasPacingInstrumentationApplied(pacing, software = false) {
+export function canvasPacingInstrumentationApplied(pacing, software = false, desynchronized = false) {
   return Number.isFinite(pacing?.startedAt) && Array.isArray(pacing?.factories)
     && pacing.factories.some(factory => factory.attributes?.alpha === false
-      && (!software || (factory.selected?.willReadFrequently === true && factory.attributes.willReadFrequently === true)));
+      && (!software || (factory.selected?.willReadFrequently === true && factory.attributes.willReadFrequently === true))
+      && (!desynchronized || factory.attributes.desynchronized === true));
 }

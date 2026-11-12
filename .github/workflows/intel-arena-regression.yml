@@ -84,23 +84,12 @@ jobs:
           assert.equal(process.platform, 'darwin');assert.equal(process.arch, 'x64');
           writeFileSync(`${root}/fixed-source.json`, JSON.stringify(provenance, null, 2) + '\n');
           JS
-      - name: Trace default canvas pacing
+      - name: Counterbalance canvas backends and trace pacing
         if: inputs.trace_pacing
         env:
           GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.intel-arena
           GBA_INTEL_APP: ${{ github.workspace }}/product/apps/desktop-electron
-          GBA_INTEL_LABEL: trace-default
-          GBA_INTEL_TRACE_PACING: '1'
-        run: node "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/scripts/diagnose-intel-installed.mjs"
-      - name: Compare software framebuffer pacing
-        if: inputs.trace_pacing
-        env:
-          GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.intel-arena
-          GBA_INTEL_APP: ${{ github.workspace }}/product/apps/desktop-electron
-          GBA_INTEL_LABEL: trace-software
-          GBA_INTEL_TRACE_PACING: '1'
-          GBA_INTEL_SOFTWARE_CANVAS: '1'
-        run: node "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/scripts/diagnose-intel-installed.mjs"
+        run: node "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/scripts/trace-intel-canvas.mjs"
       - name: Replay three fresh processes with unchanged audio and first-window gates
         if: ${{ !inputs.trace_pacing }}
         env:
@@ -116,5 +105,6 @@ jobs:
           path: |
             .intel-arena/evidence/fixed-source.json
             .intel-arena/evidence/installed-*.json
+            .intel-arena/evidence/counterbalanced-*.json
           if-no-files-found: error
           retention-days: 7

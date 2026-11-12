@@ -20,12 +20,19 @@ assert.equal(process.arch, 'x64');
 const profileRoot = path.join(root, 'cold-profiles');
 await mkdir(profileRoot, { recursive: true });
 const results = [];
+const firstTrial = Number(process.env.GBA_INTEL_FIRST_TRIAL ?? 1);
+const trialCount = Number(process.env.GBA_INTEL_TRIAL_COUNT ?? 3);
+assert(Number.isInteger(firstTrial) && firstTrial >= 1 && firstTrial <= 3);
+assert(Number.isInteger(trialCount) && trialCount >= 1 && trialCount <= 3 && firstTrial + trialCount <= 4);
+const canvasMode = process.env.GBA_INTEL_SOFTWARE_CANVAS ?? '';
+const software = ['1', 'cpu'].includes(canvasMode);
+const desynchronized = ['1', 'desync'].includes(canvasMode);
 const evaluate = async (cdp, expression) => {
   const response = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description ?? response.exceptionDetails.text);
   return response.result?.value;
 };
-for (let trial = 1; trial <= 3; trial++) {
+for (let trial = firstTrial; trial < firstTrial + trialCount; trial++) {
   const profile = await mkdtemp(path.join(profileRoot, label + '-'));
   let child, main, player;
   let stderr = '';
@@ -74,15 +81,21 @@ for (let trial = 1; trial <= 3; trial++) {
       await waitUntil(async () => evaluate(player, "location.pathname.endsWith('/player/runtime.html') && Boolean(document.querySelector('#runtime-game'))"), 'committed Player document before instrumenting');
       await evaluate(player, `(() => {
         const pacing = window.__gbaPacing = { startedAt: performance.timeOrigin + performance.now(),
-          paint: [], timerGaps: [], rafGaps: [], longTasks: [], factories: [] };
+          paint: [], comparisons: [], timerGaps: [], rafGaps: [], longTasks: [], factories: [] };
         const stamp = () => performance.timeOrigin + performance.now();
         const factory = HTMLCanvasElement.prototype.getContext;
-        const software = ${JSON.stringify(process.env.GBA_INTEL_SOFTWARE_CANVAS === '1')};
+        const software = ${JSON.stringify(software)}, desynchronized = ${JSON.stringify(desynchronized)};
         HTMLCanvasElement.prototype.getContext = function(kind, options) {
-          const selected = software && kind === '2d' ? { ...options, willReadFrequently: true, desynchronized: true } : options;
+          const selected = kind === '2d' ? { ...options, ...(software ? { willReadFrequently: true } : {}), ...(desynchronized ? { desynchronized: true } : {}) } : options;
           const context = factory.call(this, kind, selected);
           if (kind === '2d' && pacing.factories.length < 10) pacing.factories.push({ at: stamp(), selected, attributes: context?.getContextAttributes?.() });
           return context;
+        };
+        const every = Uint8Array.prototype.every;
+        Uint8Array.prototype.every = function(...args) {
+          const at = stamp(), result = every.apply(this, args), ms = stamp() - at;
+          if (this.byteLength >= 32768 && ms >= 2 && pacing.comparisons.length < 100) pacing.comparisons.push({ at, bytes: this.byteLength, ms });
+          return result;
         };
         const paint = CanvasRenderingContext2D.prototype.putImageData;
         CanvasRenderingContext2D.prototype.putImageData = function(...args) {
@@ -125,7 +138,7 @@ for (let trial = 1; trial <= 3; trial++) {
     await writeFile(path.join(evidence, `installed-${label}-${trial}.json`), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify({ trial, label, ...report.firstWindow, observedSamples: undefined, audio }));
     assert.doesNotMatch(stderr, /unrecognized flag|Error: illegal value|bad option/i, 'Electron rejected the compiler policy');
-    if (process.env.GBA_INTEL_TRACE_PACING === '1') assert(canvasPacingInstrumentationApplied(report.pacing, process.env.GBA_INTEL_SOFTWARE_CANVAS === '1'), 'Canvas instrumentation missed the committed document/context');
+    if (process.env.GBA_INTEL_TRACE_PACING === '1') assert(canvasPacingInstrumentationApplied(report.pacing, software, desynchronized), 'Canvas instrumentation missed the committed document/context');
   } finally {
     main?.close();player?.close();
     if (child) await terminateChild(child);
@@ -146,5 +159,5 @@ const checks = {
 const functionalPassed = Object.values(checks).every(Boolean);
 const summary = { functionalPassed, checks, publicationApproved: false,
   presentationGatePassed: results.every(result => result.firstWindow.presentationFps >= 55), results };
-await writeFile(path.join(evidence, `installed-${label}.json`), JSON.stringify(summary, null, 2) + '\n');
+await writeFile(path.join(evidence, trialCount === 3 ? `installed-${label}.json` : `installed-${label}-summary-${firstTrial}.json`), JSON.stringify(summary, null, 2) + '\n');
 if (process.env.GBA_INTEL_REQUIRE_PASS === '1') assert(functionalPassed, JSON.stringify(checks));

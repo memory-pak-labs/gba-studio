@@ -372,6 +372,7 @@ jobs:
             'apps/desktop-electron/scripts/diagnose-intel-startup.mjs',
             'apps/desktop-electron/scripts/diagnose-intel-player.cjs',
             'apps/desktop-electron/scripts/diagnose-intel-installed.mjs',
+            'apps/desktop-electron/scripts/trace-intel-canvas.mjs',
             'apps/desktop-electron/scripts/lib/electron-smoke-helpers.mjs',
             'apps/desktop-electron/scripts/lib/electron-smoke-helpers.test.mjs',
             'apps/desktop-electron/scripts/diagnose-macos-display.cjs',
