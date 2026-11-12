@@ -57,6 +57,17 @@ afterEach(() => {
 const start = () => startMGBAPlayer({ container, romUrl: "test.gba", storageKey: "test-state" });
 
 describe("Play resource ownership", () => {
+  it('uses an opaque CPU framebuffer only when requested, with synchronized presentation', async () => {
+    const player = await startMGBAPlayer({ container, romUrl: 'test.gba', storageKey: 'cpu-state', softwareFramebuffer: true });
+    try { expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledWith('2d', { alpha: false, willReadFrequently: true }); }
+    finally { player.destroy(); }
+  });
+  it('retains the default framebuffer for other hosts and Web exports', async () => {
+    const player = await start();
+    try { expect(HTMLCanvasElement.prototype.getContext).toHaveBeenCalledWith('2d', { alpha: false }); }
+    finally { player.destroy(); }
+  });
+
   it("keeps replay SRAM isolated from the user's normal battery store", async () => {
     const fetchRom = fetch.getMockImplementation();
     fetch.mockImplementation(url => String(url).endsWith("mgba-core.manifest.json")

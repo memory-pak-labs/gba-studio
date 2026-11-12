@@ -40,6 +40,7 @@ export interface RomPlayerServerOptions {
   inputReplay?: InputReplay;
   keyboardBindings?: GBAKeyboardBindings;
   desktopBattery?: boolean;
+  softwareFramebuffer?: boolean;
 }
 
 export interface RomPlayerServer {
@@ -78,6 +79,16 @@ export interface OpenRomPlayerWindowResult {
     maximized: boolean;
   };
   error?: string;
+}
+
+// The software GBA framebuffer does not need a GPU canvas backing store.
+// Native Intel's initial GPU synchronization can stall its first frames.
+export function preferSoftwarePlayerFramebuffer(
+  platform: NodeJS.Platform = process.platform,
+  architecture: string = process.arch,
+  translated = false
+): boolean {
+  return platform === "darwin" && architecture === "x64" && !translated;
 }
 
 export function romPlayerBrowserWindowOptions(mainDirectory: string): BrowserWindowConstructorOptions {
@@ -153,7 +164,7 @@ function safePlayerAssetPath(webPlayerRoot: string, requestPath: string): string
     : null;
 }
 
-function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale" | "desktopBattery" | "recordInput" | "recordingLaunch" | "recordingID">): string {
+function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "title" | "inputReplay" | "keyboardBindings" | "locale" | "desktopBattery" | "softwareFramebuffer" | "recordInput" | "recordingLaunch" | "recordingID">): string {
   const query = new URLSearchParams({
     rom: `../roms/${path.basename(options.romPath)}`,
     title: options.title
@@ -162,6 +173,7 @@ function runtimePlayerPath(options: Pick<RomPlayerServerOptions, "romPath" | "ti
   if (options.keyboardBindings) query.set("keyboard", "1");
   if (options.locale) query.set("locale", options.locale);
   if (options.desktopBattery) query.set("desktopBattery", "1");
+  if (options.softwareFramebuffer) query.set("framebuffer", "cpu");
   if (options.recordInput) query.set("recordInput", "1");
   if (options.recordingID) query.set("recordingID", options.recordingID);
   if (options.recordingLaunch) query.set("recordingLaunch", JSON.stringify(options.recordingLaunch));
@@ -534,6 +546,7 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
         if (Number.isInteger(entry.address) && typeof entry.eventID === "string" && typeof entry.stepID === "string") sourceByAddress.set(entry.address, { eventID: entry.eventID, stepID: entry.stepID });
       }
     } catch { /* External ROMs may have no source map. */ }
+    const { BrowserWindow, app } = await import("electron");
     const server = await createRomPlayerServer({
       locale: options.locale,
       romPath,
@@ -542,12 +555,12 @@ export async function openRomPlayerWindow(options: OpenRomPlayerWindowOptions): 
       inputReplay: options.replay,
       keyboardBindings: options.keyboardBindings,
       desktopBattery: !options.replay,
+      softwareFramebuffer: preferSoftwarePlayerFramebuffer(process.platform, process.arch, app.runningUnderARM64Translation),
       recordInput: options.recordInput,
       recordingID: options.recordingID,
       recordingLaunch: options.recordingLaunch
     });
     closeServer = server.close;
-    const { BrowserWindow, app } = await import("electron");
     const window = new BrowserWindow({
       ...romPlayerBrowserWindowOptions(options.mainDirectory),
       title: `Play - ${title}`
