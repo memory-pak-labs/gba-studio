@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom, loadUpdaterQaRelease } from './updater-qa-release-plan.mjs';
+import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom, loadUpdaterQaRelease, validateUpdaterQaFeed } from './updater-qa-release-plan.mjs';
 
 const sha = 'a'.repeat(40);
 const environment = {
@@ -9,6 +9,20 @@ const environment = {
 const release = { tag_name: 'v0.1.0-rc.7', draft: true, target_commitish: sha, created_at: '2026-11-12T00:00:00Z' };
 
 describe('immutable release pair for installed updater QA', () => {
+  const files = ['arm64', 'x64'].map(arch => ({ url: `GBA-Studio-0.1.0-rc.7-macOS-${arch}.zip`, size: 123, sha512: `${arch}-verified-digest` }));
+  const feed = { version: '0.1.0-rc.7', files, path: files[0].url, sha512: files[0].sha512 };
+  it('uses the actual final feed only when both architecture packages match the verified bytes', () => {
+    expect(validateUpdaterQaFeed(feed, '0.1.0-rc.7', files)).toBe(feed);
+  });
+  it.each([
+    { version: '0.1.0-rc.6' }, { files: files.slice(0, 1) },
+    { files: [files[0], files[0]] },
+    { files: [files[0], { ...files[1], size: 124 }] },
+    { files: [files[0], { ...files[1], sha512: 'incorrect' }] },
+    { path: files[1].url }, { sha512: 'incorrect' }
+  ])('rejects stale or incompatible final update metadata: %j', change => {
+    expect(() => validateUpdaterQaFeed({ ...feed, ...change }, '0.1.0-rc.7', files)).toThrow(/feed/i);
+  });
   it('keeps the historical published pair available by default', () => {
     expect(updaterQaReleasePlan({})).toEqual({ sourceVersion: '0.1.0-rc.5', targetVersion: '0.1.0-rc.6', targetDraft: false, targetSha: '' });
   });
