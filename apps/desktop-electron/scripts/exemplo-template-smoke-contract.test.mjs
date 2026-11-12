@@ -1,7 +1,37 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { activeBuildRomPaths, fullProjectRuntimeEvidence, exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline } from "./exemplo-template-smoke-contract.mjs";
+import { activeBuildRomPaths, fullProjectRuntimeEvidence, exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline, intelRemainingFunctionalEvidence } from "./exemplo-template-smoke-contract.mjs";
+
+describe('Intel functional evidence with the original presentation gate retained', () => {
+  const names = ['arena_arrancada','circuito_final','arena_tatica','circuito_perspectiva'];
+  function fixture() {
+    return { ok: false, audit: { ok: false, counts: { expected: 4, passed: 0, failed: 4 },
+      visualGate: { ok: true }, thresholds: { minEmulationFps: 55, minPresentationFps: 55, maxDroppedFrameRatio: 0.1 },
+      issues: names.map(name => `${name}: cadencia do Player fora dos limites esperados.`) },
+      results: names.map(name => ({ name, runtimeState: { frame: 100, audio: { pcmUnderrunCount: 0 } },
+        audio: { audioUnderrunCount: 0 }, performance: { emulationFps: 60, presentationFps: 30, droppedFrameRatio: 0 } })) };
+  }
+  it('records functional checks separately without changing failed raw results or approving publication', () => {
+    const evidence = fixture(), before = JSON.stringify(evidence);
+    const result = intelRemainingFunctionalEvidence(evidence);
+    expect(result).toMatchObject({ functionalPassed: true, presentationGatePassed: false, publicationApproved: false });
+    expect(result.sceneNames).toEqual(names);
+    expect(JSON.stringify(evidence)).toBe(before);
+  });
+  it.each(['pixels','emulation','drop','host-audio','engine-audio','coverage','thresholds','visual'])('rejects a functional failure: %s', failure => {
+    const evidence = fixture();
+    if (failure === 'pixels') evidence.audit.issues.push('circuito_final: pixels opacos do player nao correspondem exatamente ao PNG na ROM.');
+    if (failure === 'emulation') evidence.results[0].performance.emulationFps = 40;
+    if (failure === 'drop') evidence.results[0].performance.droppedFrameRatio = 0.5;
+    if (failure === 'host-audio') evidence.results[0].audio.audioUnderrunCount = 1;
+    if (failure === 'engine-audio') evidence.results[0].runtimeState.audio.pcmUnderrunCount = 1;
+    if (failure === 'coverage') evidence.results.pop();
+    if (failure === 'thresholds') evidence.audit.thresholds.minPresentationFps = 30;
+    if (failure === 'visual') evidence.audit.visualGate.ok = false;
+    expect(intelRemainingFunctionalEvidence(evidence).functionalPassed).toBe(false);
+  });
+});
 
 describe('independent moving-scene pixel baseline', () => {
   const scope = { runtimeKind: 7, currentRoom: 0 };

@@ -23,6 +23,43 @@ export function exemploSceneBuildTimeoutMs(value) {
   return timeout;
 }
 
+// This supplement never changes the original audit, its FPS thresholds, the
+// process exit code, or publication approval. It records which functional
+// assertions completed on the known 30 Hz Intel host.
+export function intelRemainingFunctionalEvidence(evidence) {
+  const expected = ['arena_arrancada', 'circuito_final', 'arena_tatica', 'circuito_perspectiva'];
+  const results = Array.isArray(evidence?.results) ? evidence.results : [];
+  const names = results.map(result => result.name);
+  const issues = Array.isArray(evidence?.audit?.issues) ? evidence.audit.issues : ['Auditoria incompleta'];
+  const nonCadenceIssues = issues.filter(issue => !expected.some(name =>
+    issue === `${name}: cadencia do Player fora dos limites esperados.`));
+  const thresholds = evidence?.audit?.thresholds;
+  const checks = {
+    sceneCoverage: results.length === expected.length && new Set(names).size === expected.length
+      && names.every(name => expected.includes(name)) && evidence?.audit?.counts?.expected === expected.length,
+    thresholdsUnchanged: thresholds?.minEmulationFps === 55 && thresholds?.minPresentationFps === 55
+      && thresholds?.maxDroppedFrameRatio === 0.1,
+    nativeExecution: results.every(result => Number.isFinite(result.runtimeState?.frame) && result.runtimeState.frame >= 8
+      && Number.isFinite(result.performance?.emulationFps) && result.performance.emulationFps >= 55),
+    droppedFrames: results.every(result => Number.isFinite(result.performance?.droppedFrameRatio)
+      && result.performance.droppedFrameRatio >= 0 && result.performance.droppedFrameRatio <= 0.1),
+    audioHealthy: results.every(result => result.audio?.audioUnderrunCount === 0
+      && result.runtimeState?.audio?.pcmUnderrunCount === 0),
+    visualGate: evidence?.audit?.visualGate?.ok === true,
+    remainingAssertions: nonCadenceIssues.length === 0
+  };
+  return { scope: 'four unfinished Intel scenes; original full audit retained',
+    functionalPassed: Object.values(checks).every(Boolean), checks, nonCadenceIssues,
+    presentationGatePassed: checks.sceneCoverage && checks.thresholdsUnchanged && checks.nativeExecution && checks.droppedFrames && results.every(result =>
+      Number.isFinite(result.performance?.presentationFps) && result.performance.presentationFps >= 55),
+    strictAuditPassed: evidence?.ok === true && evidence?.audit?.ok === true,
+    publicationApproved: false, sceneNames: names,
+    scenes: results.map(result => ({ name: result.name,
+      emulationFps: result.performance?.emulationFps, presentationFps: result.performance?.presentationFps,
+      droppedFrameRatio: result.performance?.droppedFrameRatio,
+      hostAudioUnderruns: result.audio?.audioUnderrunCount, enginePcmUnderruns: result.runtimeState?.audio?.pcmUnderrunCount })) };
+}
+
 // Autonomous actors can leave the viewport or blink after damage during the
 // uninterrupted cadence window. Audit their authored initial pixels in a
 // separate real startup, never by replacing cadence samples or masking pixels.

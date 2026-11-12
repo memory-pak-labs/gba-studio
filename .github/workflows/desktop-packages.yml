@@ -39,7 +39,7 @@ on:
       updater_qa_native_platform:
         description: 'Native updater host to validate; all retains the existing platform selection'
         type: choice
-        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display]
+        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display, macos-intel-remaining]
         default: all
       updater_qa_scene_build_timeout_ms:
         description: 'Bounded cold scene export wait (300000-900000 ms); ROM performance checks remain unchanged'
@@ -306,7 +306,7 @@ jobs:
           retention-days: 7
 
   published-updater-qa:
-    name: Published updater QA (${{ matrix.platform }})
+    name: ${{ inputs.updater_qa_native_platform == 'macos-intel-remaining' && 'Intel remaining scenes (55 FPS gate retained)' || format('Published updater QA ({0})', matrix.platform) }}
     if: inputs.updater_qa_published && inputs.updater_qa_native_platform != 'macos-intel-display'
     # GitHub hides drafts from contents:read tokens. This manual QA job reads
     # the pinned draft and its assets; it contains no release publication steps.
@@ -321,7 +321,7 @@ jobs:
       matrix:
         include: >-
           ${{ fromJSON(
-            inputs.updater_qa_native_platform == 'macos-intel' && '[{"platform":"macos-intel","runner":"macos-15-intel","architecture":"x64"}]' ||
+            (inputs.updater_qa_native_platform == 'macos-intel' || inputs.updater_qa_native_platform == 'macos-intel-remaining') && '[{"platform":"macos-intel","runner":"macos-15-intel","architecture":"x64"}]' ||
             inputs.updater_qa_native_platform == 'macos-arm64' && '[{"platform":"macos-arm64","runner":"macos-15","architecture":"arm64"}]' ||
             (inputs.updater_qa_native_platform == 'linux' || (inputs.updater_qa_native_platform == 'all' && inputs.updater_qa_platform == 'linux')) && '[{"platform":"linux","runner":"ubuntu-24.04","architecture":"x64"}]' ||
             (inputs.updater_qa_native_platform == 'windows' || (inputs.updater_qa_native_platform == 'all' && inputs.updater_qa_platform == 'windows')) && '[{"platform":"windows","runner":"windows-2022","architecture":"x64"}]' ||
@@ -337,6 +337,7 @@ jobs:
       GBA_UPDATER_QA_TARGET_DRAFT: ${{ inputs.updater_qa_target_draft && '1' || '0' }}
       GBA_UPDATER_QA_TARGET_SHA: ${{ inputs.updater_qa_target_sha }}
       GBA_STUDIO_EXEMPLO_SCENE_BUILD_TIMEOUT_MS: ${{ inputs.updater_qa_scene_build_timeout_ms }}
+      GBA_UPDATER_QA_SCENE_SCOPE: ${{ inputs.updater_qa_native_platform == 'macos-intel-remaining' && 'intel-remaining' || 'full' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -400,9 +401,10 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
-          import { readFileSync, mkdirSync } from 'node:fs';
+          import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
           import path from 'node:path';
           import { spawnSync } from 'node:child_process';
+          import { intelRemainingFunctionalEvidence } from './scripts/exemplo-template-smoke-contract.mjs';
           const root = process.env.GBA_UPDATER_QA_ROOT;
           const fixture = JSON.parse(readFileSync(path.join(root, 'fixture.json'), 'utf8'));
           let app = process.platform === 'darwin' ? path.dirname(path.dirname(path.dirname(fixture.sourceExecutable)))
@@ -417,6 +419,8 @@ jobs:
             assert.equal(unpack.status, 0, 'Extract the exact installed AppImage for offline validation');
             app = path.join(extraction, 'squashfs-root', 'gba-studio');
           }
+          const sceneContinuation = process.env.GBA_UPDATER_QA_SCENE_SCOPE === 'intel-remaining';
+          assert(!sceneContinuation || (process.platform === 'darwin' && process.arch === 'x64'), 'Continuation requires native Intel');
           const env = { ...process.env, GBA_STUDIO_PACKAGED_APP_PATH: app, GBA_STUDIO_OFFLINE_SMOKE: '1',
             APPIMAGE_EXTRACT_AND_RUN: '1', ELECTRON_DISABLE_SANDBOX: '1',
             ...(process.platform === 'darwin' ? {
@@ -425,12 +429,22 @@ jobs:
             GBA_STUDIO_EXEMPLO_TEMPLATE_OUTPUT: path.join(root, 'evidence', 'installed-template'),
             GBA_STUDIO_EXEMPLO_SCENES_OUTPUT: path.join(root, 'evidence', 'installed-scenes') };
           const scripts = [ ...(process.platform === 'darwin' ? ['smoke-macos-app-bundle.mjs'] : []),
-            'smoke-electron-welcome.mjs', 'smoke-electron-exemplo-template.mjs', 'smoke-electron-exemplo-scenes.mjs' ];
+            ...(sceneContinuation ? ['smoke-electron-exemplo-scenes.mjs']
+              : ['smoke-electron-welcome.mjs', 'smoke-electron-exemplo-template.mjs', 'smoke-electron-exemplo-scenes.mjs']) ];
           for (const script of scripts) {
             env.GBA_STUDIO_SMOKE_OUTPUT_DIR = path.join(root, 'evidence', script.replace('.mjs', ''));
             const command = process.platform === 'linux' ? 'xvfb-run' : process.execPath;
-            const args = [...(process.platform === 'linux' ? ['-a', process.execPath] : []), `scripts/${script}`, '--packaged'];
+            const args = [...(process.platform === 'linux' ? ['-a', process.execPath] : []), `scripts/${script}`, '--packaged',
+              ...(sceneContinuation && script === 'smoke-electron-exemplo-scenes.mjs'
+                ? ['--scenes=arena_arrancada,circuito_final,arena_tatica,circuito_perspectiva'] : [])];
             const result = spawnSync(command, args, { env, stdio: 'inherit' });
+            if (sceneContinuation && script === 'smoke-electron-exemplo-scenes.mjs') {
+              const evidence = JSON.parse(readFileSync(path.join(env.GBA_STUDIO_EXEMPLO_SCENES_OUTPUT, 'exemplo_scene_playtest_evidence.json'), 'utf8'));
+              const summary = { ...intelRemainingFunctionalEvidence(evidence), candidateCommit: process.env.GBA_UPDATER_QA_TARGET_SHA,
+                rawSmokeExitCode: result.status };
+              writeFileSync(path.join(root, 'evidence', 'intel-remaining-functional.json'), JSON.stringify(summary, null, 2) + '\n');
+              console.log(JSON.stringify(summary, null, 2));
+            }
             assert.equal(result.status, 0, `${script} failed: ${result.error ?? result.signal ?? result.status}`);
           }
           JS

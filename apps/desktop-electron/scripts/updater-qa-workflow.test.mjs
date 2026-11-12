@@ -15,6 +15,17 @@ function nativeHosts(platform = 'both', nativePlatform = 'all') {
 }
 
 describe('installed updater QA workflow', () => {
+  it('resumes the four unfinished Intel scenes without repeating the full authoring project or approving cadence', () => {
+    expect(nativeHosts('both', 'macos-intel-remaining').map(item => item.platform)).toEqual(['macos-intel']);
+    const step = workflow.jobs['published-updater-qa'].steps.find(item => item.name === 'Validate updated installed editor and ROM on the native host');
+    const expression = step.run.match(/const scripts = ([\s\S]*?);\n\s*for/)[1];
+    expect(runInNewContext(`(${expression})`, { process: { platform: 'darwin' }, sceneContinuation: true }))
+      .toEqual(['smoke-macos-app-bundle.mjs', 'smoke-electron-exemplo-scenes.mjs']);
+    expect(step.run).toContain('--scenes=arena_arrancada,circuito_final,arena_tatica,circuito_perspectiva');
+    expect(step.run).toContain('intelRemainingFunctionalEvidence');
+    expect(step.run).toContain('assert.equal(result.status, 0');
+    expect(workflow.jobs['published-updater-qa'].name).toContain('55 FPS');
+  });
   it('runs the read-only Intel display probe through the existing registered workflow', () => {
     expect(workflow.on.workflow_dispatch.inputs.updater_qa_native_platform.options).toContain('macos-intel-display');
     expect(workflow.jobs['published-updater-qa'].if).toContain("inputs.updater_qa_native_platform != 'macos-intel-display'");
