@@ -2,6 +2,9 @@ name: Native Intel Arena cold-start regression
 on:
   workflow_call:
     inputs:
+      full_export:
+        type: boolean
+        default: false
       trace_pacing:
         type: boolean
         default: false
@@ -12,13 +15,13 @@ on:
         required: true
         type: string
 permissions:
-  contents: read
+  contents: write
   actions: read
 jobs:
   arena:
     name: Intel cold emulation and PCM (30 Hz display)
     runs-on: macos-15-intel
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.full_export && 45 || 20 }}
     env:
       GBA_INTEL_SOURCE_SHA: ${{ inputs.product_sha }}
     defaults:
@@ -77,7 +80,18 @@ jobs:
           assert.equal(sha(`${root}/rom/arena_arrancada.gba`), original.romHash);
           assert.equal(sha('static/WebPlayer/player/mgba-core.wasm'), original.coreHash);
           execFileSync('git', ['diff', '--exit-code', original.candidate, 'HEAD', '--',
-            '../../packages/GBAStudioEngine', 'static', 'default-assets', 'src/shared', 'src/renderer'], { stdio: 'pipe' });
+            '../../packages/GBAStudioEngine', 'default-assets', 'src/shared', 'src/renderer'], { stdio: 'pipe' });
+          const changedStatic = execFileSync('git', ['diff', '--name-only', original.candidate, 'HEAD', '--', 'static'], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
+          const framebufferFiles = new Set(['apps/desktop-electron/static/WebPlayer/player/mgba-direct-player.mjs', 'apps/desktop-electron/static/WebPlayer/player/runtime.html']);
+          assert(changedStatic.every(file => framebufferFiles.has(file)), 'Unexpected static or audio changes');
+          const oldPlayer = execFileSync('git', ['show', `${original.candidate}:apps/desktop-electron/static/WebPlayer/player/mgba-direct-player.mjs`], { encoding: 'utf8' });
+          const currentPlayer = readFileSync('static/WebPlayer/player/mgba-direct-player.mjs', 'utf8');
+          const audioSection = text => {
+            const start = text.indexOf('    const AudioContext =');
+            const end = text.indexOf('    const inspectAudioRegisters =', start);
+            assert(start >= 0 && end > start);return text.slice(start, end);
+          };
+          assert.equal(audioSection(currentPlayer), audioSection(oldPlayer), 'Native audio processing must remain byte-for-byte unchanged');
           const provenance = { sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
             driverCommit: process.env.GITHUB_SHA, originalCandidate: original.candidate, romHash: original.romHash, coreHash: original.coreHash,
             platform: process.platform, architecture: process.arch, audioModified: false, publicationApproved: false };
@@ -97,7 +111,33 @@ jobs:
           GBA_INTEL_APP: ${{ github.workspace }}/product/apps/desktop-electron
           GBA_INTEL_LABEL: fixed-source
           GBA_INTEL_REQUIRE_PASS: '1'
+          GBA_INTEL_EXPECT_SOFTWARE: '1'
         run: node "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/scripts/diagnose-intel-installed.mjs"
+      # Draft reads require contents:write; this manual job never publishes.
+      - name: Verify frozen embedded export resources
+        if: inputs.full_export
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.intel-export-resources
+          GBA_UPDATER_QA_SOURCE_VERSION: 0.1.0-rc.6
+          GBA_UPDATER_QA_TARGET_VERSION: 0.1.0-rc.7
+          GBA_UPDATER_QA_TARGET_DRAFT: '1'
+          GBA_UPDATER_QA_TARGET_SHA: 094f23a906474f750ed7cf499683198d46f864bf
+        run: |
+          ln -s "$GITHUB_WORKSPACE/product/apps/desktop-electron/node_modules" "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/node_modules"
+          node "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/scripts/prepare-published-updater-qa.mjs"
+      - name: Export and play Arena from the exact fixed source
+        if: inputs.full_export
+        env:
+          GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.intel-arena
+          GBA_STUDIO_EXEMPLO_APP_ROOT: ${{ github.workspace }}/product/apps/desktop-electron
+          GBA_STUDIO_ENGINE_PACK_DIR: ${{ github.workspace }}/.intel-export-resources/reference/gba-studio.app/Contents/Resources/EnginePack/GBAStudioEnginePack
+          GBA_STUDIO_EXEMPLO_SCENES_OUTPUT: ${{ github.workspace }}/.intel-arena/evidence/full-export
+          GBA_STUDIO_EXEMPLO_SCENE_BUILD_TIMEOUT_MS: '900000'
+          GBA_STUDIO_OFFLINE_SMOKE: '1'
+          GBA_STUDIO_TRACE_SCENE_SMOKE: '1'
+        run: |
+          node "$GITHUB_WORKSPACE/qa-driver/apps/desktop-electron/scripts/verify-intel-source-export.mjs"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -106,5 +146,6 @@ jobs:
             .intel-arena/evidence/fixed-source.json
             .intel-arena/evidence/installed-*.json
             .intel-arena/evidence/counterbalanced-*.json
+            .intel-arena/evidence/full-export/
           if-no-files-found: error
           retention-days: 7

@@ -19,7 +19,8 @@ describe('installed updater QA workflow', () => {
     expect(workflow.jobs['published-updater-qa'].if).toContain("inputs.updater_qa_native_platform != 'macos-intel-fixed'");
     expect(workflow.jobs['intel-fixed-qa'].uses).toBe('./.github/workflows/intel-arena-regression.yml');
     const regression = require('js-yaml').load(readFileSync(new URL('../../../.github/workflows/intel-arena-regression.yml', import.meta.url), 'utf8'));
-    expect(regression.permissions).toEqual({ contents: 'read', actions: 'read' });
+    expect(regression.permissions).toEqual({ contents: 'write', actions: 'read' });
+    expect(regression.jobs.arena.steps.find(step => step.name === 'Verify frozen embedded export resources').if).toBe('inputs.full_export');
     const checkouts = regression.jobs.arena.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
     expect(checkouts.map(step => step.with.path)).toEqual(['qa-driver', 'product']);
     expect(checkouts[1].with.ref).toBe('${{ inputs.product_sha }}');

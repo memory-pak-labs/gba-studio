@@ -98,7 +98,8 @@ import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.m
 import { readPlayerPlaybackReadiness } from "./player-playback-readiness.mjs";
 import { createTemporarySmokeWorkspace } from "./lib/temporary-smoke-workspace.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const appRoot = process.env.GBA_STUDIO_EXEMPLO_APP_ROOT
+  ? resolve(process.env.GBA_STUDIO_EXEMPLO_APP_ROOT) : dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalTemplatePath = join(appRoot, "default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project");
 const canonicalTemplateProject = JSON.parse(readFileSync(canonicalTemplatePath, "utf8"));
 const canonicalTemplateAssetsByName = new Map(

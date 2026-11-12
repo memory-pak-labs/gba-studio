@@ -130,10 +130,12 @@ for (let trial = firstTrial; trial < firstTrial + trialCount; trial++) {
     const first = samples.filter(sample => sample.runtimeState?.frame >= 8).slice(0, 4);
     const steady = first.slice(1);
     const mean = key => steady.reduce((sum, sample) => sum + sample[key], 0) / steady.length;
+    const pacing = process.env.GBA_INTEL_TRACE_PACING === '1' ? await evaluate(player, 'window.__gbaPacing') : undefined;
+    const contextAttributes = await evaluate(player, 'window.GBAStudioDirectPlayer.canvas.getContext("2d").getContextAttributes()');
     const report = { trial, flags, label, samples, firstWindow: {
       emulationFps: mean('emulationFps'), presentationFps: mean('presentationFps'),
       droppedFrameRatio: mean('droppedFrameRatio'), emulationMs: mean('emulationMs'), observedSamples: first },
-      audio, stderr, pacing: process.env.GBA_INTEL_TRACE_PACING === '1' ? await evaluate(player, 'window.__gbaPacing') : undefined, romHash: createHash('sha256').update(await readFile(rom)).digest('hex') };
+      audio, stderr, contextAttributes, pacing, romHash: createHash('sha256').update(await readFile(rom)).digest('hex') };
     results.push(report);
     await writeFile(path.join(evidence, `installed-${label}-${trial}.json`), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify({ trial, label, ...report.firstWindow, observedSamples: undefined, audio }));
@@ -156,6 +158,8 @@ const checks = {
   outputAudio: results.every(result => result.audio?.state === 'running'
     && result.audio.emittedNonSilentSamples > 0 && result.audio.audioUnderrunCount === 0)
 };
+if (process.env.GBA_INTEL_EXPECT_SOFTWARE === '1') checks.synchronizedCpuFramebuffer = results.every(result =>
+  result.contextAttributes?.alpha === false && result.contextAttributes.willReadFrequently === true && result.contextAttributes.desynchronized === false);
 const functionalPassed = Object.values(checks).every(Boolean);
 const summary = { functionalPassed, checks, publicationApproved: false,
   presentationGatePassed: results.every(result => result.firstWindow.presentationFps >= 55), results };
