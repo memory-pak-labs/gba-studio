@@ -39,7 +39,7 @@ on:
       updater_qa_native_platform:
         description: 'Native updater host to validate; all retains the existing platform selection'
         type: choice
-        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display, macos-intel-remaining]
+        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display, macos-intel-remaining, macos-intel-startup]
         default: all
       updater_qa_scene_build_timeout_ms:
         description: 'Bounded cold scene export wait (300000-900000 ms); ROM performance checks remain unchanged'
@@ -307,7 +307,7 @@ jobs:
 
   published-updater-qa:
     name: ${{ inputs.updater_qa_native_platform == 'macos-intel-remaining' && 'Intel remaining scenes (55 FPS gate retained)' || format('Published updater QA ({0})', matrix.platform) }}
-    if: inputs.updater_qa_published && inputs.updater_qa_native_platform != 'macos-intel-display'
+    if: inputs.updater_qa_published && inputs.updater_qa_native_platform != 'macos-intel-display' && inputs.updater_qa_native_platform != 'macos-intel-startup'
     # GitHub hides drafts from contents:read tokens. This manual QA job reads
     # the pinned draft and its assets; it contains no release publication steps.
     permissions:
@@ -460,3 +460,10 @@ jobs:
   display-qa:
     if: inputs.updater_qa_native_platform == 'macos-intel-display'
     uses: ./.github/workflows/native-display-qa.yml
+
+  intel-startup-qa:
+    if: inputs.updater_qa_native_platform == 'macos-intel-startup'
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/intel-startup-qa.yml

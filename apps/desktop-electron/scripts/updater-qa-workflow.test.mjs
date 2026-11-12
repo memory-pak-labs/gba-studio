@@ -15,6 +15,16 @@ function nativeHosts(platform = 'both', nativePlatform = 'all') {
 }
 
 describe('installed updater QA workflow', () => {
+  it('isolates Intel cold startup without running or altering the release gate', () => {
+    expect(workflow.on.workflow_dispatch.inputs.updater_qa_native_platform.options).toContain('macos-intel-startup');
+    expect(workflow.jobs['published-updater-qa'].if).toContain("inputs.updater_qa_native_platform != 'macos-intel-startup'");
+    expect(workflow.jobs['intel-startup-qa'].uses).toBe('./.github/workflows/intel-startup-qa.yml');
+    const diagnostic = require('js-yaml').load(readFileSync(new URL('../../../.github/workflows/intel-startup-qa.yml', import.meta.url), 'utf8'));
+    expect(diagnostic.jobs.diagnose['runs-on']).toBe('macos-15-intel');
+    expect(diagnostic.jobs.diagnose.env.GBA_UPDATER_QA_TARGET_SHA).toBe('094f23a906474f750ed7cf499683198d46f864bf');
+    expect(diagnostic.jobs.diagnose.steps.at(-1).with['retention-days']).toBeLessThanOrEqual(3);
+  });
+
   it('resumes the four unfinished Intel scenes without repeating the full authoring project or approving cadence', () => {
     expect(nativeHosts('both', 'macos-intel-remaining').map(item => item.platform)).toEqual(['macos-intel']);
     const step = workflow.jobs['published-updater-qa'].steps.find(item => item.name === 'Validate updated installed editor and ROM on the native host');

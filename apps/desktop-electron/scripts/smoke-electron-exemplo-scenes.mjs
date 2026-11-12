@@ -5,7 +5,7 @@ import { findIsometricRoute, isometricDirectionButtons } from "./exemplo-isometr
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -5732,6 +5732,14 @@ async function main() {
         currentRoom: Number(launchContract.currentRoom)
       };
       const performance = await waitForPerformance(mainCdp, knownWindowIDs, cadenceScope);
+      // Retain only the exact compiled ROM for bounded cold-start diagnostics.
+      // This copy does not run game frames or alter the measured window.
+      if (process.env.GBA_STUDIO_DIAGNOSTIC_ROM_OUTPUT) {
+        const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
+        if (roms.length !== 1) throw new Error("Ambiguous diagnostic ROM");
+        await mkdir(process.env.GBA_STUDIO_DIAGNOSTIC_ROM_OUTPUT, { recursive: true });
+        await copyFile(roms[0], join(process.env.GBA_STUDIO_DIAGNOSTIC_ROM_OUTPUT, `${scene.name}.gba`));
+      }
       traceSceneSmoke(scene.name, "performance-ready");
       knownWindowIDs.add(performance.windowID);
       const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
