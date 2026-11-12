@@ -1,3 +1,4 @@
+import { canvasPacingInstrumentationApplied } from './exemplo-template-smoke-contract.mjs';
 // Cold starts through the real desktop app/IPC/battery path (installed or built source). No ROM rebuild,
 // debugger profiler, hidden frames, warmup, or substitutions of early samples.
 import assert from 'node:assert/strict';
@@ -70,6 +71,7 @@ for (let trial = 1; trial <= 3; trial++) {
     const playerTarget = await waitUntil(async () => (await targets()).find(target => target.type === 'page' && target.url.includes('/player/runtime.html')), 'Player');
     player = cdpSession(playerTarget.webSocketDebuggerUrl);await player.ready;
     if (process.env.GBA_INTEL_TRACE_PACING === '1') {
+      await waitUntil(async () => evaluate(player, "location.pathname.endsWith('/player/runtime.html') && Boolean(document.querySelector('#runtime-game'))"), 'committed Player document before instrumenting');
       await evaluate(player, `(() => {
         const pacing = window.__gbaPacing = { startedAt: performance.timeOrigin + performance.now(),
           paint: [], timerGaps: [], rafGaps: [], longTasks: [], factories: [] };
@@ -123,6 +125,7 @@ for (let trial = 1; trial <= 3; trial++) {
     await writeFile(path.join(evidence, `installed-${label}-${trial}.json`), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify({ trial, label, ...report.firstWindow, observedSamples: undefined, audio }));
     assert.doesNotMatch(stderr, /unrecognized flag|Error: illegal value|bad option/i, 'Electron rejected the compiler policy');
+    if (process.env.GBA_INTEL_TRACE_PACING === '1') assert(canvasPacingInstrumentationApplied(report.pacing, process.env.GBA_INTEL_SOFTWARE_CANVAS === '1'), 'Canvas instrumentation missed the committed document/context');
   } finally {
     main?.close();player?.close();
     if (child) await terminateChild(child);

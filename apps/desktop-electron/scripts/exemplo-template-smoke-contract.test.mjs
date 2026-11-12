@@ -237,3 +237,15 @@ describe("Exemplo template full-project smoke contract", () => {
     expect(source).toContain("animations: template.animations");
   });
 });
+
+import { canvasPacingInstrumentationApplied } from './exemplo-template-smoke-contract.mjs';
+it('rejects lost or unapplied canvas diagnostics instead of accepting an unmodified comparison', () => {
+  const valid = { startedAt: 123, factories: [{ selected: { alpha: false }, attributes: { alpha: false, willReadFrequently: false } }] };
+  expect(canvasPacingInstrumentationApplied(undefined)).toBe(false);
+  expect(canvasPacingInstrumentationApplied({ ...valid, factories: [] })).toBe(false);
+  expect(canvasPacingInstrumentationApplied(valid)).toBe(true);
+  expect(canvasPacingInstrumentationApplied(valid, true)).toBe(false);
+  const software = { ...valid, factories: [{ selected: { willReadFrequently: true }, attributes: { alpha: false, willReadFrequently: true } }] };
+  expect(canvasPacingInstrumentationApplied(software, true)).toBe(true);
+  expect(canvasPacingInstrumentationApplied({ ...software, factories: [{ ...software.factories[0], attributes: { alpha: false, willReadFrequently: false } }] }, true)).toBe(false);
+});
