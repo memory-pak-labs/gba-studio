@@ -36,11 +36,13 @@ app.whenReady().then(async () => {
       romUrl: '/rom.gba', storageKey: 'diagnostic-cold', onFrameStats: stats => {
         samples.push(stats); if (samples.length === 20) complete();
       } });
+    // Activate the same native PCM path as a real click, before any game RAF.
+    player.canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     const readyMs = performance.now() - started;
     await Promise.race([done, new Promise((_, reject) => setTimeout(() => reject(new Error('Missing cadence samples')), 45000))]);
     return { readyMs, samples, audio: player.inspectAudio(), runtime: player.inspectRuntime(),
       frame: player.inspectFrame() };
-  })()`);
+  })()`, true);
   const first = result.samples.filter(sample => sample.runtimeState?.frame >= 8).slice(0, 4);
   if (first.length !== 4) throw new Error('Missing first measured window');
   const steady = first.slice(1);

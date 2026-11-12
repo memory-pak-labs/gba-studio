@@ -35,12 +35,15 @@ const policies = [
 ];
 // Reverse the second round to reduce order/host drift; each process/profile is new.
 const results = [];
+const nativeEnv = { ...process.env };
+delete nativeEnv.ELECTRON_RUN_AS_NODE;
+delete nativeEnv.ATOM_SHELL_INTERNAL_RUN_AS_NODE;
 for (let round = 0; round < 2; round++) {
   for (const [policy, flags] of round ? [...policies].reverse() : policies) {
     const id = `${round + 1}-${policy}`;
     const output = path.join(evidence, `${id}.json`);
     const run = spawnSync(path.resolve('node_modules/.bin/electron'), ['scripts/diagnose-intel-player.cjs'], {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '', GBA_INTEL_ROM: rom, GBA_INTEL_WEB_ROOT: webRoot,
+      env: { ...nativeEnv, GBA_INTEL_ROM: rom, GBA_INTEL_WEB_ROOT: webRoot,
         GBA_INTEL_FLAGS: flags, GBA_INTEL_OUTPUT: output, GBA_INTEL_PROFILE: path.join(root, 'profiles', id) },
       stdio: 'inherit', timeout: 90_000
     });
