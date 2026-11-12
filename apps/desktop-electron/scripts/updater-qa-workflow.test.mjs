@@ -30,4 +30,16 @@ describe('installed updater QA workflow', () => {
     expect(qa.steps.map(step => step.run).filter(Boolean).join('\n')).toContain('scripts/prepare-published-updater-qa.mjs');
     expect(qa.steps.find(step => step.name === 'Upload updater evidence').with.path).toMatch(/\/evidence\/$/);
   });
+  it('pins unpublished candidates without granting release publication permissions', () => {
+    const inputs = workflow.on.workflow_dispatch.inputs;
+    expect(Object.keys(inputs).length).toBeLessThanOrEqual(10);
+    expect(inputs.updater_qa_source_version.default).toBe('0.1.0-rc.6');
+    expect(inputs.updater_qa_target_version.default).toBe('0.1.0-rc.7');
+    expect(inputs.updater_qa_target_draft.default).toBe(false);
+    const qa = workflow.jobs['published-updater-qa'];
+    expect(qa.env.GBA_UPDATER_QA_TARGET_SHA).toContain('inputs.updater_qa_target_sha');
+    expect(qa.env.GBA_UPDATER_QA_TARGET_DRAFT).toContain('inputs.updater_qa_target_draft');
+    expect(workflow.permissions.contents).toBe('read');
+    expect(qa.steps.some(step => /gh release (create|edit|upload)/.test(step.run ?? ''))).toBe(false);
+  });
 });

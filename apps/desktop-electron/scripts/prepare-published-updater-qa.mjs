@@ -1,19 +1,20 @@
 import { execFile } from 'node:child_process';
 import { createHash, X509Certificate } from 'node:crypto';
-import { createReadStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:https';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { updaterQaReleasePlan, validateUpdaterQaRelease, updaterQaAtom } from './updater-qa-release-plan.mjs';
 
 const run = promisify(execFile);
 const repo = 'memory-pak-labs/gba-studio';
 const github = `https://github.com/${repo}/releases`;
 const releasePath = `/${repo}/releases`;
-const version = '0.1.0-rc.5';
-const targetVersion = '0.1.0-rc.6';
 export const macBundleFiles = ['MacOS/gba-studio', 'Resources/app.asar', 'CodeResources'];
 
 export async function verifyPublishedMacBundle(app) {
@@ -39,7 +40,7 @@ async function hashFile(file, algorithm, encoding) {
   return hash.digest(encoding);
 }
 
-async function releaseMetadata(tag) {
+async function releaseMetadata(tag, plan, role) {
   const token = process.env.GH_TOKEN;
   const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/v${tag}`, {
     redirect: 'error',
@@ -47,21 +48,27 @@ async function releaseMetadata(tag) {
   });
   if (!response.ok) throw new Error(`GitHub release v${tag} returned ${response.status}`);
   const release = await response.json();
-  if (release.draft || release.tag_name !== `v${tag}`) throw new Error(`Expected published v${tag}`);
-  return release;
+  return validateUpdaterQaRelease(release, plan, role);
 }
 
 function assetFor(release, name) {
   const asset = release.assets.find(item => item.name === name && item.state === 'uploaded');
   const expectedUrl = `${github}/download/${release.tag_name}/${name}`;
-  if (!asset || asset.browser_download_url !== expectedUrl || !/^sha256:[a-f0-9]{64}$/.test(asset.digest)) {
+  if (!asset || (!release.draft && asset.browser_download_url !== expectedUrl) || !/^sha256:[a-f0-9]{64}$/.test(asset.digest)) {
     throw new Error(`Missing published asset with checksum: ${name}`);
   }
   return asset;
 }
 
-async function fetchPackage(asset, file) {
-  await run('curl', ['-q', '--fail', '--location', '--retry', '3', '--output', file, asset.browser_download_url]);
+async function fetchPackage(asset, file, draft = false) {
+  if (draft) {
+    if (!process.env.GH_TOKEN || !Number.isSafeInteger(asset.id) || asset.id <= 0) throw new Error('Authenticated draft asset ID is required');
+    const response = await fetch(`https://api.github.com/repos/${repo}/releases/assets/${asset.id}`, {
+      headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/octet-stream', 'X-GitHub-Api-Version': '2022-11-28' }
+    });
+    if (!response.ok || !response.body) throw new Error(`Draft asset download returned ${response.status}`);
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(file));
+  } else await run('curl', ['-q', '--fail', '--location', '--retry', '3', '--output', file, asset.browser_download_url]);
   const sha256 = await hashFile(file, 'sha256', 'hex');
   if (`sha256:${sha256}` !== asset.digest || (await stat(file)).size !== asset.size) {
     throw new Error(`Published package failed verification: ${asset.name}`);
@@ -74,6 +81,8 @@ async function prepare() {
   const root = path.resolve(process.env.GBA_UPDATER_QA_ROOT);
   const platform = process.platform;
   const architecture = process.arch;
+  const plan = updaterQaReleasePlan();
+  const { sourceVersion: version, targetVersion, targetDraft } = plan;
   const packageName = {
     'win32-x64': release => `GBA.Studio.Setup.${release}.exe`,
     'linux-x64': release => `GBA-Studio-${release}-linux-x86_64.AppImage`,
@@ -82,21 +91,21 @@ async function prepare() {
   }[`${platform}-${architecture}`];
   if (!packageName) throw new Error(`Unsupported updater QA host: ${platform}-${architecture}`);
   await mkdir(root, { recursive: true });
-  const [previous, candidate] = await Promise.all([releaseMetadata(version), releaseMetadata(targetVersion)]);
+  const [previous, candidate] = await Promise.all([releaseMetadata(version, plan, 'source'), releaseMetadata(targetVersion, plan, 'target')]);
   const sourceAsset = assetFor(previous, packageName(version));
   const targetAsset = assetFor(candidate, packageName(targetVersion));
   const source = path.join(root, sourceAsset.name);
   const targetInstaller = path.join(root, targetAsset.name);
-  const [sourceFile, targetFile] = await Promise.all([fetchPackage(sourceAsset, source), fetchPackage(targetAsset, targetInstaller)]);
+  const [sourceFile, targetFile] = await Promise.all([fetchPackage(sourceAsset, source), fetchPackage(targetAsset, targetInstaller, targetDraft)]);
   const targetFiles = [targetFile];
   if (platform === 'darwin') {
     // Use the same two-architecture feed that will be published if QA passes.
     const otherArch = architecture === 'arm64' ? 'x64' : 'arm64';
     const other = assetFor(candidate, `GBA-Studio-${targetVersion}-macOS-${otherArch}.zip`);
-    targetFiles.push(await fetchPackage(other, path.join(root, other.name)));
+    targetFiles.push(await fetchPackage(other, path.join(root, other.name), targetDraft));
     targetFiles.sort((a, b) => a.url.localeCompare(b.url));
   }
-  const checks = ['Verified the exact published RC5 and RC6 package bytes'];
+  const checks = [`Verified exact ${version} published source and ${targetVersion} ${targetDraft ? 'draft candidate' : 'published target'} package bytes`];
   let sourceExecutable;
   let targetBundleHashes;
   if (platform === 'win32') {
@@ -111,7 +120,7 @@ async function prepare() {
     for (const [index, archive] of [source, targetInstaller].entries()) {
       await run('/usr/bin/ditto', ['-x', '-k', archive, bundles[index]]);
       const app = path.join(bundles[index], 'gba-studio.app');
-      checks.push(`${index === 0 ? 'RC5' : 'RC6'}: ${await verifyPublishedMacBundle(app)}`);
+      checks.push(`${index === 0 ? version : targetVersion}: ${await verifyPublishedMacBundle(app)}`);
     }
     sourceExecutable = path.join(bundles[0], 'gba-studio.app', 'Contents', 'MacOS', 'gba-studio');
     const contents = path.join(bundles[1], 'gba-studio.app', 'Contents');
@@ -120,12 +129,12 @@ async function prepare() {
   }
   const atom = await fetch(`${github}.atom`);
   if (!atom.ok) throw new Error(`Published GitHub Atom feed returned ${atom.status}`);
-  const xml = await atom.text();
-  if (!xml.includes(`/tag/v${targetVersion}`)) throw new Error('Published RC6 absent from the GitHub Atom feed');
+  const xml = updaterQaAtom(await atom.text(), candidate, plan);
   await writeFile(path.join(root, 'github-releases.atom'), xml);
   await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=github.com',
     '-addext', 'subjectAltName=DNS:github.com,DNS:api.github.com', '-keyout', 'qa-key.pem', '-out', 'qa-cert.pem'], { cwd: root });
-  const fixture = { published: true, platform, architecture, version, targetVersion, sourceExecutable,
+  const fixture = { published: !targetDraft, githubProvider: true, candidateDraft: targetDraft,
+    sourceCommit: previous.target_commitish, targetCommit: candidate.target_commitish, platform, architecture, version, targetVersion, sourceExecutable,
     sourceFile, targetFile, targetFiles, targetInstaller, targetBundleHashes, releaseDate: candidate.created_at, checks, port: 9758 };
   await writeFile(path.join(root, 'fixture.json'), JSON.stringify(fixture, null, 2));
 }

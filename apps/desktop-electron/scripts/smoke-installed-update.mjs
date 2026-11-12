@@ -33,7 +33,7 @@ const targetSize = (await stat(fixture.targetInstaller)).size;
 const targetName = path.basename(fixture.targetInstaller);
 const feed = JSON.stringify({ version: fixture.targetVersion, files: [{ url: targetName, sha512: targetSha512, size: targetSize }], path: targetName, sha512: targetSha512, releaseDate: new Date().toISOString() });
 const requests = [];
-const published = fixture.published ? await startPublishedUpdaterFixture(root, fixture, requests) : null;
+const published = (fixture.githubProvider || fixture.published) ? await startPublishedUpdaterFixture(root, fixture, requests) : null;
 const server = published?.server ?? createServer((req, res) => {
   const name = new URL(req.url, 'http://127.0.0.1').pathname;
   requests.push(name);
@@ -106,7 +106,7 @@ try {
   const initial = await evaluate('window.gbaStudio.getAppUpdateState()');
   assert(initial.status !== 'disabled' && initial.currentVersion === fixture.version, 'Installed updater is enabled at the source version');
   const available = await evaluate('window.gbaStudio.checkAppUpdates()');
-  if (published) assert(available.status === 'available' && available.version === fixture.targetVersion, `GitHub provider found RC6: ${JSON.stringify(available)}`);
+  if (published) assert(available.status === 'available' && available.version === fixture.targetVersion, `GitHub provider found ${fixture.targetVersion}: ${JSON.stringify(available)}`);
   await waitFor("document.body.innerText.includes('Uma nova versão está disponível')", 'available update');
   assert(!requestedInstaller(), 'Checking does not download without confirmation');
   await click('Baixar atualização');
@@ -175,7 +175,7 @@ try {
     checks.push(await verifyPublishedMacBundle(bundle));
     const actualHashes = await Promise.all(macBundleFiles
       .map(file => hash(path.join(contents, file), 'sha256', 'hex')));
-    assert(JSON.stringify(actualHashes) === JSON.stringify(fixture.targetBundleHashes), 'Installed app matches the signed and notarized RC6 bundle');
+    assert(JSON.stringify(actualHashes) === JSON.stringify(fixture.targetBundleHashes), `Installed app matches the signed and notarized ${fixture.targetVersion} bundle`);
     process.kill(restartedPid);
     await poll(() => {
       try { process.kill(restartedPid, 0); return false; }
@@ -225,7 +225,7 @@ try {
     assert(await hash(installedImage, 'sha256', 'hex') === targetHash, 'Installed AppImage matches the downloaded target');
   }
   await screenshot('updated-editor.png');
-  await writeFile(path.join(evidence, 'result.json'), `${JSON.stringify({ ok: true, platform: fixture.platform, architecture: process.arch, sourceVersion: fixture.version, targetVersion: fixture.targetVersion, localFeed: true, sourcePackage: fixture.sourceFile, targetPackage: fixture.targetFile, checks, requests }, null, 2)}\n`);
+  await writeFile(path.join(evidence, 'result.json'), `${JSON.stringify({ ok: true, platform: fixture.platform, architecture: process.arch, sourceVersion: fixture.version, targetVersion: fixture.targetVersion, candidateDraft: fixture.candidateDraft ?? false, sourceCommit: fixture.sourceCommit, targetCommit: fixture.targetCommit, localFeed: true, sourcePackage: fixture.sourceFile, targetPackage: fixture.targetFile, checks, requests }, null, 2)}\n`);
 } catch (error) {
   let diagnostics = '';
   if (fixture.platform === 'linux') {

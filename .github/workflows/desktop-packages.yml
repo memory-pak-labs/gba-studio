@@ -17,9 +17,25 @@ on:
         options: [both, linux, windows]
         default: both
       updater_qa_published:
-        description: 'Test the published RC5 to RC6 update on Windows, Linux and both Mac architectures'
+        description: 'Test an exact release pair on Windows, Linux and both Mac architectures'
         type: boolean
         default: false
+      updater_qa_source_version:
+        description: 'Published version installed before the update'
+        type: string
+        default: '0.1.0-rc.6'
+      updater_qa_target_version:
+        description: 'Target release or unpublished candidate version'
+        type: string
+        default: '0.1.0-rc.7'
+      updater_qa_target_draft:
+        description: 'Read the target from an authenticated draft; keep public feeds unchanged'
+        type: boolean
+        default: false
+      updater_qa_target_sha:
+        description: 'Full frozen source commit required for an unpublished candidate'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -302,6 +318,10 @@ jobs:
         working-directory: apps/desktop-electron
     env:
       GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.published-updater-qa
+      GBA_UPDATER_QA_SOURCE_VERSION: ${{ inputs.updater_qa_source_version }}
+      GBA_UPDATER_QA_TARGET_VERSION: ${{ inputs.updater_qa_target_version }}
+      GBA_UPDATER_QA_TARGET_DRAFT: ${{ inputs.updater_qa_target_draft && '1' || '0' }}
+      GBA_UPDATER_QA_TARGET_SHA: ${{ inputs.updater_qa_target_sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
