@@ -77,11 +77,17 @@ constexpr RacingCameraFloorLine racing_camera_floor_line(
 constexpr RacingProjectedPoint racing_camera_project(
     RacingCameraPose camera, Vec2i point_x256, RacingCameraConfig config, int horizon
 ) {
-    const int dx=point_x256.x-camera.x_x256;
-    const int dy=point_x256.y-camera.y_x256;
-    const int depth=(dx*camera.sine_x256-dy*camera.cosine_x256)/256;
+    // Interpolated sine/cosine do not form an exactly unit-length basis.
+    // Invert that basis instead of using its transpose: otherwise the player
+    // moves vertically as its heading changes, despite a fixed camera distance.
+    const int64_t norm=static_cast<int64_t>(camera.sine_x256)*camera.sine_x256+
+        static_cast<int64_t>(camera.cosine_x256)*camera.cosine_x256;
+    if(norm==0) return {0,0,0,0,false};
+    const int64_t dx=static_cast<int64_t>(point_x256.x)-camera.x_x256;
+    const int64_t dy=static_cast<int64_t>(point_x256.y)-camera.y_x256;
+    const int depth=static_cast<int>((dx*camera.sine_x256-dy*camera.cosine_x256)*256/norm);
     if(depth<=8*256) return {0,0,0,depth,false};
-    const int lateral=(dx*camera.cosine_x256+dy*camera.sine_x256)/256;
+    const int lateral=static_cast<int>((dx*camera.cosine_x256+dy*camera.sine_x256)*256/norm);
     const int x=120+lateral*config.focal_length/depth;
     const int y=horizon+config.height*config.focal_length*256/depth;
     const int scale=config.distance*256*256/depth;
