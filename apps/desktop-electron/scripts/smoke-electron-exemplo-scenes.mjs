@@ -8,7 +8,7 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { auditNativeIsometricComposition, decodeNativeIsometricPagedComposition } from './native-isometric-composition-contract.mjs';
-import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
+import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeMetaspriteFramebufferTarget, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
 import { auditStreamedObjResidency } from "./streamed-obj-residency.mjs";
 import { dungeonActorViewCoordinates } from "./native-scene-framebuffer-contract.mjs";
 
@@ -1643,6 +1643,8 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         const nativeActorObject = ['platformer', 'luta', 'battleRpg'].includes(runtime)
           ? nativeSinglePartSpriteObject(header, symbol, frameRuntimeState?.nativeVideo)
           : null;
+        const nativeTopdownTarget = runtime === 'topdown'
+          ? nativeMetaspriteFramebufferTarget(header, symbol, frameRuntimeState?.nativeVideo) : null;
         let compiledSource = scaleRgbaSpriteSheet(decodeExportedSpriteSheetRgba({
           frameCount,
           frameHeight,
@@ -1677,11 +1679,12 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         framebufferPixels = {
           audited: true,
           authoredTarget,
+          ...(nativeTopdownTarget ? {nativePositionProof:nativeTopdownTarget} : {}),
           ...findBestOpaqueRgbaFramebufferFrame({
             candidateFlipsX: nativeActorObject ? [nativeActorObject.flipX] : [false],
             candidateSourceXs,
             candidateTargets: runtime === 'topdown'
-              ? resolveTopdownActorFramebufferTargets(room,actor,frameRuntimeState,exactOptions?.exportedProject,exactOptions?.previousPresentedRuntimeState)
+              ? resolveTopdownActorFramebufferTargets(room,actor,frameRuntimeState,exactOptions?.exportedProject,exactOptions?.previousPresentedRuntimeState,nativeTopdownTarget)
               : nativeActorObject ? [{x:nativeActorObject.x,y:nativeActorObject.y}]
               : ['racing','topdown'].includes(runtime) && authoredTarget ? [authoredTarget] : authoredTarget ? [authoredTarget, ...detectedTargets] : detectedTargets,
             framebuffer: framebufferRgba,

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
+import { decodeMGBAHardwareVideoState, exportedHudFramebufferMasks, framebufferOcclusionPixels, nativeMetaspriteFramebufferTarget, nativeSinglePartSpriteObject, pointClickCursorFramebufferMask, resolveWorldMapNativeFramebufferMasks, transformRacingSpriteSheetRgba } from './native-scene-framebuffer-contract.mjs';
 import { auditOpaqueRgbaAgainstFramebufferRegion, auditRgbaAgainstFramebufferWithMasks, findBestOpaqueRgbaFramebufferFrame } from './rgb555-framebuffer-contract.mjs';
 
 it('masks the real double-size affine airship and still rejects background corruption outside its OAM', () => {
@@ -17,7 +17,7 @@ it('masks the real double-size affine airship and still rejects background corru
   framebuffer.set([248,248,248,255],(40*160+120)*4);
   const options={sourcePixels:source,width:160,height:160,framebuffer,framebufferWidth:160,framebufferHeight:160,masks};
   expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:true,mismatchCount:0});
-  framebuffer.set([248,0,0,255],(100*160+145)*4);
+  framebuffer.set([255,0,0,255],(100*160+145)*4);
   expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:false,mismatchCount:1});
   expect(()=>resolveWorldMapNativeFramebufferMasks(null)).toThrow(/OAM unavailable/);
 });
@@ -30,7 +30,7 @@ it('masks the real hand OBJ and still rejects background corruption outside it',
   framebuffer.set([248,248,248,255],(30*40+30)*4); // Hand pixel beyond the old 16px mask.
   const options={sourcePixels:source,width:40,height:40,framebuffer,framebufferWidth:40,framebufferHeight:40,masks:[mask]};
   expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:true,mismatchCount:0});
-  framebuffer.set([248,0,0,255],(35*40+35)*4);
+  framebuffer.set([255,0,0,255],(35*40+35)*4);
   expect(auditRgbaAgainstFramebufferWithMasks(options)).toMatchObject({ok:false,mismatchCount:1});
   expect(()=>pointClickCursorFramebufferMask({})).toThrow(/OAM unavailable/);
 });
@@ -115,4 +115,37 @@ it('compares a fighter at its clipped native OAM position and rejects a corrupte
   expect(findBestOpaqueRgbaFramebufferFrame(options)).toMatchObject({ok:true,comparedPixelCount:1,mismatchCount:0,target:{x:179,y:24}});
   framebuffer.set([0,0,255,255], (44*240+219)*4);
   expect(findBestOpaqueRgbaFramebufferFrame(options)).toMatchObject({ok:false,comparedPixelCount:1,mismatchCount:1});
+});
+
+const mechanicHeader = `constexpr int mechanic_sprite_width = 32;
+constexpr int mechanic_sprite_height = 48;
+constexpr gbs::SpritePart mechanic_frame_0_parts[2] = {
+ {-8,-40,48,0,0,2,false,false}, {-8,-8,80,0,1,2,false,false}
+};`;
+const mechanicOam = [
+ {index:8,x:152,y:12,width:32,height:32,tile:48,palette:0,affine:false,flipX:false,flipY:false},
+ {index:9,x:152,y:44,width:32,height:16,tile:80,palette:0,affine:false,flipX:false,flipY:false}
+];
+it('binds every part of the moving Porto mechanic to her actual native OAM origin', () => {
+ expect(nativeMetaspriteFramebufferTarget(mechanicHeader,'mechanic',{objects:mechanicOam}))
+  .toEqual({x:152,y:12,objectIndices:[8,9]});
+});
+it('requires all declared native parts at consistent coordinates and matching tile palettes', () => {
+ for(const objects of [mechanicOam.slice(0,1), [mechanicOam[0],{...mechanicOam[1],tile:81}],
+  [mechanicOam[0],{...mechanicOam[1],y:45}], [mechanicOam[0],{...mechanicOam[1],palette:1}]]) {
+  expect(nativeMetaspriteFramebufferTarget(mechanicHeader,'mechanic',{objects})).toBeNull();
+ }
+ expect(nativeMetaspriteFramebufferTarget(mechanicHeader,'mechanic',{objects:[...mechanicOam,
+  ...mechanicOam.map(o=>({...o,index:o.index+10,x:o.x+40}))]})).toBeNull();
+});
+it('uses the real OAM position without tolerating a single corrupted sprite pixel', () => {
+ const sourcePixels=new Uint8Array(32*48*4),framebuffer=new Uint8Array(240*160*4);
+ for(let i=0;i<32*48;i++)sourcePixels.set([255,0,0,255],i*4);
+ for(let y=0;y<48;y++)for(let x=0;x<32;x++)framebuffer.set([255,0,0,255],((y+12)*240+x+152)*4);
+ const target=nativeMetaspriteFramebufferTarget(mechanicHeader,'mechanic',{objects:mechanicOam}) ?? {x:152,y:13};
+ const options={sourcePixels,sourceSheetWidth:32,frameWidth:32,frameHeight:48,candidateSourceXs:[0],
+  candidateTargets:[target],framebuffer,framebufferWidth:240,framebufferHeight:160};
+ expect(findBestOpaqueRgbaFramebufferFrame(options)).toMatchObject({ok:true,mismatchCount:0});
+ framebuffer.set([0,255,0,255],(20*240+165)*4);
+ expect(findBestOpaqueRgbaFramebufferFrame(options)).toMatchObject({ok:false,mismatchCount:1});
 });

@@ -50,7 +50,7 @@ export function resolveTopdownActorFramebufferTarget(room, actor, state, exporte
   return {x:position.x-camera.x+Math.min(...parts.map(part=>part.x)),y:position.y-camera.y+Math.min(...parts.map(part=>part.y))};
 }
 
-export function resolveTopdownActorFramebufferTargets(room, actor, state, exported, previousState) {
+export function resolveTopdownActorFramebufferTargets(room, actor, state, exported, previousState, nativeTarget = null) {
   const current = resolveTopdownActorFramebufferTarget(room, actor, state, exported);
   if (!current) return [];
   const candidates = [current];
@@ -61,6 +61,17 @@ export function resolveTopdownActorFramebufferTargets(room, actor, state, export
     && previousState.frame <= state.frame && previousState.frame >= state.frame - 1) {
     const previous = resolveTopdownActorFramebufferTarget(room, actor, previousState, exported);
     if (previous && (previous.x !== current.x || previous.y !== current.y)) candidates.push(previous);
+  }
+  const entity = exported?.topdown_project?.rooms?.find(roomData => roomData.name === room?.name)?.npcs?.find(npc => npc.name === actor?.name);
+  const movingNpc = actor?.name !== room?.playerActorName && entity?.movement?.kind && entity.movement.kind !== "none";
+  // A wander update can publish its next logical pixel before the previous
+  // OAM scanout. Accept only the actual fully bound OAM point, within that
+  // one-pixel phase; never search nearby pixels or relax color comparisons.
+  if (movingNpc && Number.isInteger(nativeTarget?.x) && Number.isInteger(nativeTarget?.y)
+    && Array.isArray(nativeTarget.objectIndices) && nativeTarget.objectIndices.length > 0
+    && nativeTarget.objectIndices.every(index => Number.isInteger(index) && index >= 0 && index < 128)
+    && candidates.some(point => Math.abs(point.x-nativeTarget.x) <= 1 && Math.abs(point.y-nativeTarget.y) <= 1)) {
+    return [{x:nativeTarget.x,y:nativeTarget.y}];
   }
   return candidates;
 }

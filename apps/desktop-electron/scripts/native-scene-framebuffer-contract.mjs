@@ -108,3 +108,37 @@ export function transformRacingSpriteSheetRgba({source, frameWidth, frameHeight,
   }
   return {...source,pixels};
 }
+
+// A complete tile/palette/offset binding is required; an unrelated nearby
+// object is never evidence for an actor's position. Ambiguity fails closed.
+export function nativeMetaspriteFramebufferTarget(header, symbol, nativeVideo) {
+  const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const dimension = name => Number(header.match(new RegExp(`${escaped}_${name}\\s*=\\s*(\\d+)`))?.[1]);
+  const width = dimension('sprite_width'), height = dimension('sprite_height');
+  if (!(width > 0 && height > 0)) return null;
+  const objects = (nativeVideo?.objects ?? []).filter(object => !object.affine && !object.flipX && !object.flipY);
+  const definitions = header.matchAll(new RegExp(`${escaped}_frame_\\d+_parts\\[(\\d+)\\]\\s*=\\s*\\{([\\s\\S]*?)\\};`, 'g'));
+  const groups = new Map();
+  for (const definition of definitions) {
+    const parts = [...definition[2].matchAll(/\{\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g)]
+      .map(match => ({x:Number(match[1]), y:Number(match[2]), tile:Number(match[3]), palette:Number(match[4])}));
+    if (!parts.length || parts.length !== Number(definition[1])) continue;
+    for (const anchor of objects.filter(object => object.tile === parts[0].tile && object.palette === parts[0].palette)) {
+      const origin = {x:anchor.x-parts[0].x, y:anchor.y-parts[0].y};
+      const used = new Set(), matched = [];
+      for (const part of parts) {
+        const object = objects.find(object => !used.has(object.index) && object.tile === part.tile && object.palette === part.palette
+          && object.x === origin.x+part.x && object.y === origin.y+part.y);
+        if (!object) break;
+        used.add(object.index); matched.push(object);
+      }
+      if (matched.length !== parts.length) continue;
+      const x = Math.min(...matched.map(object => object.x)), y = Math.min(...matched.map(object => object.y));
+      if (Math.max(...matched.map(object => object.x+object.width))-x !== width
+        || Math.max(...matched.map(object => object.y+object.height))-y !== height) continue;
+      const objectIndices = matched.map(object => object.index).sort((a,b) => a-b);
+      groups.set(`${x},${y}:${objectIndices.join(',')}`, {x,y,objectIndices});
+    }
+  }
+  return groups.size === 1 ? [...groups.values()][0] : null;
+}

@@ -475,3 +475,17 @@ describe("janela de cadência da cena selecionada", () => {
     expect(() => selectSceneCadenceWindow(input, scope)).toThrow(/cadencia|cadência/i);
   });
 });
+
+it('uses only a verified one-pixel OAM phase for the moving multipart Porto NPC', () => {
+ const parts=[{x:-8,y:-40,width:32,height:32},{x:-8,y:-8,width:32,height:16}];
+ const npc={name:'Mecânica',position:{x:752,y:377},movement:{kind:'wander_box'},animations:[{frame_metasprites:[{parts}]}]};
+ const exported={topdown_project:{player:{size:{x:16,y:8}},camera:{follow_player:true},rooms:[{name:'porto_lumen',width_tiles:126,height_tiles:86,npcs:[npc]}]}};
+ const room={name:'porto_lumen',playerActorName:'Nara'},actor={name:'Mecânica'};
+ const current={frame:144,currentRoom:0,player:{x:704,y:400},firstActor:{x:752,y:377}};
+ const native={x:152,y:12,objectIndices:[8,9]};
+ expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,null,native)).toEqual([{x:152,y:12}]);
+ expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,null,{...native,y:11})).toEqual([{x:152,y:13}]);
+ expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,null,{x:152,y:12})).toEqual([{x:152,y:13}]);
+ npc.movement.kind='none';
+ expect(resolveTopdownActorFramebufferTargets(room,actor,current,exported,null,native)).toEqual([{x:152,y:13}]);
+});
