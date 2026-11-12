@@ -1,9 +1,11 @@
 import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
+import { exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline } from './exemplo-template-smoke-contract.mjs';
+import { verifiedBattleEffectOcclusion } from './battle-effect-framebuffer-contract.mjs';
 import { findIsometricRoute, isometricDirectionButtons } from "./exemplo-isometric-route.mjs";
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -96,7 +98,8 @@ import { defaultWelcomeSavedProjectPath } from "./smoke-electron-welcome-paths.m
 import { readPlayerPlaybackReadiness } from "./player-playback-readiness.mjs";
 import { createTemporarySmokeWorkspace } from "./lib/temporary-smoke-workspace.mjs";
 
-const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const appRoot = process.env.GBA_STUDIO_EXEMPLO_APP_ROOT
+  ? resolve(process.env.GBA_STUDIO_EXEMPLO_APP_ROOT) : dirname(dirname(fileURLToPath(import.meta.url)));
 const canonicalTemplatePath = join(appRoot, "default-assets", "templates", "exemplo-gba", "exemplo-gba.gba-project");
 const canonicalTemplateProject = JSON.parse(readFileSync(canonicalTemplatePath, "utf8"));
 const canonicalTemplateAssetsByName = new Map(
@@ -124,6 +127,7 @@ const soakMinutes = parseExemploSceneSoakMinutes(process.argv.slice(2));
 const transitionProbeStyle = process.env.GBA_STUDIO_CANONICAL_TRANSITION_PROBE_STYLE?.trim() || null;
 const transitionProbeStyles = new Set(["fade", "fade-color", "wipe", "mosaic", "slide", "crossfade"]);
 const port = Number(process.env.GBA_STUDIO_SMOKE_CDP_PORT ?? 9374);
+const sceneBuildTimeoutMs = exemploSceneBuildTimeoutMs(process.env.GBA_STUDIO_EXEMPLO_SCENE_BUILD_TIMEOUT_MS);
 const evidenceRoot = process.env.GBA_STUDIO_EXEMPLO_SCENES_OUTPUT
   ?? join(appRoot, "artifacts", "exemplo-scene-playtest", "latest");
 const framebufferDumpRoot = join(evidenceRoot, "framebuffers");
@@ -331,7 +335,7 @@ async function waitForTarget(predicate, description, timeoutMs = 300_000) {
   })))}.`);
 }
 
-async function waitForPlayerTarget(mainCdp, beforeIDs, description, sceneName, timeoutMs = 300_000) {
+async function waitForPlayerTarget(mainCdp, beforeIDs, description, sceneName, timeoutMs = sceneBuildTimeoutMs) {
   let deadline = Date.now() + timeoutMs;
   let buildRestarts = 0;
   let lastTargets = [];
@@ -509,7 +513,7 @@ async function waitForPlayerPlaybackReady(cdp) {
   })`, true);
 }
 
-async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
+async function waitForPlayerEvidence(cdp, captureFramebuffer = false, maximumRuntimeFrame = null) {
   const evidence = await evaluate(cdp, `
     new Promise((resolve) => {
       const captureFramebuffer = ${captureFramebuffer ? "true" : "false"};
@@ -528,7 +532,8 @@ async function waitForPlayerEvidence(cdp, captureFramebuffer = false) {
           intrinsicWidth: canvas.width,
           reportedScale: Number(canvas.dataset.integerScale)
         } : null;
-        if (frame?.meaningful && Number(audio?.emittedAudioFrames) > 0 && Number(runtimeState?.frame) >= 8) {
+        if (frame?.meaningful && Number(audio?.emittedAudioFrames) > 0 && Number(runtimeState?.frame) >= 8
+          && (${JSON.stringify(maximumRuntimeFrame)} === null || Number(runtimeState.frame) <= ${JSON.stringify(maximumRuntimeFrame)})) {
           // The runtime publishes telemetry before the canvas paint. Wait for
           // the next browser frame so the presented state and framebuffer are
           // sampled from the same render pass; otherwise a transient previous
@@ -1663,6 +1668,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           ? await lutaNativeOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported,
             frameRuntimeState, framebufferRgba, nativeActorObject.index)
           : new Set();
+        const battleEffects = runtime === 'battleRpg' && nativeActorObject
+          ? await battleEffectOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported,
+            room.name, frameRuntimeState, framebufferRgba, nativeActorObject)
+          : { pixels: new Set(), proofs: [] };
         const renderedFrameWidth = frameWidth * spriteScale;
         const renderedFrameHeight = frameHeight * spriteScale;
         const candidateSourceXs = Array.from({ length: frameCount }, (_, index) => index * renderedFrameWidth);
@@ -1680,6 +1689,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           audited: true,
           authoredTarget,
           ...(nativeTopdownTarget ? {nativePositionProof:nativeTopdownTarget} : {}),
+          ...(runtime === 'battleRpg' ? { foregroundEffects: battleEffects.proofs } : {}),
           ...findBestOpaqueRgbaFramebufferFrame({
             candidateFlipsX: nativeActorObject ? [nativeActorObject.flipX] : [false],
             candidateSourceXs,
@@ -1697,6 +1707,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
             // visible mismatches instead of being silently accepted.
             allowedOcclusionRgb555: allowedTacticalOcclusionRgb555,
             allowedOcclusionPixels: runtime === 'luta' ? allowedLutaOcclusionPixels
+              : runtime === 'battleRpg' ? battleEffects.pixels
               : runtime === 'racing' ? allowedRacingOcclusionPixels : allowedNativeOcclusionPixels,
             sourcePixels: compiledSource.pixels,
             sourceSheetWidth: compiledSource.width
@@ -3487,6 +3498,29 @@ async function lutaNativeOcclusionPixels(exportPath, exported, runtimeState, fra
   return resolveLutaFighterOcclusionPixels({fighters,targetObjectIndex,framebuffer});
 }
 
+async function battleEffectOcclusionPixels(exportPath, exported, roomName, runtimeState, framebuffer, targetObject) {
+  const battle = exported?.battle_rpg_project;
+  const encounter = roomName ? battle?.encounters?.find(item => item.name === roomName)
+    : battle?.encounters?.[battle?.initial_encounter ?? 0];
+  const assets = new Set(Object.values(encounter?.presentation?.effects ?? {}).map(effect => effect.asset).filter(Boolean));
+  const pixels = new Set(), proofs = [];
+  for (const symbol of assets) {
+    const header = await readFile(join(dirname(exportPath), `${symbol}.hpp`), 'utf8');
+    const foregroundObject = nativeSinglePartSpriteObject(header, symbol, runtimeState?.nativeVideo);
+    const frameWidth = exportedIntegerConstant(header, symbol, 'sprite_width');
+    const frameHeight = exportedIntegerConstant(header, symbol, 'sprite_height');
+    const source = decodeExportedSpriteSheetRgba({ headerSource: header, symbol, frameWidth, frameHeight,
+      frameCount: exportedIntegerConstant(header, symbol, 'frame_count') });
+    const result = verifiedBattleEffectOcclusion({ source, frameWidth, frameHeight,
+      foregroundObject, targetObject, framebuffer });
+    for (const pixel of result.pixels) pixels.add(pixel);
+    if (result.pixels.size) proofs.push({ asset: symbol, oamIndex: foregroundObject.index,
+      sourceX: result.audit.sourceX, target: result.audit.target,
+      comparedPixelCount: result.audit.comparedPixelCount, mismatchCount: result.audit.mismatchCount });
+  }
+  return { pixels, proofs };
+}
+
 async function auditExportedLutaPlayers(exportPath, exported, frame, requireFramebuffer, exactOptions = null) {
   const lutaProject = exported?.luta_project;
   const initialStage = Number(lutaProject?.initial_stage ?? 0);
@@ -3789,6 +3823,12 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
   const allowedNativeOcclusionPixels = isometricRoom
     ? await isometricNativeOcclusionPixels(exportPath,exported,isometricRoom.name,frameRuntimeState)
     : new Set();
+  const nativeBattlePlayer = runtime === 'battleRpg'
+    ? nativeSinglePartSpriteObject(header, playerSymbol, frameRuntimeState?.nativeVideo) : null;
+  const battleEffects = runtime === 'battleRpg' && nativeBattlePlayer && exactOptions?.framebufferRgbaBase64
+    ? await battleEffectOcclusionPixels(exportPath, exported, null, frameRuntimeState,
+      Buffer.from(exactOptions.framebufferRgbaBase64, 'base64'), nativeBattlePlayer)
+    : { pixels: new Set(), proofs: [] };
   const palette = parseExportedRgb555Palette(header, playerSymbol);
   const sourceFrames = Array.from({ length: spec.frameCount }, (_, frameIndex) => auditRgbaAgainstExportedSpriteFrame({
     frameHeight: spec.frameHeight,
@@ -3865,9 +3905,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
       framebufferPixels = {
         audited: true,
         runtimePosition: { x: Number(player.x), y: Number(player.y) },
+        ...(runtime === 'battleRpg' ? { foregroundEffects: battleEffects.proofs } : {}),
         ...findBestOpaqueRgbaFramebufferFrame({
           allowedOcclusionRgb555: compiledBackgroundPalette,
-          allowedOcclusionPixels: allowedNativeOcclusionPixels,
+          allowedOcclusionPixels: runtime === 'battleRpg' ? battleEffects.pixels : allowedNativeOcclusionPixels,
           candidateFlipsX: runtime === "platformer" ? [Number(player.direction) === 2] : [false],
           candidateSourceXs,
           candidateTargets,
@@ -5695,6 +5736,14 @@ async function main() {
         currentRoom: Number(launchContract.currentRoom)
       };
       const performance = await waitForPerformance(mainCdp, knownWindowIDs, cadenceScope);
+      // Retain only the exact compiled ROM for bounded cold-start diagnostics.
+      // This copy does not run game frames or alter the measured window.
+      if (process.env.GBA_STUDIO_DIAGNOSTIC_ROM_OUTPUT) {
+        const roms = activeBuildRomPaths(await filesNamed(dirname(exported.path), "exemplo.gba"));
+        if (roms.length !== 1) throw new Error("Ambiguous diagnostic ROM");
+        await mkdir(process.env.GBA_STUDIO_DIAGNOSTIC_ROM_OUTPUT, { recursive: true });
+        await copyFile(roms[0], join(process.env.GBA_STUDIO_DIAGNOSTIC_ROM_OUTPUT, `${scene.name}.gba`));
+      }
       traceSceneSmoke(scene.name, "performance-ready");
       knownWindowIDs.add(performance.windowID);
       const playbackAudio = await evaluate(playerCdp, "window.GBAStudioDirectPlayer.inspectAudio()");
@@ -5707,7 +5756,13 @@ async function main() {
           await wait(200);
         }
       }
-      playerEvidence = await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
+      playerEvidence = ['shmup', 'racing'].includes(scene.runtime)
+        ? await captureMovingSceneVisualBaseline({
+          runtime: scene.runtime, scope: cadenceScope, performance,
+          reset: () => evaluate(playerCdp, 'window.GBAStudioDirectPlayer.reset()'),
+          capture: () => waitForPlayerEvidence(playerCdp, true, 60)
+        })
+        : await waitForPlayerEvidence(playerCdp, captureInitialFramebuffer);
       if (scene.runtime === "isometric" && templateRoomForScene(template, scene.name)?.runtime?.config?.pagedSurface) {
         playerEvidence = await waitForIsometricCameraRest(playerCdp, playerEvidence);
       }
@@ -6305,6 +6360,7 @@ async function main() {
         presentedRuntimeState: playerEvidence.presentedRuntimeState,
         romBytes,
         runtimeState: playerEvidence.runtimeState,
+        visualBaseline: playerEvidence.visualBaseline ?? null,
         screenshotPath,
         nameInputScreenshotPath,
         shmupInput,
@@ -6376,6 +6432,7 @@ async function main() {
         sourceKey: projectSource.sourceKey
       },
       requestedSceneName,
+      sceneBuildTimeoutMs,
       results,
       sessionSoak,
       soakMinutes,

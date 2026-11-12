@@ -77,6 +77,8 @@ function firstExistingPath(paths) {
 }
 
 export function electronLaunchCommand(executable, args = [], options = {}) {
+  const flags = options.jsFlags ?? process.env.GBA_STUDIO_SMOKE_JS_FLAGS?.trim();
+  if (flags) args = [`--js-flags=${flags}`, ...args];
   const architecture = options.architecture ?? process.env.GBA_STUDIO_SMOKE_ARCH?.trim();
   const platform = options.platform ?? process.platform;
   if (!architecture) return { executable, args };
