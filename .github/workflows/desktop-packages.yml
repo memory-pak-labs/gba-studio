@@ -309,12 +309,16 @@ jobs:
         include:
           - platform: windows
             runner: windows-2022
+            architecture: x64
           - platform: linux
             runner: ubuntu-24.04
+            architecture: x64
           - platform: macos-intel
             runner: macos-15-intel
+            architecture: x64
           - platform: macos-arm64
             runner: macos-15
+            architecture: arm64
     defaults:
       run:
         working-directory: apps/desktop-electron
@@ -347,6 +351,7 @@ jobs:
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           import { execFileSync } from 'node:child_process';
+          assert.equal(process.arch, '${{ matrix.architecture }}', 'QA requires the native target architecture');
           const sha = process.env.GBA_UPDATER_QA_TARGET_SHA;
           assert.match(sha, /^[a-f0-9]{40}$/);
           execFileSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD']);
