@@ -299,6 +299,10 @@ jobs:
   published-updater-qa:
     name: Published updater QA (${{ matrix.platform }})
     if: inputs.updater_qa_published
+    # GitHub hides drafts from contents:read tokens. This manual QA job reads
+    # the pinned draft and its assets; it contains no release publication steps.
+    permissions:
+      contents: write
     runs-on: ${{ matrix.runner }}
     # Full installed update plus authoring and 18 scene ROMs; Linux packaging
     # measured over an hour, so retain the tests with a realistic host budget.

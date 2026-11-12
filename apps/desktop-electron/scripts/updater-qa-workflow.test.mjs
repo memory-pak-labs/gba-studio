@@ -31,7 +31,7 @@ describe('installed updater QA workflow', () => {
     expect(qa.steps.find((step) => step.name === 'Upload updater evidence').if).toBe('always()');
   });
 
-  it('runs the published updater against the four native platforms in a read-only workflow', () => {
+  it('runs the updater on native hosts with draft visibility scoped to its manual QA job', () => {
     const qa = workflow.jobs['published-updater-qa'];
     expect(qa.strategy.matrix.include.map(({ runner }) => runner)).toEqual([
       'windows-2022', 'ubuntu-24.04', 'macos-15-intel', 'macos-15'
@@ -39,12 +39,16 @@ describe('installed updater QA workflow', () => {
     expect(qa.strategy.matrix.include.map(({ architecture }) => architecture)).toEqual(['x64', 'x64', 'x64', 'arm64']);
     expect(qa.steps.find(step => step.name === 'Verify QA changes preserve the frozen candidate').run).toContain("assert.equal(process.arch, '${{ matrix.architecture }}'");
     expect(workflow.permissions.contents).toBe('read');
+    expect(qa.permissions.contents).toBe('write');
+    for (const name of ['engine-pack', 'desktop', 'installed-updater-qa']) {
+      expect(workflow.jobs[name].permissions?.contents ?? workflow.permissions.contents).toBe('read');
+    }
     expect(workflow.jobs['engine-pack'].if).toContain('!inputs.updater_qa_published');
     expect(qa.env.GBA_UPDATER_QA_ROOT).toContain('github.workspace');
     expect(qa.steps.map(step => step.run).filter(Boolean).join('\n')).toContain('scripts/prepare-published-updater-qa.mjs');
     expect(qa.steps.find(step => step.name === 'Upload updater evidence').with.path).toMatch(/\/evidence\/$/);
   });
-  it('pins unpublished candidates without granting release publication permissions', () => {
+  it('pins unpublished candidates and contains no release publication steps', () => {
     const inputs = workflow.on.workflow_dispatch.inputs;
     expect(Object.keys(inputs).length).toBeLessThanOrEqual(10);
     expect(inputs.updater_qa_source_version.default).toBe('0.1.0-rc.6');
