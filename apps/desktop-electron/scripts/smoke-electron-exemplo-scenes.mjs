@@ -1,5 +1,6 @@
 import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
 import { exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline } from './exemplo-template-smoke-contract.mjs';
+import { verifiedBattleEffectOcclusion } from './battle-effect-framebuffer-contract.mjs';
 import { findIsometricRoute, isometricDirectionButtons } from "./exemplo-isometric-route.mjs";
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1664,6 +1665,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           ? await lutaNativeOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported,
             frameRuntimeState, framebufferRgba, nativeActorObject.index)
           : new Set();
+        const battleEffects = runtime === 'battleRpg' && nativeActorObject
+          ? await battleEffectOcclusionPixels(exportPath, exactOptions?.exportedProject ?? exported,
+            room.name, frameRuntimeState, framebufferRgba, nativeActorObject)
+          : { pixels: new Set(), proofs: [] };
         const renderedFrameWidth = frameWidth * spriteScale;
         const renderedFrameHeight = frameHeight * spriteScale;
         const candidateSourceXs = Array.from({ length: frameCount }, (_, index) => index * renderedFrameWidth);
@@ -1680,6 +1685,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
         framebufferPixels = {
           audited: true,
           authoredTarget,
+          ...(runtime === 'battleRpg' ? { foregroundEffects: battleEffects.proofs } : {}),
           ...findBestOpaqueRgbaFramebufferFrame({
             candidateFlipsX: nativeActorObject ? [nativeActorObject.flipX] : [false],
             candidateSourceXs,
@@ -1697,6 +1703,7 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
             // visible mismatches instead of being silently accepted.
             allowedOcclusionRgb555: allowedTacticalOcclusionRgb555,
             allowedOcclusionPixels: runtime === 'luta' ? allowedLutaOcclusionPixels
+              : runtime === 'battleRpg' ? battleEffects.pixels
               : runtime === 'racing' ? allowedRacingOcclusionPixels : allowedNativeOcclusionPixels,
             sourcePixels: compiledSource.pixels,
             sourceSheetWidth: compiledSource.width
@@ -3487,6 +3494,29 @@ async function lutaNativeOcclusionPixels(exportPath, exported, runtimeState, fra
   return resolveLutaFighterOcclusionPixels({fighters,targetObjectIndex,framebuffer});
 }
 
+async function battleEffectOcclusionPixels(exportPath, exported, roomName, runtimeState, framebuffer, targetObject) {
+  const battle = exported?.battle_rpg_project;
+  const encounter = roomName ? battle?.encounters?.find(item => item.name === roomName)
+    : battle?.encounters?.[battle?.initial_encounter ?? 0];
+  const assets = new Set(Object.values(encounter?.presentation?.effects ?? {}).map(effect => effect.asset).filter(Boolean));
+  const pixels = new Set(), proofs = [];
+  for (const symbol of assets) {
+    const header = await readFile(join(dirname(exportPath), `${symbol}.hpp`), 'utf8');
+    const foregroundObject = nativeSinglePartSpriteObject(header, symbol, runtimeState?.nativeVideo);
+    const frameWidth = exportedIntegerConstant(header, symbol, 'sprite_width');
+    const frameHeight = exportedIntegerConstant(header, symbol, 'sprite_height');
+    const source = decodeExportedSpriteSheetRgba({ headerSource: header, symbol, frameWidth, frameHeight,
+      frameCount: exportedIntegerConstant(header, symbol, 'frame_count') });
+    const result = verifiedBattleEffectOcclusion({ source, frameWidth, frameHeight,
+      foregroundObject, targetObject, framebuffer });
+    for (const pixel of result.pixels) pixels.add(pixel);
+    if (result.pixels.size) proofs.push({ asset: symbol, oamIndex: foregroundObject.index,
+      sourceX: result.audit.sourceX, target: result.audit.target,
+      comparedPixelCount: result.audit.comparedPixelCount, mismatchCount: result.audit.mismatchCount });
+  }
+  return { pixels, proofs };
+}
+
 async function auditExportedLutaPlayers(exportPath, exported, frame, requireFramebuffer, exactOptions = null) {
   const lutaProject = exported?.luta_project;
   const initialStage = Number(lutaProject?.initial_stage ?? 0);
@@ -3789,6 +3819,12 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
   const allowedNativeOcclusionPixels = isometricRoom
     ? await isometricNativeOcclusionPixels(exportPath,exported,isometricRoom.name,frameRuntimeState)
     : new Set();
+  const nativeBattlePlayer = runtime === 'battleRpg'
+    ? nativeSinglePartSpriteObject(header, playerSymbol, frameRuntimeState?.nativeVideo) : null;
+  const battleEffects = runtime === 'battleRpg' && nativeBattlePlayer && exactOptions?.framebufferRgbaBase64
+    ? await battleEffectOcclusionPixels(exportPath, exported, null, frameRuntimeState,
+      Buffer.from(exactOptions.framebufferRgbaBase64, 'base64'), nativeBattlePlayer)
+    : { pixels: new Set(), proofs: [] };
   const palette = parseExportedRgb555Palette(header, playerSymbol);
   const sourceFrames = Array.from({ length: spec.frameCount }, (_, frameIndex) => auditRgbaAgainstExportedSpriteFrame({
     frameHeight: spec.frameHeight,
@@ -3865,9 +3901,10 @@ async function auditExportedRuntimePlayer(exportPath, exported, runtime, frame, 
       framebufferPixels = {
         audited: true,
         runtimePosition: { x: Number(player.x), y: Number(player.y) },
+        ...(runtime === 'battleRpg' ? { foregroundEffects: battleEffects.proofs } : {}),
         ...findBestOpaqueRgbaFramebufferFrame({
           allowedOcclusionRgb555: compiledBackgroundPalette,
-          allowedOcclusionPixels: allowedNativeOcclusionPixels,
+          allowedOcclusionPixels: runtime === 'battleRpg' ? battleEffects.pixels : allowedNativeOcclusionPixels,
           candidateFlipsX: runtime === "platformer" ? [Number(player.direction) === 2] : [false],
           candidateSourceXs,
           candidateTargets,
