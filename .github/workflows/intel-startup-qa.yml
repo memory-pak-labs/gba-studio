@@ -43,6 +43,7 @@ jobs:
       - name: Compile Arena once and compare cold compiler policies
         env:
           GBA_INTEL_REPLAY_ONLY: ${{ inputs.diagnostic_run_id != '' && '1' || '0' }}
+          GBA_INTEL_CONFIRM_EXPORT: '1'
         run: node scripts/diagnose-intel-startup.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

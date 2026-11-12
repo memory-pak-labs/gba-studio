@@ -52,6 +52,17 @@ for (let trial = 1; trial <= 3; trial++) {
     await waitUntil(async () => evaluate(main, 'Boolean(window.gbaStudio?.openRomPlayerWindow)'), 'IPC bridge');
     await prepareElectronSmokeLocale(main, 'pt-BR');
     await waitUntil(async () => evaluate(main, `Boolean(document.querySelector('button[aria-label="Executar ROM"]'))`), 'complete example editor');
+    // A header can mount while the project and thumbnails are still loading.
+    // Match the original post-export parent's readiness before opening the ROM;
+    // no emulator exists yet and no game frames are skipped or warmed.
+    await waitUntil(async () => evaluate(main, `(() => {
+      const text = document.body.innerText;
+      return (text.includes('arena_arrancada') || text.includes('Arena Arrancada'))
+        && Array.from(document.images).filter(image => {
+          const r = image.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
+        }).every(image => image.complete);
+    })()`), 'complete example scenes and thumbnails');
     await evaluate(main, `(() => { window.__coldSamples = []; window.gbaStudio.onRomPlayerTelemetry(event => {
       if (event.state === 'running') window.__coldSamples.push(event.stats);
     }); })()`);
