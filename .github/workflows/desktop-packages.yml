@@ -365,6 +365,8 @@ jobs:
           assert.match(sha, /^[a-f0-9]{40}$/);
           execFileSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD']);
           const allowed = new Set(['.github/workflows/desktop-packages.yml',
+            '.github/workflows/native-display-qa.yml',
+            'apps/desktop-electron/scripts/diagnose-macos-display.cjs',
             'apps/desktop-electron/scripts/battle-effect-framebuffer-contract.mjs',
             'apps/desktop-electron/scripts/battle-effect-framebuffer-contract.test.mjs',
             'apps/desktop-electron/scripts/updater-qa-release-plan.mjs',
