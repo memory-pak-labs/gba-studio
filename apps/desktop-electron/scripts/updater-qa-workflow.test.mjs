@@ -1,11 +1,23 @@
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const workflow = require('js-yaml').load(readFileSync(new URL('../../../.github/workflows/desktop-packages.yml', import.meta.url), 'utf8'));
 
 describe('installed updater QA workflow', () => {
+  it.each([['win32', 'x64', undefined], ['linux', 'x64', undefined], ['darwin', 'x64', 'x86_64'], ['darwin', 'arm64', 'arm64']])(
+    'selects an Electron architecture only on macOS: %s %s', (platform, arch, expected) => {
+      const step = workflow.jobs['published-updater-qa'].steps.find(item => item.name === 'Validate updated installed editor and ROM on the native host');
+      const expression = step.run.match(/const env = ([\s\S]*?);\n\s*const scripts/)[1];
+      const env = runInNewContext(`(${expression})`, { process: { platform, arch, env: {} }, app: '/fixture/app', root: '/qa', path });
+      expect(env.GBA_STUDIO_SMOKE_ARCH).toBe(expected);
+      expect(env.GBA_STUDIO_PACKAGED_APP_PATH).toBe('/fixture/app');
+      expect(env.GBA_STUDIO_OFFLINE_SMOKE).toBe('1');
+    }
+  );
   it('keeps installer publication steps on the production job and isolates the QA matrix', () => {
     expect(workflow.jobs.desktop.steps.some((step) => step.name === 'Upload validated installer candidates')).toBe(true);
     const qa = workflow.jobs['installed-updater-qa'];

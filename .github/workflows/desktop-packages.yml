@@ -355,6 +355,7 @@ jobs:
             'apps/desktop-electron/scripts/updater-qa-release-plan.test.mjs',
             'apps/desktop-electron/scripts/updater-qa-workflow.test.mjs',
             'apps/desktop-electron/scripts/prepare-published-updater-qa.mjs',
+            'apps/desktop-electron/scripts/smoke-electron-exemplo-template.mjs',
             'apps/desktop-electron/scripts/smoke-installed-update.mjs']);
           const files = execFileSync('git', ['diff', '--name-only', sha, 'HEAD'], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
           assert(files.every(file => allowed.has(file)), 'QA revision changes the frozen product sources');
@@ -387,7 +388,9 @@ jobs:
             : process.platform === 'linux' ? path.join(path.dirname(fixture.sourceExecutable), path.basename(fixture.targetInstaller)) : fixture.sourceExecutable;
           const env = { ...process.env, GBA_STUDIO_PACKAGED_APP_PATH: app, GBA_STUDIO_OFFLINE_SMOKE: '1',
             APPIMAGE_EXTRACT_AND_RUN: '1', ELECTRON_DISABLE_SANDBOX: '1',
-            GBA_STUDIO_MAC_ARCH: process.arch, GBA_STUDIO_SMOKE_ARCH: process.arch === 'x64' ? 'x86_64' : 'arm64',
+            ...(process.platform === 'darwin' ? {
+              GBA_STUDIO_MAC_ARCH: process.arch, GBA_STUDIO_SMOKE_ARCH: process.arch === 'x64' ? 'x86_64' : 'arm64'
+            } : {}),
             GBA_STUDIO_EXEMPLO_TEMPLATE_OUTPUT: path.join(root, 'evidence', 'installed-template'),
             GBA_STUDIO_EXEMPLO_SCENES_OUTPUT: path.join(root, 'evidence', 'installed-scenes') };
           const scripts = [ ...(process.platform === 'darwin' ? ['smoke-macos-app-bundle.mjs'] : []),
