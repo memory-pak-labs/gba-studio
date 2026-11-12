@@ -249,3 +249,14 @@ it('rejects lost or unapplied canvas diagnostics instead of accepting an unmodif
   expect(canvasPacingInstrumentationApplied(software, true)).toBe(true);
   expect(canvasPacingInstrumentationApplied({ ...software, factories: [{ ...software.factories[0], attributes: { alpha: false, willReadFrequently: false } }] }, true)).toBe(false);
 });
+
+import { selectSceneCadenceWindow } from './exemplo-scene-playtest-contract.mjs';
+it('retains raw pre-readiness startup and rejects a slow post-readiness sample without replacing the first window', () => {
+  const make = (time, frame, fps) => ({ sampledAtUnixMs: time, emulationFps: fps,
+    runtimeState: { frame, runtimeKind: 12, currentRoom: 0 } });
+  const raw = [make(100, 8, 16.83), make(200, 12, 20), make(700, 42, 60), make(1200, 72, 60), make(1700, 102, 60), make(2200, 132, 60)];
+  const selected = selectSceneCadenceWindow(raw, { notBeforeUnixMs: 150, initialFrame: 10, runtimeKind: 12, currentRoom: 0 });
+  expect(selected.map(sample => sample.emulationFps)).toEqual([20, 60, 60, 60]);
+  expect(selected.every(sample => sample.emulationFps >= 55)).toBe(false);
+  expect(raw[0].emulationFps).toBe(16.83);
+});

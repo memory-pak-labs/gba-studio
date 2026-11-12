@@ -1,3 +1,5 @@
+import { readPlayerPlaybackReadiness } from './player-playback-readiness.mjs';
+import { selectSceneCadenceWindow } from './exemplo-scene-playtest-contract.mjs';
 import { canvasPacingInstrumentationApplied } from './exemplo-template-smoke-contract.mjs';
 // Cold starts through the real desktop app/IPC/battery path (installed or built source). No ROM rebuild,
 // debugger profiler, hidden frames, warmup, or substitutions of early samples.
@@ -122,17 +124,32 @@ for (let trial = firstTrial; trial < firstTrial + trialCount; trial++) {
       player.canvas.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
       return true;
     })()`), 'audio activation');
-    await waitUntil(async () => evaluate(main, 'window.__coldSamples.filter(sample => sample.runtimeState?.frame >= 8).length >= 4'), 'first cadence window');
+    const readiness = await evaluate(player, `new Promise((resolve, reject) => {
+      const read = ${readPlayerPlaybackReadiness.toString()};
+      const started = performance.now();
+      const check = () => {
+        const sample = read(window.GBAStudioDirectPlayer, performance.timeOrigin + performance.now());
+        if (sample.ok) requestAnimationFrame(() => {
+          const painted = read(window.GBAStudioDirectPlayer, performance.timeOrigin + performance.now());
+          if (painted.ok) resolve(painted); else setTimeout(check, 100);
+        });
+        else if (performance.now() - started > 15000) reject(new Error('No meaningful playback readiness'));
+        else setTimeout(check, 100);
+      }; check();
+    })`);
+    const scope = { notBeforeUnixMs: readiness.observedAtUnixMs, initialFrame: readiness.runtimeState.frame,
+      runtimeKind: readiness.runtimeState.runtimeKind, currentRoom: readiness.runtimeState.currentRoom };
+    await waitUntil(async () => evaluate(main, `window.__coldSamples.filter(sample => sample.sampledAtUnixMs >= ${scope.notBeforeUnixMs} && sample.runtimeState).length >= 4`), 'first original post-readiness cadence window');
     const opened = await waitUntil(async () => evaluate(main, 'window.__coldOpenResult'), 'open result');
     assert.equal(opened.ok, true, JSON.stringify(opened));
     const samples = await evaluate(main, 'window.__coldSamples');
     const audio = await evaluate(player, 'window.GBAStudioDirectPlayer.inspectAudio()');
-    const first = samples.filter(sample => sample.runtimeState?.frame >= 8).slice(0, 4);
+    const first = selectSceneCadenceWindow(samples, scope);
     const steady = first.slice(1);
     const mean = key => steady.reduce((sum, sample) => sum + sample[key], 0) / steady.length;
     const pacing = process.env.GBA_INTEL_TRACE_PACING === '1' ? await evaluate(player, 'window.__gbaPacing') : undefined;
     const contextAttributes = await evaluate(player, 'window.GBAStudioDirectPlayer.canvas.getContext("2d").getContextAttributes()');
-    const report = { trial, flags, label, samples, firstWindow: {
+    const report = { trial, flags, label, samples, readiness, scope, startupSamples: samples.filter(sample => sample.sampledAtUnixMs < scope.notBeforeUnixMs), firstWindow: {
       emulationFps: mean('emulationFps'), presentationFps: mean('presentationFps'),
       droppedFrameRatio: mean('droppedFrameRatio'), emulationMs: mean('emulationMs'), observedSamples: first },
       audio, stderr, contextAttributes, pacing, romHash: createHash('sha256').update(await readFile(rom)).digest('hex') };
