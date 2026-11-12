@@ -2,6 +2,25 @@ import { createRequire } from 'node:module';
 
 const { valid, gt } = createRequire(import.meta.url)('semver');
 
+export function validateUpdaterQaFeed(feed, version, files) {
+  if (feed?.version !== version || !Array.isArray(feed.files) || feed.files.length !== files.length) {
+    throw new Error('Final update feed version or architecture count differs');
+  }
+  const expected = new Map(files.map(file => [file.url, file]));
+  const seen = new Set();
+  for (const entry of feed.files) {
+    const file = expected.get(entry?.url);
+    if (!file || seen.has(entry.url) || entry.size !== file.size || entry.sha512 !== file.sha512) {
+      throw new Error('Final update feed does not match the verified installer bytes');
+    }
+    seen.add(entry.url);
+  }
+  if (feed.path !== feed.files[0]?.url || feed.sha512 !== feed.files[0]?.sha512) {
+    throw new Error('Final update feed legacy entry differs from its primary file');
+  }
+  return feed;
+}
+
 export function updaterQaReleasePlan(environment = process.env) {
   const sourceVersion = environment.GBA_UPDATER_QA_SOURCE_VERSION || '0.1.0-rc.5';
   const targetVersion = environment.GBA_UPDATER_QA_TARGET_VERSION || '0.1.0-rc.6';
@@ -23,6 +42,20 @@ export function validateUpdaterQaRelease(release, plan, role) {
     if (release.target_commitish !== plan.targetSha) throw new Error('Draft candidate commit differs from the frozen revision');
   } else if (release.draft) throw new Error(`Expected published ${role} release`);
   return release;
+}
+
+export async function loadUpdaterQaRelease(plan, role, request = fetch, token = process.env.GH_TOKEN) {
+  const version = role === 'source' ? plan.sourceVersion : plan.targetVersion;
+  const draft = role === 'target' && plan.targetDraft;
+  const endpoint = draft ? 'releases?per_page=100' : `releases/tags/v${version}`;
+  const response = await request(`https://api.github.com/repos/memory-pak-labs/gba-studio/${endpoint}`, {
+    redirect: 'error', headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  if (!response.ok) throw new Error(`GitHub release ${role} returned ${response.status}`);
+  const body = await response.json();
+  const matches = draft && Array.isArray(body) ? body.filter(item => item.tag_name === `v${version}`) : [body];
+  if (matches.length !== 1) throw new Error('Missing or ambiguous draft candidate');
+  return validateUpdaterQaRelease(matches[0], plan, role);
 }
 
 export function updaterQaAtom(xml, release, plan) {

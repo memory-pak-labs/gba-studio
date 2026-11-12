@@ -1,9 +1,86 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { activeBuildRomPaths, fullProjectRuntimeEvidence } from "./exemplo-template-smoke-contract.mjs";
+import { activeBuildRomPaths, fullProjectRuntimeEvidence, exemploSceneBuildTimeoutMs, captureMovingSceneVisualBaseline, intelRemainingFunctionalEvidence } from "./exemplo-template-smoke-contract.mjs";
+
+describe('Intel functional evidence with the original presentation gate retained', () => {
+  const names = ['arena_arrancada','circuito_final','arena_tatica','circuito_perspectiva'];
+  function fixture() {
+    return { ok: false, audit: { ok: false, counts: { expected: 4, passed: 0, failed: 4 },
+      visualGate: { ok: true }, thresholds: { minEmulationFps: 55, minPresentationFps: 55, maxDroppedFrameRatio: 0.1 },
+      issues: names.map(name => `${name}: cadencia do Player fora dos limites esperados.`) },
+      results: names.map(name => ({ name, runtimeState: { frame: 100, audio: { pcmUnderrunCount: 0 } },
+        audio: { audioUnderrunCount: 0 }, performance: { emulationFps: 60, presentationFps: 30, droppedFrameRatio: 0,
+          observedSamples: Array.from({length:4}, () => ({ runtimeState: { audio: { pcmUnderrunCount: 0 } } })) } })) };
+  }
+  it('records functional checks separately without changing failed raw results or approving publication', () => {
+    const evidence = fixture(), before = JSON.stringify(evidence);
+    const result = intelRemainingFunctionalEvidence(evidence);
+    expect(result).toMatchObject({ functionalPassed: true, presentationGatePassed: false, publicationApproved: false });
+    expect(result.sceneNames).toEqual(names);
+    expect(JSON.stringify(evidence)).toBe(before);
+  });
+  it.each(['pixels','emulation','drop','host-audio','engine-audio','engine-audio-before-reset','missing-audio-window','coverage','thresholds','visual'])('rejects a functional failure: %s', failure => {
+    const evidence = fixture();
+    if (failure === 'pixels') evidence.audit.issues.push('circuito_final: pixels opacos do player nao correspondem exatamente ao PNG na ROM.');
+    if (failure === 'emulation') evidence.results[0].performance.emulationFps = 40;
+    if (failure === 'drop') evidence.results[0].performance.droppedFrameRatio = 0.5;
+    if (failure === 'host-audio') evidence.results[0].audio.audioUnderrunCount = 1;
+    if (failure === 'engine-audio') evidence.results[0].runtimeState.audio.pcmUnderrunCount = 1;
+    if (failure === 'engine-audio-before-reset') evidence.results[0].performance.observedSamples[1].runtimeState.audio.pcmUnderrunCount = 1;
+    if (failure === 'missing-audio-window') evidence.results[0].performance.observedSamples = [];
+    if (failure === 'coverage') evidence.results.pop();
+    if (failure === 'thresholds') evidence.audit.thresholds.minPresentationFps = 30;
+    if (failure === 'visual') evidence.audit.visualGate.ok = false;
+    expect(intelRemainingFunctionalEvidence(evidence).functionalPassed).toBe(false);
+  });
+});
+
+describe('independent moving-scene pixel baseline', () => {
+  const scope = { runtimeKind: 7, currentRoom: 0 };
+  const evidence = frame => ({ ok: true, framebufferRgbaBase64: 'actual pixels',
+    runtimeState: { ...scope, frame }, presentedRuntimeState: { ...scope, frame } });
+  it.each(['shmup', 'racing'])('captures %s at startup only after the completed cadence window', async runtime => {
+    const calls = [];
+    const result = await captureMovingSceneVisualBaseline({ runtime, scope,
+      performance: { observedSamples: [{ runtimeState: { frame: 8 } }, { runtimeState: { frame: 140 } }] },
+      reset: async () => calls.push('reset'),
+      capture: async () => { calls.push('capture'); return evidence(10); } });
+    expect(calls).toEqual(['reset', 'capture']);
+    expect(result.runtimeState.frame).toBe(10);
+    expect(result.visualBaseline).toEqual({ source: 'independent-startup-after-cadence', cadenceFinalFrame: 140, capturedFrame: 10 });
+  });
+  it.each([0, 7, 61, 140])('rejects a stale, unready or late visual frame: %s', async frame => {
+    await expect(captureMovingSceneVisualBaseline({ runtime: 'racing', scope,
+      performance: { observedSamples: [{ runtimeState: { frame: 140 } }] },
+      reset: async () => {}, capture: async () => evidence(frame) })).rejects.toThrow(/visual baseline/);
+  });
+  it('rejects a different scene and requires real pixel data', async () => {
+    for (const bad of [{ ...evidence(10), framebufferRgbaBase64: null },
+      { ...evidence(10), presentedRuntimeState: { ...scope, frame: 10, currentRoom: 1 } }]) {
+      await expect(captureMovingSceneVisualBaseline({ runtime: 'shmup', scope,
+        performance: { observedSamples: [{ runtimeState: { frame: 140 } }] },
+        reset: async () => {}, capture: async () => bad })).rejects.toThrow(/visual baseline/);
+    }
+  });
+  it('does not reset or recapture other runtimes or an unfinished cadence measurement', async () => {
+    let called = false;
+    const reset = async () => { called = true; };
+    await expect(captureMovingSceneVisualBaseline({ runtime: 'topdown', reset })).rejects.toThrow(/moving runtime/);
+    await expect(captureMovingSceneVisualBaseline({ runtime: 'shmup', reset, performance: { observedSamples: [] } })).rejects.toThrow(/completed cadence/);
+    expect(called).toBe(false);
+  });
+});
 
 describe("Exemplo template full-project smoke contract", () => {
+  it('bounds cold scene compilation separately from ROM performance and fidelity', () => {
+    expect(exemploSceneBuildTimeoutMs()).toBe(300_000);
+    expect(exemploSceneBuildTimeoutMs('600000')).toBe(600_000);
+    expect(exemploSceneBuildTimeoutMs('900000')).toBe(900_000);
+  });
+  it.each(['0', '-1', '299999', '900001', 'Infinity', '300000.5', 'not-a-timeout'])('rejects invalid compilation budgets: %s', value => {
+    expect(() => exemploSceneBuildTimeoutMs(value)).toThrow(/compilation timeout/);
+  });
   it("seleciona a ROM ativa sem contar cópias de variantes em cache", () => {
     expect(activeBuildRomPaths([
       "/export/mixed/build/project.gba",
@@ -159,4 +236,37 @@ describe("Exemplo template full-project smoke contract", () => {
     expect(source).toContain("runtime === \"cutscene\"");
     expect(source).toContain("animations: template.animations");
   });
+});
+
+import { canvasPacingInstrumentationApplied } from './exemplo-template-smoke-contract.mjs';
+it('rejects lost or unapplied canvas diagnostics instead of accepting an unmodified comparison', () => {
+  const valid = { startedAt: 123, factories: [{ selected: { alpha: false }, attributes: { alpha: false, willReadFrequently: false } }] };
+  expect(canvasPacingInstrumentationApplied(undefined)).toBe(false);
+  expect(canvasPacingInstrumentationApplied({ ...valid, factories: [] })).toBe(false);
+  expect(canvasPacingInstrumentationApplied(valid)).toBe(true);
+  expect(canvasPacingInstrumentationApplied(valid, true)).toBe(false);
+  const software = { ...valid, factories: [{ selected: { willReadFrequently: true }, attributes: { alpha: false, willReadFrequently: true } }] };
+  expect(canvasPacingInstrumentationApplied(software, true)).toBe(true);
+  expect(canvasPacingInstrumentationApplied({ ...software, factories: [{ ...software.factories[0], attributes: { alpha: false, willReadFrequently: false } }] }, true)).toBe(false);
+});
+
+import { selectSceneCadenceWindow, steadyFrameSamples } from './exemplo-scene-playtest-contract.mjs';
+it('retains raw pre-readiness startup and rejects a slow post-readiness sample without replacing the first window', () => {
+  const make = (time, frame, fps) => ({ sampledAtUnixMs: time, emulationFps: fps,
+    runtimeState: { frame, runtimeKind: 12, currentRoom: 0 } });
+  const raw = [make(100, 8, 16.83), make(200, 12, 60), make(700, 42, 20), make(1200, 72, 60), make(1700, 102, 60), make(2200, 132, 60)];
+  const selected = selectSceneCadenceWindow(raw, { notBeforeUnixMs: 150, initialFrame: 10, runtimeKind: 12, currentRoom: 0 });
+  expect(selected.map(sample => sample.emulationFps)).toEqual([60, 20, 60, 60]);
+  expect(steadyFrameSamples(selected).reduce((sum, sample) => sum + sample.emulationFps, 0) / 3).toBeLessThan(55);
+  expect(selected.every(sample => sample.emulationFps >= 55)).toBe(false);
+  expect(raw[0].emulationFps).toBe(16.83);
+});
+
+it('uses the unchanged average-window budget without erasing individual spikes', () => {
+  const raw = [0, 0.1111, 0, 0].map((droppedFrameRatio, index) => ({ droppedFrameRatio, emulationFps: 60, runtimeState: { frame: 30 * index } }));
+  const steady = steadyFrameSamples(raw);
+  expect(steady[0].droppedFrameRatio).toBe(0.1111);
+  expect(steady.reduce((sum, sample) => sum + sample.droppedFrameRatio, 0) / 3).toBeLessThan(0.1);
+  const failing = raw.map(sample => ({ ...sample, droppedFrameRatio: 0.4 }));
+  expect(steadyFrameSamples(failing).reduce((sum, sample) => sum + sample.droppedFrameRatio, 0) / 3).toBeGreaterThan(0.1);
 });

@@ -200,3 +200,8 @@ describe("packagedDarwinElectronExecutableCandidates", () => {
     ]);
   });
 });
+
+it('passes diagnostic compiler flags as one argument without changing ordinary launches', () => {
+  expect(electronLaunchCommand('/app', ['project'], { platform: 'linux', jsFlags: '--no-liftoff --no-wasm-tier-up' }))
+    .toEqual({ executable: '/app', args: ['--js-flags=--no-liftoff --no-wasm-tier-up', 'project'] });
+});
