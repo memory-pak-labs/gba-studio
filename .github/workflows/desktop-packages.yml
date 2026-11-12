@@ -467,3 +467,5 @@ jobs:
       contents: write
       actions: read
     uses: ./.github/workflows/intel-startup-qa.yml
+    with:
+      diagnostic_run_id: ${{ inputs.updater_qa_source_run_id }}

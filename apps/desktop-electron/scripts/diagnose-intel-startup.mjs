@@ -12,6 +12,24 @@ const evidence = path.join(root, 'evidence');
 await mkdir(evidence, { recursive: true });
 const app = path.join(root, 'reference', 'gba-studio.app');
 const romRoot = path.join(evidence, 'rom');
+if (process.env.GBA_INTEL_REPLAY_ONLY === '1') {
+  const original = JSON.parse(await readFile(path.join(evidence, 'comparison.json'), 'utf8'));
+  const sha = async file => createHash('sha256').update(await readFile(file)).digest('hex');
+  assert.equal(original.candidate, process.env.GBA_UPDATER_QA_TARGET_SHA);
+  assert.equal(await sha(path.join(romRoot, 'arena_arrancada.gba')), original.romHash);
+  assert.equal(await sha(path.join(app, 'Contents', 'Resources', 'WebPlayer', 'player', 'mgba-core.wasm')), original.coreHash);
+  for (const [label, flags] of [
+    ['baseline', ''],
+    ['eager-wasm', '--no-liftoff --no-wasm-lazy-compilation --no-wasm-tier-up'],
+    ['js-baseline', '--max-opt=1 --always-sparkplug'],
+    ['combined', '--max-opt=1 --always-sparkplug --no-liftoff --no-wasm-lazy-compilation --no-wasm-tier-up']
+  ]) {
+    const run = spawnSync(process.execPath, ['scripts/diagnose-intel-installed.mjs'], {
+      env: { ...process.env, GBA_INTEL_LABEL: label, GBA_INTEL_FLAGS: flags }, stdio: 'inherit', timeout: 180000 });
+    assert.equal(run.status, 0, `Installed control failed to execute: ${label}`);
+  }
+  process.exit(0);
+}
 const env = { ...process.env, GBA_STUDIO_PACKAGED_APP_PATH: app,
   GBA_STUDIO_SMOKE_ARCH: 'x86_64', GBA_STUDIO_MAC_ARCH: 'x64',
   GBA_STUDIO_OFFLINE_SMOKE: '1', GBA_STUDIO_TRACE_SCENE_SMOKE: '1',

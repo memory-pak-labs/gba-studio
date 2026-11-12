@@ -1,6 +1,10 @@
 name: Intel Arena cold startup diagnostics
 on:
   workflow_call:
+    inputs:
+      diagnostic_run_id:
+        type: string
+        default: ''
 permissions:
   contents: write
   actions: read
@@ -29,7 +33,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/prepare-published-updater-qa.mjs
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: inputs.diagnostic_run_id != ''
+        with:
+          name: Intel-Arena-cold-startup
+          path: .intel-startup-qa/evidence
+          run-id: ${{ inputs.diagnostic_run_id }}
+          github-token: ${{ github.token }}
       - name: Compile Arena once and compare cold compiler policies
+        env:
+          GBA_INTEL_REPLAY_ONLY: ${{ inputs.diagnostic_run_id != '' && '1' || '0' }}
         run: node scripts/diagnose-intel-startup.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

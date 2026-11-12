@@ -1,11 +1,11 @@
-// Cold starts through the real installed app/IPC/battery path. No ROM rebuild,
+// Cold starts through the real desktop app/IPC/battery path (installed or built source). No ROM rebuild,
 // debugger profiler, hidden frames, warmup, or substitutions of early samples.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFile, mkdir, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { cdpSession, createElectronSmokeEnv, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
+import { cdpSession, createElectronSmokeEnv, prepareElectronSmokeLocale, terminateChild, wait } from './lib/electron-smoke-helpers.mjs';
 
 const root = process.env.GBA_UPDATER_QA_ROOT;
 const evidence = path.join(root, 'evidence');
@@ -31,7 +31,8 @@ for (let trial = 1; trial <= 3; trial++) {
   try {
     const port = 9461;
     const env = createElectronSmokeEnv({ GBA_STUDIO_SMOKE_CDP_PORT: String(port),
-      GBA_STUDIO_SMOKE_USER_DATA_DIR: profile });
+      GBA_STUDIO_SMOKE_USER_DATA_DIR: profile,
+      GBA_STUDIO_OPEN_PROJECT: path.resolve('default-assets/templates/exemplo-gba/exemplo-gba.gba-project') });
     const executable = process.env.GBA_INTEL_APP ? path.resolve('node_modules/.bin/electron') : path.join(app, 'Contents', 'MacOS', 'gba-studio');
     const args = [...(flags ? [`--js-flags=${flags}`] : []), ...(process.env.GBA_INTEL_APP ? [app] : [])];
     child = spawn(executable, args, { env, stdio: ['ignore', 'ignore', 'pipe'] });
@@ -49,6 +50,8 @@ for (let trial = 1; trial <= 3; trial++) {
     const target = await waitUntil(async () => (await targets()).find(target => target.type === 'page' && target.webSocketDebuggerUrl), 'editor');
     main = cdpSession(target.webSocketDebuggerUrl);await main.ready;
     await waitUntil(async () => evaluate(main, 'Boolean(window.gbaStudio?.openRomPlayerWindow)'), 'IPC bridge');
+    await prepareElectronSmokeLocale(main, 'pt-BR');
+    await waitUntil(async () => evaluate(main, `Boolean(document.querySelector('button[aria-label="Executar ROM"]'))`), 'complete example editor');
     await evaluate(main, `(() => { window.__coldSamples = []; window.gbaStudio.onRomPlayerTelemetry(event => {
       if (event.state === 'running') window.__coldSamples.push(event.stats);
     }); })()`);
