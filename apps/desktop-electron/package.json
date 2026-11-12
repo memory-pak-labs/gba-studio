@@ -181,7 +181,7 @@
         "\\.(?:pyc|pyo|a|o|whl|lz|gz|zip|asar|png|icns|ico|wasm|pak|dat|bin)$"
       ],
       "bundleShortVersion": "0.1.0",
-      "bundleVersion": "12",
+      "bundleVersion": "13",
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
