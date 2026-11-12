@@ -66,10 +66,41 @@ for (let trial = 1; trial <= 3; trial++) {
     await evaluate(main, `(() => { window.__coldSamples = []; window.gbaStudio.onRomPlayerTelemetry(event => {
       if (event.state === 'running') window.__coldSamples.push(event.stats);
     }); })()`);
-    const opened = await evaluate(main, `window.gbaStudio.openRomPlayerWindow(${JSON.stringify({ romPath: rom, title: 'Arena Arrancada cold diagnostic' })})`);
-    assert.equal(opened?.ok, true, JSON.stringify(opened));
+    await evaluate(main, `(() => { window.__coldOpenResult = null; void window.gbaStudio.openRomPlayerWindow(${JSON.stringify({ romPath: rom, title: 'Arena Arrancada cold diagnostic' })}).then(result => { window.__coldOpenResult = result; }); })()`);
     const playerTarget = await waitUntil(async () => (await targets()).find(target => target.type === 'page' && target.url.includes('/player/runtime.html')), 'Player');
     player = cdpSession(playerTarget.webSocketDebuggerUrl);await player.ready;
+    if (process.env.GBA_INTEL_TRACE_PACING === '1') {
+      await evaluate(player, `(() => {
+        const pacing = window.__gbaPacing = { startedAt: performance.timeOrigin + performance.now(),
+          paint: [], timerGaps: [], rafGaps: [], longTasks: [], factories: [] };
+        const stamp = () => performance.timeOrigin + performance.now();
+        const factory = HTMLCanvasElement.prototype.getContext;
+        const software = ${JSON.stringify(process.env.GBA_INTEL_SOFTWARE_CANVAS === '1')};
+        HTMLCanvasElement.prototype.getContext = function(kind, options) {
+          const selected = software && kind === '2d' ? { ...options, willReadFrequently: true, desynchronized: true } : options;
+          const context = factory.call(this, kind, selected);
+          if (kind === '2d' && pacing.factories.length < 10) pacing.factories.push({ at: stamp(), selected, attributes: context?.getContextAttributes?.() });
+          return context;
+        };
+        const paint = CanvasRenderingContext2D.prototype.putImageData;
+        CanvasRenderingContext2D.prototype.putImageData = function(...args) {
+          const at = stamp(); const result = paint.apply(this, args); const ms = stamp() - at;
+          if (ms >= 2 && pacing.paint.length < 100) pacing.paint.push({ at, ms });
+          return result;
+        };
+        let previousTimer = stamp(), previousRaf = stamp();
+        const timer = setInterval(() => { const at = stamp(), ms = at - previousTimer; previousTimer = at;
+          if (ms >= 30 && pacing.timerGaps.length < 100) pacing.timerGaps.push({ at, ms }); }, 10);
+        const raf = () => { const at = stamp(), ms = at - previousRaf; previousRaf = at;
+          if (ms >= 45 && pacing.rafGaps.length < 100) pacing.rafGaps.push({ at, ms }); requestAnimationFrame(raf); };
+        requestAnimationFrame(raf);
+        try { new PerformanceObserver(list => { for (const entry of list.getEntries()) if (pacing.longTasks.length < 100)
+          pacing.longTasks.push({ at: performance.timeOrigin + entry.startTime, ms: entry.duration, name: entry.name });
+        }).observe({ type: 'longtask', buffered: true }); } catch {}
+        setTimeout(() => clearInterval(timer), 15000);
+      })()`);
+    }
+
     await waitUntil(async () => evaluate(player, `(() => {
       const player = window.GBAStudioDirectPlayer;
       if (!player?.canvas) return false;
@@ -77,6 +108,8 @@ for (let trial = 1; trial <= 3; trial++) {
       return true;
     })()`), 'audio activation');
     await waitUntil(async () => evaluate(main, 'window.__coldSamples.filter(sample => sample.runtimeState?.frame >= 8).length >= 4'), 'first cadence window');
+    const opened = await waitUntil(async () => evaluate(main, 'window.__coldOpenResult'), 'open result');
+    assert.equal(opened.ok, true, JSON.stringify(opened));
     const samples = await evaluate(main, 'window.__coldSamples');
     const audio = await evaluate(player, 'window.GBAStudioDirectPlayer.inspectAudio()');
     const first = samples.filter(sample => sample.runtimeState?.frame >= 8).slice(0, 4);
@@ -85,7 +118,7 @@ for (let trial = 1; trial <= 3; trial++) {
     const report = { trial, flags, label, samples, firstWindow: {
       emulationFps: mean('emulationFps'), presentationFps: mean('presentationFps'),
       droppedFrameRatio: mean('droppedFrameRatio'), emulationMs: mean('emulationMs'), observedSamples: first },
-      audio, stderr, romHash: createHash('sha256').update(await readFile(rom)).digest('hex') };
+      audio, stderr, pacing: process.env.GBA_INTEL_TRACE_PACING === '1' ? await evaluate(player, 'window.__gbaPacing') : undefined, romHash: createHash('sha256').update(await readFile(rom)).digest('hex') };
     results.push(report);
     await writeFile(path.join(evidence, `installed-${label}-${trial}.json`), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify({ trial, label, ...report.firstWindow, observedSamples: undefined, audio }));
