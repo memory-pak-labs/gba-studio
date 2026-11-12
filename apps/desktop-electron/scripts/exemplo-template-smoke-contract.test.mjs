@@ -10,7 +10,8 @@ describe('Intel functional evidence with the original presentation gate retained
       visualGate: { ok: true }, thresholds: { minEmulationFps: 55, minPresentationFps: 55, maxDroppedFrameRatio: 0.1 },
       issues: names.map(name => `${name}: cadencia do Player fora dos limites esperados.`) },
       results: names.map(name => ({ name, runtimeState: { frame: 100, audio: { pcmUnderrunCount: 0 } },
-        audio: { audioUnderrunCount: 0 }, performance: { emulationFps: 60, presentationFps: 30, droppedFrameRatio: 0 } })) };
+        audio: { audioUnderrunCount: 0 }, performance: { emulationFps: 60, presentationFps: 30, droppedFrameRatio: 0,
+          observedSamples: Array.from({length:4}, () => ({ runtimeState: { audio: { pcmUnderrunCount: 0 } } })) } })) };
   }
   it('records functional checks separately without changing failed raw results or approving publication', () => {
     const evidence = fixture(), before = JSON.stringify(evidence);
@@ -19,13 +20,15 @@ describe('Intel functional evidence with the original presentation gate retained
     expect(result.sceneNames).toEqual(names);
     expect(JSON.stringify(evidence)).toBe(before);
   });
-  it.each(['pixels','emulation','drop','host-audio','engine-audio','coverage','thresholds','visual'])('rejects a functional failure: %s', failure => {
+  it.each(['pixels','emulation','drop','host-audio','engine-audio','engine-audio-before-reset','missing-audio-window','coverage','thresholds','visual'])('rejects a functional failure: %s', failure => {
     const evidence = fixture();
     if (failure === 'pixels') evidence.audit.issues.push('circuito_final: pixels opacos do player nao correspondem exatamente ao PNG na ROM.');
     if (failure === 'emulation') evidence.results[0].performance.emulationFps = 40;
     if (failure === 'drop') evidence.results[0].performance.droppedFrameRatio = 0.5;
     if (failure === 'host-audio') evidence.results[0].audio.audioUnderrunCount = 1;
     if (failure === 'engine-audio') evidence.results[0].runtimeState.audio.pcmUnderrunCount = 1;
+    if (failure === 'engine-audio-before-reset') evidence.results[0].performance.observedSamples[1].runtimeState.audio.pcmUnderrunCount = 1;
+    if (failure === 'missing-audio-window') evidence.results[0].performance.observedSamples = [];
     if (failure === 'coverage') evidence.results.pop();
     if (failure === 'thresholds') evidence.audit.thresholds.minPresentationFps = 30;
     if (failure === 'visual') evidence.audit.visualGate.ok = false;

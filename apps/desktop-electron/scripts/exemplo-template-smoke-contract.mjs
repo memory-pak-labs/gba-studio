@@ -45,6 +45,9 @@ export function intelRemainingFunctionalEvidence(evidence) {
       && result.performance.droppedFrameRatio >= 0 && result.performance.droppedFrameRatio <= 0.1),
     audioHealthy: results.every(result => result.audio?.audioUnderrunCount === 0
       && result.runtimeState?.audio?.pcmUnderrunCount === 0),
+    measuredEngineAudioHealthy: results.every(result => Array.isArray(result.performance?.observedSamples)
+      && result.performance.observedSamples.length >= 3
+      && result.performance.observedSamples.every(sample => sample.runtimeState?.audio?.pcmUnderrunCount === 0)),
     visualGate: evidence?.audit?.visualGate?.ok === true,
     remainingAssertions: nonCadenceIssues.length === 0
   };
@@ -57,7 +60,8 @@ export function intelRemainingFunctionalEvidence(evidence) {
     scenes: results.map(result => ({ name: result.name,
       emulationFps: result.performance?.emulationFps, presentationFps: result.performance?.presentationFps,
       droppedFrameRatio: result.performance?.droppedFrameRatio,
-      hostAudioUnderruns: result.audio?.audioUnderrunCount, enginePcmUnderruns: result.runtimeState?.audio?.pcmUnderrunCount })) };
+      hostAudioUnderruns: result.audio?.audioUnderrunCount, enginePcmUnderruns: result.runtimeState?.audio?.pcmUnderrunCount,
+      measuredEnginePcmUnderruns: result.performance?.observedSamples?.map(sample => sample.runtimeState?.audio?.pcmUnderrunCount) })) };
 }
 
 // Autonomous actors can leave the viewport or blink after damage during the
