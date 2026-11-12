@@ -39,7 +39,7 @@ on:
       updater_qa_native_platform:
         description: 'Native updater host to validate; all retains the existing platform selection'
         type: choice
-        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display, macos-intel-remaining, macos-intel-startup]
+        options: [all, windows, linux, macos-intel, macos-arm64, macos-intel-display, macos-intel-remaining, macos-intel-startup, macos-intel-fixed]
         default: all
       updater_qa_scene_build_timeout_ms:
         description: 'Bounded cold scene export wait (300000-900000 ms); ROM performance checks remain unchanged'
@@ -307,7 +307,7 @@ jobs:
 
   published-updater-qa:
     name: ${{ inputs.updater_qa_native_platform == 'macos-intel-remaining' && 'Intel remaining scenes (55 FPS gate retained)' || format('Published updater QA ({0})', matrix.platform) }}
-    if: inputs.updater_qa_published && inputs.updater_qa_native_platform != 'macos-intel-display' && inputs.updater_qa_native_platform != 'macos-intel-startup'
+    if: inputs.updater_qa_published && inputs.updater_qa_native_platform != 'macos-intel-display' && inputs.updater_qa_native_platform != 'macos-intel-startup' && inputs.updater_qa_native_platform != 'macos-intel-fixed'
     # GitHub hides drafts from contents:read tokens. This manual QA job reads
     # the pinned draft and its assets; it contains no release publication steps.
     permissions:
@@ -367,6 +367,13 @@ jobs:
           execFileSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD']);
           const allowed = new Set(['.github/workflows/desktop-packages.yml',
             '.github/workflows/native-display-qa.yml',
+            '.github/workflows/intel-startup-qa.yml',
+            '.github/workflows/intel-arena-regression.yml',
+            'apps/desktop-electron/scripts/diagnose-intel-startup.mjs',
+            'apps/desktop-electron/scripts/diagnose-intel-player.cjs',
+            'apps/desktop-electron/scripts/diagnose-intel-installed.mjs',
+            'apps/desktop-electron/scripts/lib/electron-smoke-helpers.mjs',
+            'apps/desktop-electron/scripts/lib/electron-smoke-helpers.test.mjs',
             'apps/desktop-electron/scripts/diagnose-macos-display.cjs',
             'apps/desktop-electron/scripts/battle-effect-framebuffer-contract.mjs',
             'apps/desktop-electron/scripts/battle-effect-framebuffer-contract.test.mjs',
@@ -469,3 +476,10 @@ jobs:
     uses: ./.github/workflows/intel-startup-qa.yml
     with:
       diagnostic_run_id: ${{ inputs.updater_qa_source_run_id }}
+
+  intel-fixed-qa:
+    if: inputs.updater_qa_native_platform == 'macos-intel-fixed'
+    uses: ./.github/workflows/intel-arena-regression.yml
+    with:
+      diagnostic_run_id: ${{ inputs.updater_qa_source_run_id }}
+      product_sha: ${{ inputs.updater_qa_target_sha }}

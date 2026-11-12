@@ -89,6 +89,7 @@ for (let trial = 1; trial <= 3; trial++) {
     results.push(report);
     await writeFile(path.join(evidence, `installed-${label}-${trial}.json`), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify({ trial, label, ...report.firstWindow, observedSamples: undefined, audio }));
+    assert.doesNotMatch(stderr, /unrecognized flag|Error: illegal value|bad option/i, 'Electron rejected the compiler policy');
   } finally {
     main?.close();player?.close();
     if (child) await terminateChild(child);

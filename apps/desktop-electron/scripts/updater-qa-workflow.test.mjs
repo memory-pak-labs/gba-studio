@@ -15,6 +15,17 @@ function nativeHosts(platform = 'both', nativePlatform = 'all') {
 }
 
 describe('installed updater QA workflow', () => {
+  it('tests a pinned source fix separately from the unmodified signed candidate', () => {
+    expect(workflow.jobs['published-updater-qa'].if).toContain("inputs.updater_qa_native_platform != 'macos-intel-fixed'");
+    expect(workflow.jobs['intel-fixed-qa'].uses).toBe('./.github/workflows/intel-arena-regression.yml');
+    const regression = require('js-yaml').load(readFileSync(new URL('../../../.github/workflows/intel-arena-regression.yml', import.meta.url), 'utf8'));
+    expect(regression.permissions).toEqual({ contents: 'read', actions: 'read' });
+    const checkouts = regression.jobs.arena.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
+    expect(checkouts.map(step => step.with.path)).toEqual(['qa-driver', 'product']);
+    expect(checkouts[1].with.ref).toBe('${{ inputs.product_sha }}');
+    expect(regression.jobs.arena.steps.find(step => step.name === 'Verify identical ROM and emulation core').run).toContain("'diff', '--exit-code', original.candidate");
+  });
+
   it('isolates Intel cold startup without running or altering the release gate', () => {
     expect(workflow.on.workflow_dispatch.inputs.updater_qa_native_platform.options).toContain('macos-intel-startup');
     expect(workflow.jobs['published-updater-qa'].if).toContain("inputs.updater_qa_native_platform != 'macos-intel-startup'");
