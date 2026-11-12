@@ -14,6 +14,15 @@ const expectedRuntimes = [
   "luta"
 ];
 
+export function exemploSceneBuildTimeoutMs(value) {
+  if (value === undefined || value === '') return 300_000;
+  const timeout = Number(value);
+  if (!/^\d+$/.test(String(value)) || !Number.isSafeInteger(timeout) || timeout < 300_000 || timeout > 900_000) {
+    throw new Error('Invalid scene compilation timeout: expected 300000 to 900000 milliseconds');
+  }
+  return timeout;
+}
+
 export function activeBuildRomPaths(files) {
   return files.filter((file) => file.endsWith(".gba") && !file.split(/[\\/]/).includes(".gba-cache"));
 }

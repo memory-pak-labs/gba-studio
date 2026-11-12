@@ -8,16 +8,18 @@ import { describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
 const workflow = require('js-yaml').load(readFileSync(new URL('../../../.github/workflows/desktop-packages.yml', import.meta.url), 'utf8'));
 
-function nativeHosts(platform = 'all') {
+function nativeHosts(platform = 'both', nativePlatform = 'all') {
   const include = workflow.jobs['published-updater-qa'].strategy.matrix.include;
   if (Array.isArray(include)) return include;
-  return runInNewContext(include.trim().slice(3, -2), { inputs: { updater_qa_platform: platform }, fromJSON: JSON.parse });
+  return runInNewContext(include.trim().slice(3, -2), { inputs: { updater_qa_platform: platform, updater_qa_native_platform: nativePlatform }, fromJSON: JSON.parse });
 }
 
 describe('installed updater QA workflow', () => {
   it('retries only a selected operating system without repeating already validated native hosts', () => {
     expect(nativeHosts('linux').map(item => item.platform)).toEqual(['linux']);
     expect(nativeHosts('windows').map(item => item.platform)).toEqual(['windows']);
+    expect(nativeHosts('both', 'macos-intel').map(item => item.platform)).toEqual(['macos-intel']);
+    expect(nativeHosts('linux', 'macos-arm64').map(item => item.platform)).toEqual(['macos-arm64']);
     expect(nativeHosts().map(item => item.platform)).toEqual(['windows', 'linux', 'macos-intel', 'macos-arm64']);
   });
   it('tests the exact updated Linux payload offline without requiring the AppImage shell launcher', () => {
@@ -81,9 +83,12 @@ describe('installed updater QA workflow', () => {
     expect(inputs.updater_qa_source_version.default).toBe('0.1.0-rc.6');
     expect(inputs.updater_qa_target_version.default).toBe('0.1.0-rc.7');
     expect(inputs.updater_qa_target_draft.default).toBe(false);
+    expect(inputs.updater_qa_native_platform.default).toBe('all');
+    expect(inputs.updater_qa_scene_build_timeout_ms.default).toBe('300000');
     const qa = workflow.jobs['published-updater-qa'];
     expect(qa.env.GBA_UPDATER_QA_TARGET_SHA).toContain('inputs.updater_qa_target_sha');
     expect(qa.env.GBA_UPDATER_QA_TARGET_DRAFT).toContain('inputs.updater_qa_target_draft');
+    expect(qa.env.GBA_STUDIO_EXEMPLO_SCENE_BUILD_TIMEOUT_MS).toContain('inputs.updater_qa_scene_build_timeout_ms');
     expect(qa.steps.find(step => step.name === 'Verify QA changes preserve the frozen candidate').if).toBe('inputs.updater_qa_target_draft');
     expect(qa.steps.find(step => step.uses?.startsWith('actions/checkout')).with['fetch-depth']).toBe(0);
     expect(workflow.permissions.contents).toBe('read');

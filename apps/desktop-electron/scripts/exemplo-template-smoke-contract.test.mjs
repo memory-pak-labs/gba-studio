@@ -1,9 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { activeBuildRomPaths, fullProjectRuntimeEvidence } from "./exemplo-template-smoke-contract.mjs";
+import { activeBuildRomPaths, fullProjectRuntimeEvidence, exemploSceneBuildTimeoutMs } from "./exemplo-template-smoke-contract.mjs";
 
 describe("Exemplo template full-project smoke contract", () => {
+  it('bounds cold scene compilation separately from ROM performance and fidelity', () => {
+    expect(exemploSceneBuildTimeoutMs()).toBe(300_000);
+    expect(exemploSceneBuildTimeoutMs('600000')).toBe(600_000);
+    expect(exemploSceneBuildTimeoutMs('900000')).toBe(900_000);
+  });
+  it.each(['0', '-1', '299999', '900001', 'Infinity', '300000.5', 'not-a-timeout'])('rejects invalid compilation budgets: %s', value => {
+    expect(() => exemploSceneBuildTimeoutMs(value)).toThrow(/compilation timeout/);
+  });
   it("seleciona a ROM ativa sem contar cópias de variantes em cache", () => {
     expect(activeBuildRomPaths([
       "/export/mixed/build/project.gba",

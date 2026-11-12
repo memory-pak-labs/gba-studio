@@ -36,6 +36,15 @@ on:
         description: 'Full frozen source commit required for an unpublished candidate'
         type: string
         default: ''
+      updater_qa_native_platform:
+        description: 'Native updater host to validate; all retains the existing platform selection'
+        type: choice
+        options: [all, windows, linux, macos-intel, macos-arm64]
+        default: all
+      updater_qa_scene_build_timeout_ms:
+        description: 'Bounded cold scene export wait (300000-900000 ms); ROM performance checks remain unchanged'
+        type: string
+        default: '300000'
 
 permissions:
   contents: read
@@ -312,8 +321,10 @@ jobs:
       matrix:
         include: >-
           ${{ fromJSON(
-            inputs.updater_qa_platform == 'linux' && '[{"platform":"linux","runner":"ubuntu-24.04","architecture":"x64"}]' ||
-            inputs.updater_qa_platform == 'windows' && '[{"platform":"windows","runner":"windows-2022","architecture":"x64"}]' ||
+            inputs.updater_qa_native_platform == 'macos-intel' && '[{"platform":"macos-intel","runner":"macos-15-intel","architecture":"x64"}]' ||
+            inputs.updater_qa_native_platform == 'macos-arm64' && '[{"platform":"macos-arm64","runner":"macos-15","architecture":"arm64"}]' ||
+            (inputs.updater_qa_native_platform == 'linux' || (inputs.updater_qa_native_platform == 'all' && inputs.updater_qa_platform == 'linux')) && '[{"platform":"linux","runner":"ubuntu-24.04","architecture":"x64"}]' ||
+            (inputs.updater_qa_native_platform == 'windows' || (inputs.updater_qa_native_platform == 'all' && inputs.updater_qa_platform == 'windows')) && '[{"platform":"windows","runner":"windows-2022","architecture":"x64"}]' ||
             '[{"platform":"windows","runner":"windows-2022","architecture":"x64"},{"platform":"linux","runner":"ubuntu-24.04","architecture":"x64"},{"platform":"macos-intel","runner":"macos-15-intel","architecture":"x64"},{"platform":"macos-arm64","runner":"macos-15","architecture":"arm64"}]'
           ) }}
     defaults:
@@ -325,6 +336,7 @@ jobs:
       GBA_UPDATER_QA_TARGET_VERSION: ${{ inputs.updater_qa_target_version }}
       GBA_UPDATER_QA_TARGET_DRAFT: ${{ inputs.updater_qa_target_draft && '1' || '0' }}
       GBA_UPDATER_QA_TARGET_SHA: ${{ inputs.updater_qa_target_sha }}
+      GBA_STUDIO_EXEMPLO_SCENE_BUILD_TIMEOUT_MS: ${{ inputs.updater_qa_scene_build_timeout_ms }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -358,6 +370,9 @@ jobs:
             'apps/desktop-electron/scripts/updater-qa-workflow.test.mjs',
             'apps/desktop-electron/scripts/prepare-published-updater-qa.mjs',
             'apps/desktop-electron/scripts/smoke-electron-exemplo-template.mjs',
+            'apps/desktop-electron/scripts/smoke-electron-exemplo-scenes.mjs',
+            'apps/desktop-electron/scripts/exemplo-template-smoke-contract.mjs',
+            'apps/desktop-electron/scripts/exemplo-template-smoke-contract.test.mjs',
             'apps/desktop-electron/scripts/smoke-installed-update.mjs']);
           const files = execFileSync('git', ['diff', '--name-only', sha, 'HEAD'], { encoding: 'utf8' }).trim().split(/\r?\n/).filter(Boolean);
           assert(files.every(file => allowed.has(file)), 'QA revision changes the frozen product sources');

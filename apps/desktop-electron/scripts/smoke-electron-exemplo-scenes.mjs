@@ -1,4 +1,5 @@
 import { platformerCameraPosition, composePlatformerViewport } from './platformer-viewport-contract.mjs';
+import { exemploSceneBuildTimeoutMs } from './exemplo-template-smoke-contract.mjs';
 import { findIsometricRoute, isometricDirectionButtons } from "./exemplo-isometric-route.mjs";
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -124,6 +125,7 @@ const soakMinutes = parseExemploSceneSoakMinutes(process.argv.slice(2));
 const transitionProbeStyle = process.env.GBA_STUDIO_CANONICAL_TRANSITION_PROBE_STYLE?.trim() || null;
 const transitionProbeStyles = new Set(["fade", "fade-color", "wipe", "mosaic", "slide", "crossfade"]);
 const port = Number(process.env.GBA_STUDIO_SMOKE_CDP_PORT ?? 9374);
+const sceneBuildTimeoutMs = exemploSceneBuildTimeoutMs(process.env.GBA_STUDIO_EXEMPLO_SCENE_BUILD_TIMEOUT_MS);
 const evidenceRoot = process.env.GBA_STUDIO_EXEMPLO_SCENES_OUTPUT
   ?? join(appRoot, "artifacts", "exemplo-scene-playtest", "latest");
 const framebufferDumpRoot = join(evidenceRoot, "framebuffers");
@@ -331,7 +333,7 @@ async function waitForTarget(predicate, description, timeoutMs = 300_000) {
   })))}.`);
 }
 
-async function waitForPlayerTarget(mainCdp, beforeIDs, description, sceneName, timeoutMs = 300_000) {
+async function waitForPlayerTarget(mainCdp, beforeIDs, description, sceneName, timeoutMs = sceneBuildTimeoutMs) {
   let deadline = Date.now() + timeoutMs;
   let buildRestarts = 0;
   let lastTargets = [];
@@ -6373,6 +6375,7 @@ async function main() {
         sourceKey: projectSource.sourceKey
       },
       requestedSceneName,
+      sceneBuildTimeoutMs,
       results,
       sessionSoak,
       soakMinutes,
