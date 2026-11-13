@@ -19,6 +19,8 @@ int main() {
     gbs::update_racing_vehicle_animator(animator,complete,256,{false,true,-1},false);assert(animator.animation==&brake_left);
     gbs::update_racing_vehicle_animator(animator,complete,256,{false,true,1},false);assert(animator.animation==&brake_right);
     gbs::update_racing_vehicle_animator(animator,complete,256,{false,true,0},false);assert(animator.animation==&brake);
+    const gbs::RacingVehicleAnimationSet no_brake{&idle,&drive};
+    gbs::update_racing_vehicle_animator(animator,no_brake,-128,{false,true,0},false);assert(animator.animation==&drive);
     gbs::update_racing_vehicle_animator(animator,complete,256,{false,true,1},true);assert(animator.animation==&hurt);
     const gbs::SpriteAnimation idle_right{frames,1,true},drive_right{frames,2,true},hurt_right{frames,1,false};
     const gbs::RacingVehicleAnimationSet directional{&idle,&drive,&left,&right,&brake,&hurt,nullptr,nullptr,

@@ -753,8 +753,9 @@ void append_hud_number(char* buffer, size_t capacity, size_t& length, unsigned i
 
 GBS_RACING_RENDER_CODE void draw_racing_hud(const gbs::RacingRoomData& room) {
     const int maximum_speed = gbs::racing_boost_max_speed_x256(room, runtime_state);
+    const int speed_magnitude = runtime_state.speed_x256 < 0 ? -runtime_state.speed_x256 : runtime_state.speed_x256;
     const unsigned int speed = maximum_speed > 0
-        ? static_cast<unsigned int>(clamp_int((runtime_state.speed_x256 * 99) / maximum_speed, 0, 99))
+        ? static_cast<unsigned int>(clamp_int((speed_magnitude * 99) / maximum_speed, 0, 99))
         : 0;
     const unsigned int laps = room.config.pseudo3d.laps_to_win > 0
         ? room.config.pseudo3d.laps_to_win
@@ -765,7 +766,7 @@ GBS_RACING_RENDER_CODE void draw_racing_hud(const gbs::RacingRoomData& room) {
     if (layout && (std::strcmp(layout->id, "hud-porto-corrida") == 0 || std::strcmp(layout->id, "hud-porto-corrida-challenge") == 0)) {
         const auto porto = gbs::porto_racing_hud_text(lap, laps, position,
             static_cast<unsigned int>(room.actor_count + 1),
-            static_cast<unsigned int>(runtime_state.speed_x256 * 40 / 256), runtime_state.elapsed_frames);
+            static_cast<unsigned int>(speed_magnitude * 40 / 256), runtime_state.elapsed_frames);
         char boost[9] {};
         gbs::racing_boost_hud_text(runtime_state,gbs::racing_challenge_boost_enabled(room,event_state),boost);
         const char* slots[] = { porto.position, porto.lap, porto.time, porto.speed, boost };
@@ -868,7 +869,7 @@ const gbs::MetaSprite* current_vehicle_sprite() {
     const auto* visual = project.rooms[current_room_index].player_visual;
     const auto* idle = visual ? visual->idle : project.player_idle_metasprite;
     const auto* drive = visual ? visual->drive : project.player_drive_metasprite;
-    return runtime_state.speed_x256 > 0 && drive ? drive : idle;
+    return runtime_state.speed_x256 != 0 && drive ? drive : idle;
 }
 
 GBS_RACING_RENDER_CODE void draw_pseudo3d_actors(const gbs::RacingRoomData& room, bool controls_active) {
