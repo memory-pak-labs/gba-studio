@@ -8,7 +8,8 @@ import {
   createRomPlayerServer,
   normalizeRomPlayerFrameStats,
   romPlayerBrowserWindowOptions,
-  resolveWebPlayerRoot
+  resolveWebPlayerRoot,
+  preferSoftwarePlayerFramebuffer
 } from "./romPlayerWindow.js";
 import { createInputReplay } from "../shared/inputReplay.js";
 
@@ -26,6 +27,23 @@ afterEach(async () => {
 });
 
 describe("romPlayerWindow", () => {
+  it.each([
+    ['darwin', 'x64', false, true], ['darwin', 'x64', true, false],
+    ['darwin', 'arm64', false, false], ['win32', 'x64', false, false], ['linux', 'x64', false, false]
+  ] as const)('selects the CPU framebuffer only for native Intel on %s/%s', (platform, arch, translated, expected) => {
+    expect(preferSoftwarePlayerFramebuffer(platform, arch, translated)).toBe(expected);
+  });
+  it('forwards the explicit CPU framebuffer choice without changing ordinary player URLs', async () => {
+    const root = await tempRoot(); const romPath = path.join(root, 'game.gba');
+    await writeFile(romPath, new Uint8Array([1, 2, 3]));
+    const software = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: 'CPU', softwareFramebuffer: true });
+    const ordinary = await createRomPlayerServer({ romPath, webPlayerRoot: root, title: 'Default' });
+    try {
+      expect(new URL(software.url).searchParams.get('framebuffer')).toBe('cpu');
+      expect(new URL(ordinary.url).searchParams.has('framebuffer')).toBe(false);
+    } finally { await software.close(); await ordinary.close(); }
+  });
+
   it("retains the complete recording state across IPC and rejects malformed snapshots", () => {
     const stats = { cpuPercent: 8, droppedFrameRatio: 0, droppedFrames: 0, emulationFps: 60,
       emulationMs: 1.2, fps: 60, frameMs: 16.67, presentationFps: 60, romBytes: 85000 };

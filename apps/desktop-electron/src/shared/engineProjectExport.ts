@@ -3706,7 +3706,8 @@ function buildAssetcAudioPackGenerationUncached(data: GBAProjectData): AssetcAud
       sourceCopies.push({ id: String(asset.id), name, kind: "Audio", source, output: `assets/audio/${file}`, trackerModule: song });
       const projectVolume = integerField(child(settings(data), "audio"), "musicVolume", 100);
       tracker.push({ name: exportID, [extension]: file, loop: booleanField(audio, "loops", false), row_duration_frames: 4,
-        native_primary_volume: trackerVolumeFromAudioVolume(projectVolume * integerField(audio, "volume", 100) / 100) });
+        // Prepared PCM is keyed by the actual Music bus, as for unopened imports.
+        native_primary_volume: trackerVolumeFromAudioVolume(projectVolume) });
       return;
     }
 

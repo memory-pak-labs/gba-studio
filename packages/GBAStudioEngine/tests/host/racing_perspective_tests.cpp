@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <initializer_list>
 #include "gbs/racing.hpp"
 #include "gbs/racing_camera.hpp"
 
@@ -25,6 +26,18 @@ int main() {
     assert(east.x_x256 < player.x && east.y_x256 == player.y);
     auto origin = gbs::racing_camera_project(north, player, camera, 48);
     assert(origin.visible && origin.x == 120 && origin.y == 120 && origin.scale_x256 == 256);
+    // A fixed follow-camera distance must keep the player's screen anchor
+    // stable throughout a turn, including interpolated compass angles.
+    for (const auto config : {gbs::RacingCameraConfig {48,64,96}, gbs::RacingCameraConfig {56,80,96}}) {
+        const int expected_y = 48 + config.height * config.focal_length / config.distance;
+        for (uint16_t angle = 0; angle < 4096; ++angle) {
+            const auto pose = gbs::racing_camera_pose(player, angle, config);
+            const auto projected = gbs::racing_camera_project(pose, player, config, 48);
+            assert(projected.visible && projected.x == 120 && projected.y == expected_y);
+            assert(projected.depth_x256 == config.distance * 256 && projected.scale_x256 == 256);
+        }
+    }
+    assert(!gbs::racing_camera_project({0,0,0,0}, player, camera, 48).visible);
     auto ahead = gbs::racing_camera_project(north, { player.x, player.y - 64 * 256 }, camera, 48);
     assert(ahead.visible && ahead.x == 120 && ahead.y < origin.y && ahead.scale_x256 < origin.scale_x256);
     auto behind = gbs::racing_camera_project(north, { player.x, player.y + 128 * 256 }, camera, 48);

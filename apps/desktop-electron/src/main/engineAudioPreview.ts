@@ -84,10 +84,11 @@ extern "C" { volatile uint32_t audio_preview[8] __attribute__((section(".ewram_b
 extern "C" int gbs_main() {
  gbs::init();
  gbs::set_audio_mixing_rate(${projectAudioMixingRate(data)});
+ // PCM voices also pass through the primary bus; keep the PCM sub-bus neutral.
  gbs::set_audio_channel_volume(gbs::AudioChannel::Music,${gain("musicVolume")});
- gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic,${gain("musicVolume")});
+ gbs::set_audio_channel_volume(gbs::AudioChannel::PcmMusic,15);
  gbs::set_audio_channel_volume(gbs::AudioChannel::Sfx,${gain("sfxVolume")});
- gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx,${gain("sfxVolume")});
+ gbs::set_audio_channel_volume(gbs::AudioChannel::PcmSfx,15);
  audio_preview[6]=2; // Pending: large tracker validation can cross a video frame.
  audio_preview[0]=0x41555043;audio_preview[1]=0x50434d31;
  audio_preview[6]=${call};

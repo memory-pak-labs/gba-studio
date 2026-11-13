@@ -829,7 +829,7 @@ export function gamepadKeys(navigatorObject = navigator) {
   return keys;
 }
 
-export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameStats, replay, keyboardBindings, batteryOptions, touchControls, recordInput = false, recordingLaunch, recordingID }) {
+export async function startMGBAPlayer({ container, softwareFramebuffer = false, romUrl, storageKey, onFrameStats, replay, keyboardBindings, batteryOptions, touchControls, recordInput = false, recordingLaunch, recordingID }) {
   if (!(container instanceof HTMLElement)) throw new Error("Container do GBA Studio Player invalido.");
   const keyboardKeys = keyboardKeyMapForBindings(keyboardBindings);
   const [{ default: createMGBA }, response] = await Promise.all([
@@ -900,7 +900,8 @@ export async function startMGBAPlayer({ container, romUrl, storageKey, onFrameSt
     canvas.dataset.input = "none";
     canvas.tabIndex = 0;
     canvas.dataset.audio = "suspended";
-    const context = canvas.getContext("2d", { alpha: false });
+    const context = canvas.getContext("2d", softwareFramebuffer
+      ? { alpha: false, willReadFrequently: true } : { alpha: false });
     if (!context) throw new Error("Canvas 2D indisponivel.");
     const image = context.createImageData(WIDTH, HEIGHT);
     const keyboardInput = createKeyboardInputLatch();

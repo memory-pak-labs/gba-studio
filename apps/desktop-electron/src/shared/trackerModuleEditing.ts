@@ -34,6 +34,17 @@ export function createEditableTrackerCopyInProject(data: GBAProjectData, audioID
   return { ...data, audioItems: [...items, copy] };
 }
 
+/** Store an editable overlay on the library item without changing its identity or source. */
+export function prepareTrackerModuleForEditingInProject(data: GBAProjectData, audioID: string, song: TrackerModuleSong): GBAProjectData {
+  validateTrackerModuleSong(song);
+  const source = audioRecords(data.audioItems).find(item => item.id === audioID);
+  const asset = source && audioSourceAsset(data, source);
+  if (!source || source.kind !== "Musica" || !asset || audioSourceFormat(data, source) !== song.format) throw new Error("Selecione uma música MOD, S3M, XM ou IT importada.");
+  if (isTrackerModule(source)) return data;
+  const overlay = { ...source, ...structuredClone(song), trackerModule: { ...structuredClone(song.trackerModule), projectOverlay: true } };
+  return { ...data, audioItems: (data.audioItems as Record<string, unknown>[]).map(item => item === source ? overlay : item) };
+}
+
 function emptyChannel(id: string, index: number, rows = 64): TrackerModuleChannel {
   return { id, name: `Canal ${index + 1}`, type: "pcm", notes: Array(rows).fill("---"),
     trackerCells: Array.from({ length: rows }, () => ({ instrument: 0, effect: 0, parameter: 0 })) };
