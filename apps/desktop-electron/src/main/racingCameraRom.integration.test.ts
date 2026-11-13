@@ -57,6 +57,25 @@ describe.skipIf(!output || !music)("rear-view car anchor during actual steering"
         }
         evidence.warmup = warmup;
         expect(ready, "canonical countdown completes and all sixteen music voices start").toBe(true);
+        // A stationary camera must keep the floor in the same place even when
+        // the mixer occupies VBlank. This region excludes HUD and cars.
+        const floorWaterPixels: number[] = [];
+        const stationaryPlayer = readRuntimeTelemetry(core).player;
+        core._gba_set_keys(0);
+        for (let frame = 0; frame < 36; ++frame) {
+          core._gba_run_frame();
+          const telemetry = readRuntimeTelemetry(core);
+          expect(telemetry.player).toEqual(stationaryPlayer);
+          const pixels = core.HEAPU8.subarray(core._gba_framebuffer(), core._gba_framebuffer() + 240 * 160 * 4);
+          let water = 0;
+          for (let y = 65; y < 115; ++y) for (let x = 200; x < 232; ++x) {
+            const index = (y * 240 + x) * 4;
+            if (pixels[index] === 0 && pixels[index + 1] === 90 && pixels[index + 2] === 214) ++water;
+          }
+          floorWaterPixels.push(water);
+        }
+        evidence.stationaryFloorWaterPixels = floorWaterPixels;
+        expect(new Set(floorWaterPixels).size, "stationary floor does not jump between scanlines").toBe(1);
         const windows: Record<string, unknown>[] = []; evidence.windows = windows;
         const yValues = new Set<number>(), headings = new Set<number>();
         let minVoices = 99, maxUnderruns = 0;

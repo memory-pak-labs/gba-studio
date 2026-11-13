@@ -52,6 +52,7 @@ struct {uint8_t enabled;} scene_raster_tables[2];int scene_raster_active=0;
 uint16_t fake_palette[256]{}, fake_control=0, fake_ie=1, fake_status=8, fake_vcount=160;
 uint16_t shadow_bg_enabled_bits=0x500;
 uint8_t render_publication_blocked=0, render_handoff_fallback_active=0;
+uint8_t affine_hblank_enabled=0, affine_hblank_frame_ready=0;
 #define MEM_PALETTE fake_palette
 #define REG_BLDCNT fake_control
 #define REG_BLDALPHA fake_control
