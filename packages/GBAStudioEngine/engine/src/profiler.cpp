@@ -35,7 +35,13 @@ struct SubsystemProfiler {
     bool active;
 };
 static_assert(sizeof(SubsystemProfiler) <= 128, "native subsystem profiler RAM budget");
+// Profiling state is not part of the audio/IRQ hot path; keep scarce IWRAM
+// available for cartridge drivers and runtime code in full projects.
+#if defined(__arm__) || defined(__thumb__)
+SubsystemProfiler s_subsystems __attribute__((section(".ewram_bss"))) {};
+#else
 SubsystemProfiler s_subsystems {};
+#endif
 uint32_t s_frame_total_ticks = 0;
 uint32_t s_last_frame_total_ticks = 0;
 uint32_t s_frame_count = 0;
