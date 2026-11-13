@@ -1,6 +1,6 @@
 # Exported Racing
 
-Template nativo de Corrida para GBA Studio, com vista de cima ou perspectiva affine com câmera atrás do carro. A acelera, B freia e Esquerda/Direita viram. A pista, colisões e parâmetros físicos são gerados a partir da room.
+Template nativo de Corrida para GBA Studio, com vista de cima ou perspectiva affine com câmera atrás do carro. A ou Cima acelera, B ou Baixo freia e Esquerda/Direita viram. Nos circuitos em perspectiva, manter B ou Baixo após parar engata a ré; A ou Cima reduz a velocidade de ré antes de avançar. A pista, colisões e parâmetros físicos são gerados a partir da room.
 
 Na perspectiva com circuito, o mapa quadrado usa 32, 64 ou 128 tiles de 8 pixels por lado e até 256 tiles únicos no piso. Células apagadas recebem um tile transparente; se os 256 tiles já estiverem ocupados e nenhum for transparente, o compilador pede espaço para ele. Panorama e minimapa são opcionais. A altura, distância e perspectiva da câmera acompanham os dados exportados.
 

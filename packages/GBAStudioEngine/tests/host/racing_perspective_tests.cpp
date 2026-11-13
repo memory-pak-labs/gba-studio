@@ -79,7 +79,39 @@ int main() {
     bool blocked=false;
     for(int i=0;i<8;++i) if(!gbs::tick_racing_vehicle(state,room,{true,false,0})) blocked=true;
     assert(blocked && state.position_x256 < 272*256 && state.collision_frames>0);
+    while (state.speed_x256 > 0) gbs::tick_racing_vehicle(state,room,{false,true,0});
+    const int crashed_x=state.position_x256;
+    const int distance_before_reverse=state.distance_x256;
+    for(int i=0;i<30;++i) assert(gbs::tick_racing_vehicle(state,room,{false,true,0}));
+    assert(state.speed_x256 < 0 && state.position_x256 < crashed_x-256);
+    assert(state.speed_x256 >= -room.config.max_speed_x256/2);
+    assert(state.distance_x256 == distance_before_reverse);
+    const auto reverse_heading=state.heading_x256;
+    assert(gbs::tick_racing_vehicle(state,room,{false,true,1}));
+    assert(state.heading_x256 < reverse_heading); // steering reverses while backing up
+    for(int i=0;i<60 && state.speed_x256<0;++i) gbs::tick_racing_vehicle(state,room,{true,false,0});
+    assert(state.speed_x256 == 0); // accelerate first stops reverse motion
+    gbs::tick_racing_vehicle(state,room,{true,false,0});
+    assert(state.speed_x256 > 0);
     flags[32*64+34]=0;
+    static constexpr gbs::RacingTopdownCheckpoint reverse_gate[] = {
+        {"reverse-gate",{250,256},4,8}
+    };
+    constexpr gbs::RacingTopdownTrackData reverse_track {0,0,reverse_gate,1,4,path,4};
+    room.topdown_track=&reverse_track;
+    state=gbs::make_racing_runtime_state(room);
+    for(int i=0;i<30;++i) gbs::tick_racing_vehicle(state,room,{false,true,0});
+    assert(state.position_x256 < 248*256 && state.checkpoint_count == 0 && state.lap_count == 0);
+    for(int i=0;i<120 && state.speed_x256<0;++i) gbs::tick_racing_vehicle(state,room,{});
+    assert(state.speed_x256 == 0); // releasing reverse slows the car to a stop
+    flags[32*64+30]=1;
+    room.topdown_track=&track;
+    state=gbs::make_racing_runtime_state(room);
+    state.last_checkpoint=-1;
+    assert(!gbs::tick_racing_vehicle(state,room,{false,true,0}));
+    assert(state.speed_x256 == 0 && state.position_x256 == 256*256);
+    assert(state.checkpoint_count == 0 && state.lap_count == 0);
+    flags[32*64+30]=0;
     static constexpr gbs::RacingTopdownCheckpoint narrow_gates[]={
         {"finish",{256,256},1,1},{"gate",{265,256},1,1}
     };

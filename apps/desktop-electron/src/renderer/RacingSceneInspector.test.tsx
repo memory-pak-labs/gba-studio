@@ -7,6 +7,12 @@ import { RacingSceneInspector } from "./RacingSceneInspector";
 
 afterEach(cleanup);
 
+it("explains how to reverse in a perspective circuit", () => {
+  render(<RacingSceneInspector config={normalizeRacingSceneConfig({presentation:"pseudo3d",topdownTrack:createRacingCircuitTrack(64,64)})}
+    width={64} height={64} background="floor.png" assets={[]} onChange={vi.fn()} onPrepare={vi.fn()}/>);
+  expect(screen.getByText(/B ou ↓ freia e engata a ré após parar/)).toBeTruthy();
+});
+
 it("prepares positional checkpoints and a rival route for a new perspective circuit", () => {
   const onPrepare=vi.fn();
   render(<RacingSceneInspector config={normalizeRacingSceneConfig({presentation:"pseudo3d"})}
@@ -26,6 +32,7 @@ it("describes the preserved checkpoint order of older racing scenes", () => {
     width={64} height={64} background="floor.png" assets={[]}
     onChange={vi.fn()} onPrepare={vi.fn()}/>);
   expect(screen.queryByRole("group",{name:"Chegada"})).toBeNull();
+  expect(screen.queryByText(/engata a ré após parar/)).toBeNull();
   expect(screen.getByRole("group",{name:"Checkpoint 1"})).toBeTruthy();
   expect(screen.getByText(/O último completa a volta/)).toBeTruthy();
 });

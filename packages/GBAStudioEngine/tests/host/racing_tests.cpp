@@ -208,6 +208,22 @@ int main() {
     assert(restored_event_state.variables[3] == 77);
     assert(restored_event_state.inventory[2] == 5);
 
+    auto reverse_room = room;
+    reverse_room.config.pseudo3d.presentation = gbs::RacingPresentation::Pseudo3D;
+    reverse_room.topdown_track = &topdown_track;
+    auto reverse_project = project;
+    reverse_project.rooms = &reverse_room;
+    auto reversing = state;
+    reversing.speed_x256 = -reverse_room.config.max_speed_x256 / 4;
+    gbs::UniversalSaveData reverse_save {};
+    assert(gbs::capture_racing_save_data(reverse_save, 0, reversing, event_state, 3600));
+    assert(gbs::apply_racing_save_data(reverse_project, reverse_save, restored_room, restored_state, restored_event_state));
+    assert(restored_state.speed_x256 == reversing.speed_x256);
+    assert(!gbs::apply_racing_save_data(project, reverse_save, restored_room, restored_state, restored_event_state));
+    reversing.speed_x256 = -reverse_room.config.max_speed_x256;
+    assert(gbs::capture_racing_save_data(reverse_save, 0, reversing, event_state, 3600));
+    assert(!gbs::apply_racing_save_data(reverse_project, reverse_save, restored_room, restored_state, restored_event_state));
+
     const gbs::RacingInput player_input { true, true, -1, true };
     const gbs::RacingInput scripted_input = gbs::racing_runtime_input(player_input, true);
     assert(!scripted_input.accelerate);

@@ -18,6 +18,8 @@ describe.skipIf(!output || !music)("rear-view car anchor during actual steering"
     const pack = path.resolve(process.env.GBA_TRACKER_ENGINE_PACK ?? "../../packages/GBAStudioEngine/dist/GBAStudioEnginePack");
     const evidence: Record<string, unknown> = { passed: false };
     try {
+      expect(await readFile(path.join(pack, "templates/exported_mixed/racing_runtime.inc")))
+        .toEqual(await readFile(path.join(pack, "templates/exported_racing/main.cpp")));
       await symlink(path.join(template, "Assets"), path.join(work, "Assets"), "dir");
       const musicBytes = await readFile(music!); await writeFile(path.join(work, "stress.xm"), musicBytes);
       const data = JSON.parse(source.toString()); const scene = "circuito_perspectiva";
@@ -57,6 +59,66 @@ describe.skipIf(!output || !music)("rear-view car anchor during actual steering"
         }
         evidence.warmup = warmup;
         expect(ready, "canonical countdown completes and all sixteen music voices start").toBe(true);
+        // A stationary camera must keep the floor in the same place even when
+        // the mixer occupies VBlank. This region excludes HUD and cars.
+        const floorWaterPixels: number[] = [];
+        const stationaryPlayer = readRuntimeTelemetry(core).player;
+        core._gba_set_keys(0);
+        for (let frame = 0; frame < 36; ++frame) {
+          core._gba_run_frame();
+          const telemetry = readRuntimeTelemetry(core);
+          expect(telemetry.player).toEqual(stationaryPlayer);
+          const pixels = core.HEAPU8.subarray(core._gba_framebuffer(), core._gba_framebuffer() + 240 * 160 * 4);
+          let water = 0;
+          for (let y = 65; y < 115; ++y) for (let x = 200; x < 232; ++x) {
+            const index = (y * 240 + x) * 4;
+            if (pixels[index] === 0 && pixels[index + 1] === 90 && pixels[index + 2] === 214) ++water;
+          }
+          floorWaterPixels.push(water);
+        }
+        evidence.stationaryFloorWaterPixels = floorWaterPixels;
+        expect(new Set(floorWaterPixels).size, "stationary floor does not jump between scanlines").toBe(1);
+        // Drive straight into the canonical circuit wall, then hold B to
+        // escape. Restore the emulator afterwards so steering tests retain
+        // their original starting conditions.
+        const savedSize = core._gba_state_size();
+        const savedPointer = core._malloc(savedSize);
+        expect(savedPointer).toBeGreaterThan(0);
+        try {
+          expect(core._gba_save_state(savedPointer, savedSize)).toBe(1);
+          const start = readRuntimeTelemetry(core);
+          core._gba_set_keys(1); // A: accelerate
+          let lastX = start.player.x, stableSamples = 0, wall: any = null;
+          for (let frame = 0; frame < 900; ++frame) {
+            core._gba_run_frame();
+            if (frame % 15 !== 14) continue;
+            const current = readRuntimeTelemetry(core);
+            stableSamples = current.player.x === lastX ? stableSamples + 1 : 0;
+            lastX = current.player.x;
+            if (current.player.x > start.player.x + 24 && stableSamples >= 5) { wall = current; break; }
+          }
+          expect(wall, "car reaches and stops at the circuit wall").not.toBeNull();
+          core._gba_set_keys(2); // B: brake, then reverse
+          for (let frame = 0; frame < 120; ++frame) core._gba_run_frame();
+          const reversed = readRuntimeTelemetry(core);
+          evidence.reverseFromWall = { start: start.player, wall: wall.player, after: reversed.player,
+            voices: reversed.audio.activeVoiceCount, underruns: reversed.audio.pcmUnderrunCount };
+          const framebuffer = core._gba_framebuffer();
+          const reversePixels = core.HEAPU8.slice(framebuffer, framebuffer + 240 * 160 * 4);
+          await writeFile(path.join(root, "reverse-from-wall.png"), encodePngRgba({ width: 240, height: 160, pixels: reversePixels }));
+          expect(reversed.player.x, "holding B backs away from the wall").toBeLessThan(wall.player.x - 4);
+          expect(reversed.audio.activeVoiceCount).toBe(16);
+          expect(reversed.audio.pcmUnderrunCount).toBe(0);
+          // At this track's reverse speed the hundreds digit is 0. A negative
+          // speed cast to unsigned produced 999 KMH; this pixel separates 0 from 9.
+          const hundredsPixel = (149 * 240 + 180) * 4;
+          expect([...reversePixels.slice(hundredsPixel, hundredsPixel + 3)], "reverse speed HUD does not wrap to 999")
+            .toEqual([247, 231, 189]);
+        } finally {
+          expect(core._gba_load_state(savedPointer, savedSize)).toBe(1);
+          core._free(savedPointer);
+          core._gba_set_keys(0);
+        }
         const windows: Record<string, unknown>[] = []; evidence.windows = windows;
         const yValues = new Set<number>(), headings = new Set<number>();
         let minVoices = 99, maxUnderruns = 0;

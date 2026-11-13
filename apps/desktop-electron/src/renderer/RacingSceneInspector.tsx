@@ -26,7 +26,9 @@ export function RacingSceneInspector({config,width,height,background,assets,onCh
     <InspectorNumber label={ui("Velocidade de curva")} value={config.steeringSpeed} min={0.125} max={16} step={0.125} onChange={steeringSpeed=>onChange({steeringSpeed})}/>
     <InspectorNumber label={ui("Voltas para vencer")} value={config.lapsToWin} min={1} max={9} onChange={lapsToWin=>onChange({lapsToWin})}/>
     <InspectorNumber label={ui("Velocidade dos rivais")} value={config.rivalSpeed} min={0.125} max={config.presentation==="pseudo3d"&&!track?16:127} unit="px/s" step={0.125} onChange={rivalSpeed=>onChange({rivalSpeed})}/>
-    <p>{ui("A acelera, B freia e as setas viram. Os atores comuns percorrem a rota dos rivais. ")}{config.presentation === "pseudo3d"
+    <p>{config.presentation === "pseudo3d" && (track?.checkpoints.length ?? 0) > 0
+      ? ui("A ou ↑ acelera; B ou ↓ freia e engata a ré após parar. Use ← e → para virar. Os atores comuns percorrem a rota dos rivais.")
+      : ui("A acelera, B freia e as setas viram. Os atores comuns percorrem a rota dos rivais.")}{" "}{config.presentation === "pseudo3d"
       ? ui("Animações: idle, drive, steer_left, steer_right, brake, brake_left, brake_right e hurt.")
       : ui("Animações: idle, drive e hurt nas direções up, right, down e left.")}</p>
     {config.presentation==="pseudo3d" ? <>

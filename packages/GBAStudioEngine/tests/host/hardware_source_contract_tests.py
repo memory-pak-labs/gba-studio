@@ -99,7 +99,7 @@ uint16_t REG_WIN1H;
 static uint16_t window1_hblank_rows[2][161];
 static uint8_t window1_hblank_active_buffer,window1_hblank_active;
 static uint8_t pending_window1_hblank_enabled,pending_window1_hblank_dirty;
-static uint8_t affine_hblank_enabled,affine_hblank_active_buffer;
+static uint8_t affine_hblank_enabled,affine_hblank_active_buffer,affine_hblank_frame_ready;
 static uint8_t pending_hblank_scroll_enabled,pending_hblank_scroll_dirty;
 static int pending_hblank_scroll_layer;
 static const int16_t* pending_hblank_scroll_offsets;
@@ -849,6 +849,7 @@ uint16_t scene_raster_base_x,shadow_bg_scroll_x[4];
 uint8_t scene_raster_phase;
 int scene_raster_active,hblank_dispatch_required;int keypad_irq_pending,arms;
 static int affine_hblank_enabled=1;
+static int affine_hblank_frame_ready=0, render_publication_blocked=0, affine_commits=0, audio_must_follow_commit=0;
 static int window1_hblank_active=0;
 static int window_arms;
 static void capture_multiplayer_async(void){}
@@ -858,12 +859,22 @@ uint32_t gbs_hw_frame_counter_ticks(void){return ticks++;}
 void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
 void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
+static void commit_hblank_bg_scroll(void){assert(REG_VCOUNT == 160);++affine_commits;}
 void gbs_hw_mix_audio_with_hblank(void){}
 void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
-void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""
 void dispatch(void) {"""+irq+"""}
-int main(void){dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert(frame_vblank_irq_ticks==1);REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);}
+int main(void){
+ dispatch();dispatch();assert(arms==2);assert(irq_ticks==2);assert(frame_vblank_irq_ticks==1);
+ REG_IF=0;dispatch();assert(arms==2);assert(irq_ticks==2);
+ REG_IF=1;window1_hblank_active=1;dispatch();dispatch();assert(window_arms==2 && arms==2);
+ window1_hblank_active=0;REG_VCOUNT=160;affine_hblank_frame_ready=1;
+ render_publication_blocked=1;dispatch();assert(affine_commits==0 && affine_hblank_frame_ready==1);
+ render_publication_blocked=0;audio_must_follow_commit=1;dispatch();
+ assert(affine_commits==1 && affine_hblank_frame_ready==0 && REG_VCOUNT==24);
+ audio_must_follow_commit=0;dispatch();assert(affine_commits==1);
+}
 """
         with tempfile.TemporaryDirectory() as directory:
             source=Path(directory)/"irq.c";source.write_text(code);binary=Path(directory)/"irq"

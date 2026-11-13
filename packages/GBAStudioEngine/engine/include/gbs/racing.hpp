@@ -290,6 +290,11 @@ constexpr bool racing_uses_circuit_track(const RacingRoomData& room) {
     return room.topdown_track != nullptr && room.topdown_track->checkpoint_count > 0;
 }
 
+constexpr int racing_reverse_speed_limit_x256(const RacingRoomData& room) {
+    if (!racing_uses_pseudo3d(room) || !racing_uses_circuit_track(room)) return 0;
+    return room.config.max_speed_x256 >= 2 ? room.config.max_speed_x256 / 2 : 1;
+}
+
 // The affine source map occupies low VRAM. Keep the panorama after it and
 // below the fixed UI tiles (0x7000), independently of the floor's charblock 2.
 constexpr unsigned racing_panorama_base_tile(const RacingPseudo3DVisualData& visual) {
@@ -1101,7 +1106,7 @@ inline bool apply_racing_save_data(
         payload.runtime_state.position_y256 / 256
     };
     if (racing_position_blocked(room, position) ||
-        payload.runtime_state.speed_x256 < 0 ||
+        payload.runtime_state.speed_x256 < -racing_reverse_speed_limit_x256(room) ||
         payload.runtime_state.speed_x256 > racing_boost_max_speed_x256(room, payload.runtime_state) ||
         payload.runtime_state.distance_x256 < 0 ||
         payload.runtime_state.heading > 15 || payload.runtime_state.heading_x256 > 4095 ||

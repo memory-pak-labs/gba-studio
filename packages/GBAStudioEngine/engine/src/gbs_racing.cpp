@@ -13,6 +13,10 @@ int clamp_speed(int value, int maximum) {
     return value > maximum ? maximum : value;
 }
 
+int clamp_signed_speed(int value, int reverse_limit, int maximum) {
+    return value < -reverse_limit ? -reverse_limit : value > maximum ? maximum : value;
+}
+
 int abs_int(int value) {
     return value < 0 ? -value : value;
 }
@@ -48,8 +52,10 @@ void update_race_progress(RacingRuntimeState& state, const RacingRoomData& room,
         const int dy=state.position_y256/256-previous_position.y;
         const int distance=abs_int(dx)>abs_int(dy)?abs_int(dx):abs_int(dy);
         const int steps=distance>0?distance:1;
-        for(int step=1;step<=steps;++step) update_checkpoint_at(state,room,
-            {previous_position.x+dx*step/steps,previous_position.y+dy*step/steps});
+        if (!racing_uses_pseudo3d(room) || state.speed_x256 > 0) {
+            for(int step=1;step<=steps;++step) update_checkpoint_at(state,room,
+                {previous_position.x+dx*step/steps,previous_position.y+dy*step/steps});
+        }
     } else {
         const int checkpoint_span = track_length / config.checkpoints_per_lap;
         const unsigned int expected_checkpoints = static_cast<unsigned int>(
@@ -109,30 +115,34 @@ bool tick_racing_vehicle(RacingRuntimeState& state, const RacingRoomData& room, 
         state.boost_frames = 45;
     }
     const int maximum_speed = racing_boost_max_speed_x256(room, state);
+    const int reverse_limit = racing_reverse_speed_limit_x256(room);
+    const int acceleration = positive_per_frame(room.config.acceleration_x256_per_second);
+    const int braking = positive_per_frame(room.config.brake_power_x256_per_second);
     if (input.accelerate && !input.brake) {
-        state.speed_x256 = clamp_speed(
-            state.speed_x256 + positive_per_frame(room.config.acceleration_x256_per_second),
-            maximum_speed
-        );
+        if (state.speed_x256 < 0) {
+            state.speed_x256 += braking;
+            if (state.speed_x256 > 0) state.speed_x256 = 0;
+        } else state.speed_x256 = clamp_speed(state.speed_x256 + acceleration, maximum_speed);
     } else if (input.brake) {
-        state.speed_x256 = clamp_speed(
-            state.speed_x256 - positive_per_frame(room.config.brake_power_x256_per_second),
-            maximum_speed
-        );
+        if (reverse_limit > 0 && state.speed_x256 <= 0) {
+            state.speed_x256 = clamp_signed_speed(state.speed_x256 - acceleration, reverse_limit, maximum_speed);
+        } else state.speed_x256 = clamp_speed(state.speed_x256 - braking, maximum_speed);
     } else if (state.speed_x256 > 0) {
-        state.speed_x256 = clamp_speed(
-            state.speed_x256 - positive_per_frame(room.config.acceleration_x256_per_second) / 2,
-            maximum_speed
-        );
+        state.speed_x256 = clamp_speed(state.speed_x256 - acceleration / 2, maximum_speed);
+    } else if (state.speed_x256 < 0) {
+        const int drag = acceleration / 2 > 0 ? acceleration / 2 : 1;
+        state.speed_x256 += drag;
+        if (state.speed_x256 > 0) state.speed_x256 = 0;
     }
 
     const int steering = input.steering < 0 ? -1 : input.steering > 0 ? 1 : 0;
     int target_x256 = state.position_x256;
     int target_y256 = state.position_y256;
     if (racing_uses_pseudo3d(room) && racing_uses_circuit_track(room)) {
-        if(steering!=0 && state.speed_x256>0) {
+        if(steering!=0 && state.speed_x256!=0) {
             const int turn=room.config.steering_speed_x256/16;
-            state.heading_x256=static_cast<uint16_t>((state.heading_x256+4096+steering*(turn>0?turn:1))&4095);
+            const int direction=state.speed_x256<0 ? -1 : 1;
+            state.heading_x256=static_cast<uint16_t>((state.heading_x256+4096+steering*direction*(turn>0?turn:1))&4095);
             state.heading=static_cast<uint8_t>(((state.heading_x256+128)>>8)&15);
         }
         target_x256+=state.speed_x256*racing_camera_sine(state.heading_x256)/256;
@@ -187,13 +197,13 @@ bool tick_racing_vehicle(RacingRuntimeState& state, const RacingRoomData& room, 
     state.position_x256 = target_x256;
     state.position_y256 = target_y256;
     const int surface_limit=racing_surface_speed_limit_x256(room,target_pixels);
-    state.speed_x256=clamp_speed(state.speed_x256,surface_limit>=room.config.max_speed_x256?maximum_speed:surface_limit);
-    state.distance_x256 += state.speed_x256;
+    state.speed_x256=clamp_signed_speed(state.speed_x256,reverse_limit,surface_limit>=room.config.max_speed_x256?maximum_speed:surface_limit);
+    if (state.speed_x256 > 0) state.distance_x256 += state.speed_x256;
     if (completed_lap) ++state.lap_count;
     if (state.boost_frames > 0) {
         --state.boost_frames;
         if (state.boost_frames == 0) {
-            state.speed_x256 = clamp_speed(state.speed_x256, room.config.max_speed_x256);
+            state.speed_x256 = clamp_signed_speed(state.speed_x256, reverse_limit, room.config.max_speed_x256);
         }
     }
     update_race_progress(state, room,previous_position);

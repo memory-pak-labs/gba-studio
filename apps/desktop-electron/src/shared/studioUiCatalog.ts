@@ -2001,6 +2001,11 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
     "8bpp · advanced",
     "8bpp · avanzado"
   ],
+  "A ou ↑ acelera; B ou ↓ freia e engata a ré após parar. Use ← e → para virar. Os atores comuns percorrem a rota dos rivais.": [
+    "A ou ↑ acelera; B ou ↓ freia e engata a ré após parar. Use ← e → para virar. Os atores comuns percorrem a rota dos rivais.",
+    "A or ↑ accelerates; B or ↓ brakes and reverses after stopping. Use ← and → to steer. Regular actors follow the rivals' route.",
+    "A o ↑ acelera; B o ↓ frena y da marcha atrás tras detenerse. Usa ← y → para girar. Los actores comunes recorren la ruta de los rivales."
+  ],
   "A acelera, B freia e as setas viram. Os atores comuns percorrem a rota dos rivais.": [
     "A acelera, B freia e as setas viram. Os atores comuns percorrem a rota dos rivais.",
     "A accelerates, B brakes, and the arrow keys steer. Regular actors follow the rivals' route.",

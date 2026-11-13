@@ -27,7 +27,7 @@ inline void update_racing_vehicle_animator(SpriteAnimatorState& animator,
         selected = collision ? (direction.hurt ? direction.hurt : direction.idle) :
             speed_x256 == 0 ? direction.idle : direction.drive;
     }
-    if(selected == nullptr) selected = speed_x256 > 0 && clips.drive != nullptr ? clips.drive : clips.idle;
+    if(selected == nullptr) selected = speed_x256 != 0 && clips.drive != nullptr ? clips.drive : clips.idle;
     if(selected == nullptr) { init_sprite_animator(animator); return; }
     if(animator.animation != selected) play_sprite_animation(animator,*selected);
     else update_sprite_animator(animator);

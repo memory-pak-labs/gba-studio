@@ -129,6 +129,7 @@ static uint32_t affine_hblank_words[2][161 * 4] __attribute__((section(".ewram_b
 static uint8_t affine_hblank_active_buffer;
 static uint8_t affine_hblank_enabled;
 static uint8_t affine_hblank_layer;
+static volatile uint8_t affine_hblank_frame_ready;
 static uint16_t window1_hblank_rows[2][161] __attribute__((section(".ewram_bss"), aligned(4)));
 static uint8_t window1_hblank_active_buffer;
 static uint8_t window1_hblank_active;
@@ -150,6 +151,7 @@ static uint8_t pcm_timer_running;
 static uint8_t pcm_stop_after_pending;
 static void commit_pcm_stream_block(void);
 static void rearm_active_affine_hblank(void);
+static void commit_hblank_bg_scroll(void);
 static void rearm_active_window1_hblank(void);
 // Hardware-only host links may omit the mixer; the engine supplies this hook.
 void __attribute__((weak)) gbs_audio_vblank_update(void) {}
@@ -295,7 +297,10 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
         keypad_irq_pending = 1;
     }
     if ((pending & 1u) != 0) {
-        if (window1_hblank_active) rearm_active_window1_hblank();
+        if (affine_hblank_frame_ready && !render_publication_blocked && affine_hblank_enabled) {
+            affine_hblank_frame_ready = 0;
+            commit_hblank_bg_scroll();
+        } else if (window1_hblank_active) rearm_active_window1_hblank();
         else if (affine_hblank_enabled) rearm_active_affine_hblank();
         commit_scene_raster_frame();
         commit_pcm_stream_block();
@@ -1155,6 +1160,7 @@ void gbs_hw_init(void) {
     commit_shadow_bg_scroll();
     affine_hblank_enabled=0;
     affine_hblank_active_buffer=0;
+    affine_hblank_frame_ready=0;
     window1_hblank_active_buffer=0;
     window1_hblank_active=0;
     pending_window1_hblank_enabled=0;
@@ -1171,7 +1177,11 @@ void gbs_hw_init(void) {
 
 void gbs_hw_wait_vblank(void) {
     frame_vblank_irq_ticks = 0;
-    if ((REG_IE & (1u << 0)) != 0 && (REG_DISPSTAT & (1u << 3)) != 0) {
+    const int vblank_irq_enabled = (REG_IE & (1u << 0)) != 0 && (REG_DISPSTAT & (1u << 3)) != 0;
+    if (vblank_irq_enabled) {
+        // The audio IRQ can outlast VBlank. Publish the completed affine
+        // table at the start of that IRQ, before mixing delays this thread.
+        if (affine_hblank_enabled && !render_publication_blocked) affine_hblank_frame_ready = 1;
         gbs_bios_vblank_intr_wait();
     } else {
         while (REG_VCOUNT >= 160) {
@@ -1185,7 +1195,7 @@ void gbs_hw_wait_vblank(void) {
         commit_shadow_oam();
         commit_shadow_bg_tilemaps();
         commit_shadow_bg_scroll();
-        commit_hblank_bg_scroll();
+        if (!vblank_irq_enabled || !affine_hblank_enabled) commit_hblank_bg_scroll();
         if (render_handoff_fallback_active) {
             REG_DISPCNT = (uint16_t)(
                 (REG_DISPCNT & ~(0x0F00u | 0x0007u))
@@ -3617,6 +3627,7 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
     if (layer < 0 || layer > 3 || offsets == 0) {
         return;
     }
+    affine_hblank_frame_ready=0;
     affine_hblank_enabled=0;
     gbs_hw_disable_hblank_window1();
     pending_hblank_scroll_layer = layer;
@@ -3627,6 +3638,7 @@ void gbs_hw_start_hblank_bg_scroll(int layer, const int16_t* offsets) {
 
 void gbs_hw_disable_hblank_effects(void) {
     gbs_hw_disable_hblank_window1();
+    affine_hblank_frame_ready=0;
     affine_hblank_enabled=0;
     pending_hblank_scroll_enabled = 0;
     pending_hblank_scroll_dirty = 1;
@@ -3638,6 +3650,7 @@ void gbs_hw_start_hblank_window1(const uint16_t* bounds) {
     for (unsigned i = 0; i < 161; ++i) pending[i] = bounds[i];
     pending_window1_hblank_enabled = 1;
     pending_window1_hblank_dirty = 1;
+    affine_hblank_frame_ready = 0;
     affine_hblank_enabled = 0;
     pending_hblank_scroll_enabled = 0;
     pending_hblank_scroll_dirty = 1;
