@@ -1819,7 +1819,7 @@
       "id": "tempestade-approved-actor-boss",
       "name": "Farol da Tempestade",
       "roomName": "tempestade",
-      "x": 43,
+      "x": 22,
       "y": 7,
       "spriteSheet": "tempestade-approved-boss.png",
       "animationName": "idle",
@@ -1829,7 +1829,9 @@
         "width": 48,
         "height": 48,
         "health": 6,
-        "fireInterval": 40
+        "fireInterval": 40,
+        "velocityX": 0,
+        "velocityY": 0
       },
       "eventBindings": {
         "onInit": "tempestade_farol_entrar",
@@ -195374,7 +195376,7 @@
               "startFrame": 0,
               "playerSpeed": 2,
               "fireCooldown": 8,
-              "scrollSpeed": 1
+              "scrollSpeed": 0
             }
           ],
           "composition": {
@@ -242946,7 +242948,7 @@
               "startFrame": 0,
               "playerSpeed": 2,
               "fireCooldown": 8,
-              "scrollSpeed": 1
+              "scrollSpeed": 0
             }
           ],
           "composition": {

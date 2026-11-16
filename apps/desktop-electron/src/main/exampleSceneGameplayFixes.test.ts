@@ -15,3 +15,20 @@ it("authors B attack and L dash with existing events and the approved attack cli
   const exported = buildEngineExportProjectContract(project).platformer_project!;
   expect(exported.scripts.some(script => script.script.some(command => command.op === "set_platformer_state" && command.state === "dash"))).toBe(true);
 });
+it("stops every boss-wave background and keeps the boss in the arena until defeated", () => {
+  const project = template();
+  const exported = buildEngineExportProjectContract(project).shmup_project!;
+  const travel = exported.backgrounds.find(background => background.name === "tempestade_inicial")!;
+  const arena = exported.backgrounds.find(background => background.name === "tempestade_farol")!;
+  expect(travel.layers.some(layer => layer.scroll.x > 0)).toBe(true);
+  expect(arena.layers.length).toBeGreaterThan(0);
+  expect(arena.layers.every(layer => layer.scroll.x === 0 && layer.scroll.y === 0)).toBe(true);
+  const wave = exported.waves.find(wave => wave.name === "tempestade_farol")!;
+  expect(wave.enemies).toHaveLength(1);
+  const boss = wave.enemies[0]!;
+  expect(boss.velocity).toEqual({ x: 0, y: 0 });
+  expect(boss.position.x).toBeGreaterThan(120);
+  expect(boss.position.x + boss.size.x).toBeLessThanOrEqual(240);
+  expect(boss.health).toBe(6);
+  expect(wave.on_clear?.some(command => command.op === "warp_runtime")).toBe(true);
+});
