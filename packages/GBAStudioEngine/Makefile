@@ -48,6 +48,7 @@ menu-presentation-test: $(HOST_BUILD)/menu_presentation_tests
 	python3 tests/host/menu_hud_label_tests.py
 	python3 tests/host/hud_selector_pixels_tests.py
 	python3 tests/host/menu_text_input_presentation_tests.py
+	python3 tests/host/menu_text_input_confirmation_tests.py
 	python3 tests/host/name_input_palette_tests.py
 $(HOST_BUILD)/menu_presentation_tests: tests/host/menu_presentation_tests.cpp engine/include/gbs/menu.hpp engine/include/gbs/menu_presentation.hpp
 	@mkdir -p $(@D)

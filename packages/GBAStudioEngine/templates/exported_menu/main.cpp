@@ -716,6 +716,24 @@ void draw_menu_text_input() {
     }
 }
 
+void confirm_menu_text_input() {
+    menu_text_input.editing = false;
+    // Publish the final value before the authored action can save or change runtime.
+    copy_menu_text_input_to_event_state();
+    const auto* screen = gbs::menu_screen_for(project, menu_state.screen_index);
+    if (screen == nullptr) return;
+    for (size_t index = static_cast<size_t>(menu_state.selected_item_index + 1);
+         index < screen->item_count; ++index) {
+        const auto* item = gbs::menu_item_for(*screen, static_cast<int>(index));
+        if (item != nullptr && gbs::menu_item_is_visible(event_state, *item) &&
+            gbs::menu_item_is_available(event_state, *item)) {
+            menu_state.selected_item_index = static_cast<int>(index);
+            activate_selection();
+            break;
+        }
+    }
+}
+
 bool update_menu_text_input(const gbs::InputState& input) {
     if (!menu_text_input.editing) return false;
     const gbs::MenuScreenData* screen = gbs::menu_screen_for(project, menu_state.screen_index);
@@ -739,26 +757,11 @@ bool update_menu_text_input(const gbs::InputState& input) {
                     menu_text_input.lowercase = !menu_text_input.lowercase;
                 }
             } else if (menu_text_input.keyboard_index == 28) {
-                menu_text_input.editing = false;
-                if (screen != nullptr) {
-                    for (size_t candidate_index = static_cast<size_t>(menu_state.selected_item_index + 1);
-                         candidate_index < screen->item_count;
-                         ++candidate_index) {
-                        const gbs::MenuItemData* candidate = gbs::menu_item_for(
-                            *screen,
-                            static_cast<int>(candidate_index)
-                        );
-                        if (candidate != nullptr &&
-                            gbs::menu_item_is_visible(event_state, *candidate) &&
-                            gbs::menu_item_is_available(event_state, *candidate)) {
-                            menu_state.selected_item_index = static_cast<int>(candidate_index);
-                            activate_selection();
-                            break;
-                        }
-                    }
-                }
+                confirm_menu_text_input();
             }
-        } else if (input.was_pressed(gbs::ButtonB) || input.was_pressed(gbs::ButtonStart)) {
+        } else if (input.was_pressed(gbs::ButtonStart)) {
+            confirm_menu_text_input();
+        } else if (input.was_pressed(gbs::ButtonB)) {
             menu_text_input.editing = false;
         }
     } else if (input.was_pressed(gbs::ButtonUp)) {
@@ -772,7 +775,9 @@ bool update_menu_text_input(const gbs::InputState& input) {
     } else if (input.was_pressed(gbs::ButtonA)) {
         if (menu_text_input.cursor_index + 1 < menu_text_input.max_length) ++menu_text_input.cursor_index;
         else menu_text_input.editing = false;
-    } else if (input.was_pressed(gbs::ButtonB) || input.was_pressed(gbs::ButtonStart)) {
+    } else if (input.was_pressed(gbs::ButtonStart)) {
+        confirm_menu_text_input();
+    } else if (input.was_pressed(gbs::ButtonB)) {
         menu_text_input.editing = false;
     }
     copy_menu_text_input_to_event_state();
