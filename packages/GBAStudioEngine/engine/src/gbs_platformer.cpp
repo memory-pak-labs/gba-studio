@@ -471,8 +471,20 @@ const SpriteAnimation* update_platformer_player_presentation(
     return platformer_player_animation_for_state(animations, platformer_actor_animation_state(actor));
 }
 
+bool start_platformer_dash(PlatformerActor& actor, const PlatformerConfig& config) {
+    const bool allowed = config.dash_style == 0 ? actor.on_ground
+        : config.dash_style == 1 ? !actor.on_ground : true;
+    if (!config.dash_enabled || !actor.dash_available || !allowed || config.dash_frames <= 0) return false;
+    actor.dash_timer = static_cast<uint8_t>(config.dash_frames > 255 ? 255 : config.dash_frames);
+    actor.dash_available = false;
+    actor.dash_recharge_timer = config.dash_recharge_frames;
+    actor.on_ladder = false;
+    return true;
+}
+
 void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputState input, const PlatformerConfig& config) {
     const bool touched_wall_last_frame = actor.hit_wall && !actor.on_ground;
+    const bool was_on_ladder = actor.on_ladder && config.ladders_enabled && platformer_actor_on_ladder(map, actor);
     actor.hit_ceiling = false;
     actor.hit_wall = false;
     actor.wall_sliding = false;
@@ -511,16 +523,7 @@ void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputSt
         actor.jump_buffer_timer = 0;
     }
 
-    const bool dash_allowed_on_state = config.dash_style == 0
-        ? actor.on_ground
-        : config.dash_style == 1
-            ? !actor.on_ground
-            : true;
-    if (config.dash_enabled && input.was_pressed(ButtonB) && actor.dash_available && dash_allowed_on_state && config.dash_frames > 0) {
-        actor.dash_timer = static_cast<uint8_t>(config.dash_frames > 255 ? 255 : config.dash_frames);
-        actor.dash_available = false;
-        actor.dash_recharge_timer = config.dash_recharge_frames;
-    }
+    if (input.was_pressed(ButtonB)) start_platformer_dash(actor, config);
     if (actor.dash_timer > 0) {
         actor.dashing = true;
         if (config.dash_momentum != 1) {
@@ -558,10 +561,12 @@ void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputSt
         actor.velocity_x256.x = clamp_int(actor.velocity_x256.x, -config.max_run_speed_x256, config.max_run_speed_x256);
     }
 
-    actor.on_ladder = config.ladders_enabled && platformer_actor_on_ladder(map, actor);
+    const bool climbing_requested = input.is_held(ButtonUp) || input.is_held(ButtonDown);
+    actor.on_ladder = config.ladders_enabled && !actor.dashing && !input.is_held(ButtonA) &&
+        (actor.on_ladder || climbing_requested) && platformer_actor_on_ladder(map, actor);
     if (actor.dashing) {
         // Dash momentum owns the vertical component for this frame.
-    } else if (actor.on_ladder && (input.is_held(ButtonUp) || input.is_held(ButtonDown))) {
+    } else if (actor.on_ladder) {
         actor.velocity_x256.y = 0;
         if (input.is_held(ButtonUp)) {
             actor.velocity_x256.y = -config.max_run_speed_x256;
@@ -595,7 +600,7 @@ void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputSt
 
     const int minimum_jump_speed = clamp_int(config.jump_min_height_x256, 0, config.jump_speed_x256);
     const int grounded_jump_speed = minimum_jump_speed > 0 ? minimum_jump_speed : config.jump_speed_x256;
-    if (actor.jump_buffer_timer > 0 && (actor.on_ground || actor.coyote_timer > 0 || actor.on_ladder)) {
+    if (actor.jump_buffer_timer > 0 && (actor.on_ground || actor.coyote_timer > 0 || actor.on_ladder || was_on_ladder)) {
         actor.velocity_x256.y = -grounded_jump_speed;
         actor.jump_hold_timer = static_cast<uint8_t>(config.jump_hold_frames > 255 ? 255 : config.jump_hold_frames);
         actor.on_ground = false;

@@ -689,6 +689,7 @@ topdown-player-script-animation-test:
 host-test: platformer-player-script-animation-test
 platformer-player-script-animation-test:
 	python3 tests/host/platformer_player_script_animation_tests.py
+	python3 tests/host/platformer_dash_event_tests.py
 
 .PHONY: player-animation-controls-test
 host-test: player-animation-controls-test

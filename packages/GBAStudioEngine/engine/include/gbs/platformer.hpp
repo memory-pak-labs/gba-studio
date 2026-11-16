@@ -887,6 +887,7 @@ const SpriteAnimation* platformer_player_animation_for_state(
     const PlatformerPlayerAnimationSet& animations,
     PlatformerActorAnimationState state
 );
+bool start_platformer_dash(PlatformerActor& actor, const PlatformerConfig& config);
 void update_platformer_actor(const TileMap& map, PlatformerActor& actor, InputState input, const PlatformerConfig& config = default_platformer_config());
 void update_platformer_blank_actor(const TileMap& map, PlatformerActor& actor, int gravity_subpixels, int max_fall_speed_x256);
 void update_platformer_camera(Camera& camera, const PlatformerActor& actor, int room_width_pixels, int room_height_pixels);
