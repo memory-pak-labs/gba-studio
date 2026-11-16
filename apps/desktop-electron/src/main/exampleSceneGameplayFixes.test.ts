@@ -18,8 +18,8 @@ it("authors B attack and L dash with existing events and the approved attack cli
 it("stops every boss-wave background and keeps the boss in the arena until defeated", () => {
   const project = template();
   const exported = buildEngineExportProjectContract(project).shmup_project!;
-  const travel = exported.backgrounds.find(background => background.name === "tempestade_inicial")!;
-  const arena = exported.backgrounds.find(background => background.name === "tempestade_farol")!;
+  const travel = exported.backgrounds!.find(background => background.name === "tempestade_inicial")!;
+  const arena = exported.backgrounds!.find(background => background.name === "tempestade_farol")!;
   expect(travel.layers.some(layer => layer.scroll.x > 0)).toBe(true);
   expect(arena.layers.length).toBeGreaterThan(0);
   expect(arena.layers.every(layer => layer.scroll.x === 0 && layer.scroll.y === 0)).toBe(true);
