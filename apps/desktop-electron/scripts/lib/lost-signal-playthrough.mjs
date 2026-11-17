@@ -208,7 +208,7 @@ export async function playLostSignalMission(driver, project, exported, options =
   const partial = await driver.saveInfo();
   assert.equal(partial.slot?.status, 'ok', 'Partial autosave checksum');
   await driver.checkpoint('partial-warehouse');
-  await driver.reboot(); await driver.run(180, 0); await expect(3, 0, 'partial-reboot');
+  await driver.reboot(); await driver.run(180, 0); await waitForOpening(); await expect(3, 0, 'partial-reboot');
   assert.equal(await value('stage'), 0, 'Hardware reboot clears volatile progress');
   await loadSlot(0, 'partial-load'); await expect(5, 0, 'partial-restored-warehouse');
   assert.equal(await value('stage'), 1); assert.equal(await value('chart'), 1); assert.equal(await value('part'), 1);
