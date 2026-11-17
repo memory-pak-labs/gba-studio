@@ -11,11 +11,12 @@ import {
 import { decodePngRgba, encodePngRgba } from "./lib/png-icons.mjs";
 import { decodeMGBAHardwareVideoState } from "./native-scene-framebuffer-contract.mjs";
 import { playCampaignEvolutions } from "./lib/campaign-evolutions-playthrough.mjs";
-import { readNativeCoastState, readNativeUI, readNativeRacing, readNativePausedRace, readNativeSceneMenu, runtimeNativeSymbols } from "./lib/native-ui-diagnostics.mjs";
+import { playPlayerScenes } from "./lib/player-scenes-playthrough.mjs";
+import { readNativeCoastState, readNativePlayerAnimation, readNativeSpriteAnimator, readNativeUI, readNativeRacing, readNativePausedRace, readNativeSceneMenu, runtimeNativeSymbols } from "./lib/native-ui-diagnostics.mjs";
 
-// Production ROM, native controller input only. No QA driver or RAM writes.
+// Both modes drive the controller. The scene audit uses menu shortcuts in its test ROM.
 const [romPath, output] = process.argv.slice(2);
-assert.ok(romPath && output, "usage: node scripts/playtest-exemplo-campaign-native.mjs ROM OUTPUT [--skip-prologue] [--female] [--chapter-two] [--chapter-three | --finale] --contract=EXPORT_JSON [--map=ROM_MAP]");
+assert.ok(romPath && output, "usage: node scripts/playtest-exemplo-campaign-native.mjs ROM OUTPUT [--skip-prologue] [--female] [--chapter-two | --chapter-three | --finale | --player-scenes] --contract=EXPORT_JSON [--map=ROM_MAP]");
 mkdirSync(output, { recursive: true });
 const rom = readFileSync(romPath);
 const wasm = readFileSync(new URL("../static/WebPlayer/player/mgba-core.wasm", import.meta.url));
@@ -30,6 +31,7 @@ const core = await createMGBA({
 const skipPrologue = process.argv.includes("--skip-prologue");
 const female = process.argv.includes("--female");
 const finale = process.argv.includes("--finale");
+const sceneAudit = process.argv.includes("--player-scenes");
 const chapterThree = finale || process.argv.includes("--chapter-three");
 const chapterTwo = chapterThree || process.argv.includes("--chapter-two");
 const contractPath = process.argv.find((argument) => argument.startsWith("--contract="))?.slice("--contract=".length);
@@ -181,16 +183,18 @@ function moveIsoTo(tx, ty) {
   for (let point = [tx, ty]; previous.get(point.join(",")) !== null;) {
     route.push(point); point = previous.get(point.join(","));
   }
-  for (const [x, y] of route.reverse()) for (const [axis, coordinate] of [["x256", x * 256], ["y256", y * 256]]) {
+  // Settle inside each tile before turning. Stopping just below its minimum
+  // coordinate leaves the actor on the previous tile and misses narrow ramps.
+  for (const [x, y] of route.reverse()) for (const [axis, coordinate] of [["x256", x * 256 + 128], ["y256", y * 256 + 128]]) {
     let reached = false;
     for (let frame = 0; frame < 100; frame++) {
       const current = isometricDiagnostic().actors.find(actor => actor.index === 0);
       const delta = coordinate - current[axis];
-      if (Math.abs(delta) < 16) { reached = true; break; }
+      if (Math.abs(delta) <= 16) { reached = true; break; }
       const key = axis === "x256" ? delta > 0 ? 144 : 96 : delta > 0 ? 160 : 80;
       run(key, Math.max(1, Math.min(4, Math.floor(Math.abs(delta) / 16))));
     }
-    assert.ok(reached, `isometric controller reaches ${x},${y} ${axis}`);
+    assert.ok(reached, `isometric controller reaches ${x},${y} ${axis}: ${JSON.stringify(isometricDiagnostic().actors[0])}`);
   }
   run(0, 8);
 }
@@ -346,7 +350,7 @@ function matchingNativeDiagnostics() {
   const directory = path.join(output, "abi");
   const diagnostic = spawnSync(process.execPath, [
     fileURLToPath(new URL("./smoke-lost-signal-mission.mjs", import.meta.url)),
-    romPath, path.dirname(path.dirname(path.resolve(romPath))), directory, "--diagnostics-only"
+    romPath, path.dirname(path.resolve(contractPath)), directory, "--diagnostics-only"
   ], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   assert.equal(diagnostic.status, 0, diagnostic.stdout + diagnostic.stderr);
   const report = JSON.parse(readFileSync(path.join(directory, "report.json"), "utf8"));
@@ -421,14 +425,92 @@ function battleDiagnostic() {
   };
 }
 function campaignDriver() {
+  const readActiveAnimation = (symbol, layout, field, selector) => {
+    const { symbols, layouts } = matchingNativeDiagnostics();
+    const active = runtimeNativeSymbols(symbols, readRuntimeTelemetry(core).runtimeKind);
+    const match = active.find(s => s.name.endsWith("::" + symbol) && s.size === layouts[layout].size);
+    assert.ok(match, "Missing matching animation state " + symbol);
+    const animation = readNativeSpriteAnimator(match.address + (field ? layouts[layout][field] : 0), layouts, nativeRead8, nativeRead32);
+    return { ...animation, clip: symbols.find(s => s.address === animation.address && s.name.endsWith("_animation"))?.name,
+      visualState: selector ? nativeRead8(match.address + layouts[layout][selector]) : undefined };
+  };
   return {
     run(frames, keys) { run(keys, frames); },
     state() { const state = readRuntimeTelemetry(core); return { ...state, variables: Array.from({ length: 64 }, (_, i) => nativeVariable(i)) }; },
     dialogue() { return !!nativeUI().dialogue; }, ui: nativeUI, battle: battleDiagnostic,
+    animation() {
+      const { symbols, layouts } = matchingNativeDiagnostics();
+      const actorSymbols = runtimeNativeSymbols(symbols, readRuntimeTelemetry(core).runtimeKind);
+      const animation = readNativePlayerAnimation(actorSymbols, layouts, nativeRead8, nativeRead32);
+      return { ...animation, clip: symbols.find(s => s.address === animation.address && s.name.endsWith("_animation"))?.name };
+    },
+    cursorAnimation() { return readActiveAnimation("cursor_animator", "animator"); },
+    vehicleAnimation() { return readActiveAnimation("vehicle_animator", "animator"); },
+    aircraftAnimation() { return readActiveAnimation("player_animator", "flightAnimation", "animator", "action"); },
+    fighterAnimation(index) { return readActiveAnimation(`p${index + 1}_visual_state`, "fighterVisual", "animator", "state"); },
+    isoAnimation(index) {
+      const { symbols, layouts: { isoAnimation } } = matchingNativeDiagnostics();
+      const active = runtimeNativeSymbols(symbols, 2);
+      const array = active.find(s => s.name.endsWith("::actor_animation_states"));
+      assert.ok(array && (index + 1) * isoAnimation.size <= array.size);
+      const address = array.address + index * isoAnimation.size;
+      return { mode: nativeRead8(address + isoAnimation.mode), frame: nativeRead8(address + isoAnimation.frame_index) };
+    },
+    coast() {
+      const { symbols, layouts } = matchingNativeDiagnostics();
+      return readNativeCoastState(readRuntimeTelemetry(core).runtimeKind, symbols, layouts, nativeRead8, nativeRead32);
+    },
+    camera() {
+      const { symbols, layouts: { camera } } = matchingNativeDiagnostics();
+      const room = exported.topdown_project.rooms[readRuntimeTelemetry(core).currentRoom];
+      const matches = symbols.filter(s => s.name.endsWith("::camera") && s.size === camera.size &&
+        nativeRead32(s.address + camera.bounds_pixels + 8) === room.width_tiles * 8 &&
+        nativeRead32(s.address + camera.bounds_pixels + 12) === room.height_tiles * 8);
+      assert.equal(matches.length, 1, "The camera matches the active room");
+      const address = matches[0].address;
+      return { x: nativeRead32(address + camera.position_pixels), y: nativeRead32(address + camera.position_pixels + 4),
+        follow: !!nativeRead8(address + camera.follow_player),
+        bounds: [0, 1, 2, 3].map(i => nativeRead32(address + camera.bounds_pixels + i * 4)) };
+    },
     capture,
     frame() { const p = core._gba_framebuffer(); const pixels = core.HEAPU8.slice(p, p + 153600); for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255; return pixels; },
     hardware() { const size = core._gba_state_size(), p = core._malloc(size); assert.equal(core._gba_save_state(p, size), 1); const result = decodeMGBAHardwareVideoState(core.HEAPU8.slice(p, p + size)); core._free(p); return result; }
   };
+}
+function playAuditFromPort() {
+  const checkpointSize = core._gba_state_size();
+  const checkpoint = core._malloc(checkpointSize);
+  assert.equal(core._gba_save_state(checkpoint, checkpointSize), 1);
+  const saved = core.HEAPU8.slice(checkpoint, checkpoint + checkpointSize);
+  core._free(checkpoint);
+  const projectPath = fileURLToPath(new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url));
+  const port = exported.menu_project.screens[menuSceneIndex("menu_start")];
+  return playPlayerScenes(campaignDriver(), {
+    project: JSON.parse(readFileSync(projectPath)),
+    projectRoot: path.dirname(projectPath),
+    exported,
+    enter(name) {
+      const pointer = core._malloc(saved.length);
+      core.HEAPU8.set(saved, pointer);
+      assert.equal(core._gba_load_state(pointer, saved.length), 1);
+      core._free(pointer);
+      run(0, 8);
+      if (name === "porto_lumen") return;
+      const index = port.items.findIndex(item => item.label === "QA " + name);
+      assert.ok(index >= 0, "QA navigation includes " + name);
+      press(8, 100);
+      selectNativeMenuItem("menu_start", index);
+    },
+    close: closeNativeDialogue,
+    tap,
+    moveTopdownTo,
+    moveIsoTo,
+    moveDungeonTo,
+    faceDungeon,
+    clickPointClickHotspot,
+    race: readRaceState,
+    record(result) { evidence.push({ label: "player-scene", ...result }); }
+  });
 }
 function selectNativeMenuItem(name, index) {
   assert.equal(readRuntimeTelemetry(core).runtimeKind, 3);
@@ -577,6 +659,12 @@ try {
     capture(`prologue-page-${page + 1}`);
   }
   expectRoom("port-after-prologue", 0, 0);
+
+  if (sceneAudit) {
+    const audit = await playAuditFromPort();
+    assert.equal(audit.failed.length, 0, "Player scene audit failures: " + audit.failed.join(", "));
+    passed = true;
+  } else {
 
   // Walk to the mechanic; the authored event recovers the aircraft and saves.
   for (let attempt = 0; attempt < 8 && readRuntimeTelemetry(core).variables[1] === 0; attempt++) {
@@ -886,13 +974,14 @@ try {
   }
   passed = true;
   console.log(`PASS: native opening, prologue, mechanic, fresh-ROM save/load, pause menus and map travel${chapterTwo ? ", Penedos upgrade, point-click chapters and checkpoints through Mercado" : ""}${chapterThree ? ", market cargo, sentinel victory, cell save/load, council, storm clear and relay entry" : ""}${finale ? ", Guardian victory, two fighting rounds, background fidelity, three racing laps, ending and fresh-ROM completion Load" : ""}`);
+  }
 } catch (error) {
   evidence.push({ label: "failure-detail", error: String(error) });
   if (readRuntimeTelemetry(core)) capture("failure");
   throw error;
 } finally {
   writeFileSync(path.join(output, "result.json"), JSON.stringify({
-    passed, skipPrologue, female, chapterTwo, chapterThree, finale, romSha256: createHash("sha256").update(rom).digest("hex"),
+    passed, skipPrologue, female, chapterTwo, chapterThree, finale, sceneAudit, romSha256: createHash("sha256").update(rom).digest("hex"),
     linkMapSha256: linkMap ? createHash("sha256").update(linkMap).digest("hex") : undefined,
     emulatedFrames, inputs, evidence,
     limitations: [finale ? "Optional branches and arbitrary mid-combat checkpoints are not exercised by this campaign route." : chapterThree ? "Relay victory, fighting match, racing finish and checkpoints in these families are not exercised." : chapterTwo ? "Challenges after entering Mercado and campaign ending are not exercised." : "Remaining challenges and campaign ending are not exercised by this first route.", "Emulator evidence does not validate physical hardware."]
