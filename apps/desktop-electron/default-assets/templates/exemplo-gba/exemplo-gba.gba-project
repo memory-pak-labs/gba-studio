@@ -173057,6 +173057,31 @@
           "id": "coast_restore_penedos_vento-1",
           "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
           "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-2",
+          "command": "attach_platform_callback jumpStart penedos_player_jump",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-3",
+          "command": "attach_platform_callback groundStart penedos_player_ground",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-4",
+          "command": "attach_platform_callback dashStart penedos_player_dash",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-5",
+          "command": "attach_button B penedos_player_attack true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-6",
+          "command": "attach_button L penedos_player_dash_input true",
+          "isEnabled": true
         }
       ]
     },

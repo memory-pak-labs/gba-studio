@@ -187,7 +187,11 @@ export function deepenExampleCampaign(source, manifest) {
         const previous=p.events.find(e=>e.name===restore);
         original=previous?.steps?.map(s=>s.command).find(command=>command.startsWith('call_event '))?.split(/\s+/)[1];
       }
-      addEvent(restore,r.name,[...(original?[(original.startsWith('coast_')?'call_procedure ':'call_event ')+original]:[]),'call_procedure coast_audio_mute',`fade_audio_volume music ${interior.has(r.name)?70:100} 45 var_audio_music_volume var_audio_master_volume`]);
+      const controls = r.name === 'penedos_vento'
+        ? entry.steps.filter(step => step.isEnabled !== false &&
+            /^(attach_platform_callback |attach_button [BL] )/.test(step.command)).map(step => step.command)
+        : [];
+      addEvent(restore,r.name,[...(original?[(original.startsWith('coast_')?'call_procedure ':'call_event ')+original]:[]),'call_procedure coast_audio_mute',`fade_audio_volume music ${interior.has(r.name)?70:100} 45 var_audio_music_volume var_audio_master_volume`, ...controls]);
       updateRoom(r.name,row=>({...row,eventBindings:{...row.eventBindings,onRestore:restore}}));
     }
   }

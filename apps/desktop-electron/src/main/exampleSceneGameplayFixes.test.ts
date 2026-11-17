@@ -15,6 +15,17 @@ it("authors B attack and L dash with existing events and the approved attack cli
   const exported = buildEngineExportProjectContract(project).platformer_project!;
   expect(exported.scripts.some(script => script.script.some(command => command.op === "set_platformer_state" && command.state === "dash"))).toBe(true);
 });
+it("restores the authored Penedos controls and platform callbacks after loading a checkpoint", () => {
+  const platformer = buildEngineExportProjectContract(template()).platformer_project!;
+  const room = platformer.rooms.find(room => room.name === "penedos_vento")!;
+  const enter = room.on_enter ?? [];
+  const isControl = (command: (typeof enter)[number]) =>
+    command.op === "attach_platform_callback" ||
+    (command.op === "attach_button_event" && (command.button === "B" || command.button === "L"));
+  const authored = enter.filter(isControl);
+  expect(authored).toHaveLength(5);
+  expect(room.on_restore?.filter(isControl)).toEqual(authored);
+});
 it("stops every boss-wave background and keeps the boss in the arena until defeated", () => {
   const project = template();
   const exported = buildEngineExportProjectContract(project).shmup_project!;
