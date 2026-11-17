@@ -49,6 +49,7 @@ struct PlatformerPlayerAnimationSet {
 struct PlatformerPlayerPresentation {
     const SpriteAnimation* one_shot = nullptr;
     uint16_t frames_remaining = 0;
+    bool showing_landing = false;
 };
 
 enum class PlatformerEnemyContactResult : uint8_t {

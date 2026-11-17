@@ -91,10 +91,14 @@ try {
    until(s=>s.variables[31]===2,180);
    assert.equal(state().variables[31],2,'B defeats and hides the east crab');
   } else run(frames,key,trace);
-  samples[label]=state();if(['settle','descend-mid','climb-mid','attack-east','exit-load'].includes(label))shot('platform-'+label);
+  samples[label]=state();if(['settle','glide','descend-mid','climb-mid','attack-east','exit-load'].includes(label))shot('platform-'+label);
  }
+ check('walk cycles through the approved frames and jumps transition to fall, glide and land',()=>{
+  assert.ok(new Set(trace.filter(s=>s.animation==='walk').map(s=>s.animationFrame)).size>1);
+  for(const animation of ['idle','jump','fall','glide','land']) assert.ok(trace.some(s=>s.animation===animation), animation);
+ });
  check('crosses the ladder without vertical input',()=>assert.equal(samples['ladder-center-stop'].onLadder,false));
- check('Down/Up initiate and control ladder climbing',()=>{assert.equal(samples['descend-mid'].onLadder,true);assert.ok(trace.some(s=>s.onLadder && s.input.held===64));assert.ok(samples['climb-mid'].player.y < samples['descend-mid'].player.y);});
+ check('Down/Up initiate and control ladder climbing with the climb clip',()=>{assert.equal(samples['descend-mid'].onLadder,true);assert.equal(samples['descend-mid'].animation,'climb');assert.ok(trace.some(s=>s.onLadder && s.input.held===64 && s.animation==='climb'));assert.ok(samples['climb-mid'].player.y < samples['descend-mid'].player.y);});
  check('B attacks with the approved animation and defeats the enemy',()=>assert.ok(trace.some(s=>s.animation?.includes('attack'))));
  check('platformer reward advances to the warehouse',()=>assert.equal(samples['exit-load'].runtimeKind,5));
  restore(platformStart);const attackRight=[];run(8,16|2,attackRight);shot('platform-attack-right');run(18,16|2,attackRight);
@@ -102,6 +106,47 @@ try {
  restore(platformStart);run(14,32);const attackLeft=[];run(8,32|2,attackLeft);shot('platform-attack-left');
  check('left attack uses the same approved mirrored clip',()=>{assert.ok(attackLeft.some(s=>s.animation?.includes('attack')));assert.equal(video().objects.find(object=>object.index===0).flipX,true);});
  restore(platformStart);const dash=[];run(10,16|512,dash);shot('platform-dash-L');check('L activates dash',()=>assert.ok(dash.some(s=>s.animation==='dash')));
+
+ restore(platformStart);
+ run(10,1);
+ until(s=>s.animation==='land',120);
+ shot('platform-land');
+ const landingY = state().bounds.y;
+ run(2); // Let the ground-start callback run while the landing clip is still visible.
+ assert.equal(state().animation,'land');
+ until(s=>s.bounds.y<landingY,6,1);
+ shot('platform-first-airborne-frame');
+ check('the first airborne frame of a quick second jump uses the jump clip',()=>assert.equal(state().animation,'jump'));
+
+ restore(platformStart);
+ until(s=>s.animation==='hurt',120,16);
+ shot('platform-contact-hurt');
+ check('enemy contact plays hurt, subtracts health and returns to walking',()=>{
+  assert.ok(state().variables[27] < 3);
+  until(s=>s.animation==='walk',90,16);
+ });
+
+ restore(platformStart);
+ const workerAnimator = symbol('platformer_npc_animators').address;
+ const workerClip = name => {
+  const clip = symbols.find(s=>s.name===`gbastudio_platformer_project::penedos_vento_npc_0_${name}_right_animation`);
+  assert.ok(clip, 'worker clip ' + name);
+  return clip.address;
+ };
+ const workerIdle = workerClip('idle'), workerTalk = workerClip('talk');
+ until(s=>s.bounds.x<=40,40,32);run(12);
+ check('worker loops the talk clip on interaction and returns to idle when the dialogue closes',()=>{
+  assert.equal(r32(workerAnimator),workerIdle);
+  run(4,1);
+  until(()=>r32(workerAnimator)===workerTalk,25);
+  shot('platform-worker-talk');
+  const talkFrames = new Set();
+  for(let i=0;i<25;i++){run(1);talkFrames.add(r8(workerAnimator+4));}
+  assert.ok(talkFrames.size>1);
+  for(let i=0;i<20 && r32(workerAnimator)!==workerIdle;i++) press(2);
+  assert.equal(r32(workerAnimator),workerIdle);
+ });
+
  qa(2);until(s=>s.runtimeKind===4);run(4);shot('shmup-entry');
  const scrolling=[];for(let i=0;i<12;i++){run(1);scrolling.push(video().bg[2].x);}
  report.travelScroll=scrolling;

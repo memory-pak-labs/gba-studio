@@ -183895,7 +183895,7 @@
         "objective": "Alcançar o módulo de aderência no alto das falésias.",
         "nextScene": "armazem_das_mares",
         "completionVariable": "vehicleModules.grip",
-        "controls": "Direcional move; A pula e interage; B ataca; L usa o impulso; R plana.",
+        "controls": "Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.",
         "success": "Coletar o módulo de aderência e alcançar o Armazém das Marés.",
         "failureRecovery": "Checkpoints retomam a travessia sem apagar a campanha.",
         "tutorialDialogue": "",
@@ -183941,7 +183941,7 @@
           "lockY": true
         }
       ],
-      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B usa o impulso curto."
+      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada."
     },
     {
       "backgroundAssetName": "warehouse-frontal-bg-240x160.png",
@@ -231467,7 +231467,7 @@
         "objective": "Alcançar o módulo de aderência no alto das falésias.",
         "nextScene": "armazem_das_mares",
         "completionVariable": "vehicleModules.grip",
-        "controls": "Direcional move; A pula e interage; B ataca; L usa o impulso; R plana.",
+        "controls": "Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.",
         "success": "Coletar o módulo de aderência e alcançar o Armazém das Marés.",
         "failureRecovery": "Checkpoints retomam a travessia sem apagar a campanha.",
         "tutorialDialogue": "",
@@ -231513,7 +231513,7 @@
           "lockY": true
         }
       ],
-      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B usa o impulso curto."
+      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada."
     },
     {
       "backgroundAssetName": "warehouse-frontal-bg-240x160.png",

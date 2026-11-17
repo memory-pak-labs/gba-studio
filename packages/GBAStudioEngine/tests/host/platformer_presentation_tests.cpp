@@ -17,6 +17,39 @@ int main(){
  assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,false)==&hurt);
  assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,false)==&idle);
  clips.attack=nullptr;assert(gbs::update_platformer_player_presentation(state,clips,actor,press,false,false)==&idle);
+
+ // A fresh jump cancels the landing pose, which must not return on descent.
+ clips.jump=&walk;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,true,false)==&land);
+ actor.on_ground=false;
+ actor.velocity_x256.y=-256;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,false)==&walk);
+ assert(state.one_shot==nullptr && state.frames_remaining==0);
+
+ // A dash started immediately after landing also owns its first frame.
+ actor.on_ground=true;
+ clips.dash=&walk;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,true,false)==&land);
+ actor.dashing=true;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,false)==&walk);
+ assert(state.one_shot==nullptr && state.frames_remaining==0);
+ actor.dashing=false;
+
+ // At the ladder lip, ground contact may persist as climbing starts.
+ clips.climb=&walk;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,true,false)==&land);
+ actor.on_ladder=true;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,true,false)==&walk);
+ assert(state.one_shot==nullptr && state.frames_remaining==0);
+ actor.on_ladder=false;
+
+ // The same authored clip may serve as both hurt and landing.
+ clips.hurt=&land;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,true)==&land);
+ actor.on_ground=false;
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,false)==&land);
+ assert(gbs::update_platformer_player_presentation(state,clips,actor,none,false,false)==&walk);
+ actor.on_ground=true;
  assert(gbs::platformer_callback_state_for_actor(actor)==1);
  actor.velocity_x256.x=512;assert(gbs::platformer_callback_state_for_actor(actor)==1); // walking is still grounded
  actor.on_ground=false;actor.velocity_x256.y=-256;assert(gbs::platformer_callback_state_for_actor(actor)==2);

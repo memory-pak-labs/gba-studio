@@ -19,7 +19,7 @@ export function promoteApprovedPlatformer(source) {
     p.settings.hudPresets = upsert(p.settings.hudPresets, [m.hud]);
     const update = r => r.name !== name ? r : { ...r, width: 120, height: 40, backgroundAssetName: 'penedos-approved-terrain.png',
         runtimeBaseBackgroundAssetName: 'penedos-approved-terrain.png', runtimeCompositeBackgroundAssetName: 'penedos-approved-terrain.png', backgroundRenderMode: 'tilemap', gbStudioUseBackgroundLayout: true,
-        campaign: { ...r.campaign, controls: 'Direcional move; A pula e interage; B ataca; L usa o impulso; R plana.' },
+        campaign: { ...r.campaign, controls: 'Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.' },
         cameraMode: 'follow_player', cameraBounds: { x: 0, y: 0, width: 120, height: 40 }, cameraZoom: 100,
         cameraPosition: structuredClone(m.cameraPosition),
         cameraZones: [structuredClone(m.cameraZone)],

@@ -452,11 +452,22 @@ const SpriteAnimation* update_platformer_player_presentation(
     bool landed,
     bool hurt
 ) {
+    // The landing pose belongs to grounded movement. An immediate jump,
+    // ladder grab or dash must present its own pose in the same update.
+    const bool can_present_landing = actor.on_ground && !actor.on_ladder && !actor.dashing;
+    if (state.showing_landing && !can_present_landing) {
+        state = {};
+    }
+    const bool attack_requested = !hurt && state.frames_remaining == 0 &&
+        input.was_pressed(ButtonL) && !actor.dashing;
+    const bool landing_requested = !hurt && !attack_requested && state.frames_remaining == 0 &&
+        landed && can_present_landing;
     const SpriteAnimation* requested = hurt ? animations.hurt
-        : state.frames_remaining == 0 && input.was_pressed(ButtonL) && !actor.dashing ? animations.attack
-        : state.frames_remaining == 0 && landed ? animations.land : nullptr;
+        : attack_requested ? animations.attack
+        : landing_requested ? animations.land : nullptr;
     if (requested != nullptr && requested->frames != nullptr && requested->frame_count > 0) {
         state.one_shot = requested;
+        state.showing_landing = landing_requested;
         state.frames_remaining = 0;
         for (uint8_t i = 0; i < requested->frame_count; ++i) {
             state.frames_remaining += requested->frames[i].duration_frames > 0
@@ -467,7 +478,7 @@ const SpriteAnimation* update_platformer_player_presentation(
         --state.frames_remaining;
         return state.one_shot;
     }
-    state.one_shot = nullptr;
+    state = {};
     return platformer_player_animation_for_state(animations, platformer_actor_animation_state(actor));
 }
 
