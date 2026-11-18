@@ -11,11 +11,12 @@ import {
 import { decodePngRgba, encodePngRgba } from "./lib/png-icons.mjs";
 import { decodeMGBAHardwareVideoState } from "./native-scene-framebuffer-contract.mjs";
 import { playCampaignEvolutions } from "./lib/campaign-evolutions-playthrough.mjs";
-import { readNativeCoastState, readNativeUI, readNativeRacing, readNativePausedRace, readNativeSceneMenu, runtimeNativeSymbols } from "./lib/native-ui-diagnostics.mjs";
+import { playPlayerScenes } from "./lib/player-scenes-playthrough.mjs";
+import { readNativeCoastState, readNativePlayerAnimation, readNativeSpriteAnimator, readNativeUI, readNativeRacing, readNativePausedRace, readNativeSceneMenu, runtimeNativeSymbols } from "./lib/native-ui-diagnostics.mjs";
 
-// Production ROM, native controller input only. No QA driver or RAM writes.
+// Both modes drive the controller. The scene audit uses menu shortcuts in its test ROM.
 const [romPath, output] = process.argv.slice(2);
-assert.ok(romPath && output, "usage: node scripts/playtest-exemplo-campaign-native.mjs ROM OUTPUT [--skip-prologue] [--female] [--chapter-two] [--chapter-three | --finale] --contract=EXPORT_JSON [--map=ROM_MAP]");
+assert.ok(romPath && output, "usage: node scripts/playtest-exemplo-campaign-native.mjs ROM OUTPUT [--skip-prologue] [--female] [--chapter-two | --chapter-three | --finale | --player-scenes] --contract=EXPORT_JSON [--map=ROM_MAP]");
 mkdirSync(output, { recursive: true });
 const rom = readFileSync(romPath);
 const wasm = readFileSync(new URL("../static/WebPlayer/player/mgba-core.wasm", import.meta.url));
@@ -30,11 +31,17 @@ const core = await createMGBA({
 const skipPrologue = process.argv.includes("--skip-prologue");
 const female = process.argv.includes("--female");
 const finale = process.argv.includes("--finale");
+const sceneAudit = process.argv.includes("--player-scenes");
 const chapterThree = finale || process.argv.includes("--chapter-three");
 const chapterTwo = chapterThree || process.argv.includes("--chapter-two");
 const contractPath = process.argv.find((argument) => argument.startsWith("--contract="))?.slice("--contract=".length);
 assert.ok(contractPath, "campaign navigation requires the production export contract");
 const exported = contractPath ? JSON.parse(readFileSync(contractPath, "utf8")) : null;
+if (!sceneAudit) {
+  assert.ok(exported.menu_project.screens.every(screen => screen.items.every(item => !item.label?.startsWith("QA "))),
+    "The campaign replay requires the original menus without scene shortcuts");
+}
+const templateFile = fileURLToPath(new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url));
 function menuSceneIndex(name) {
   assert.ok(exported?.menu_project, "campaign navigation requires --contract=EXPORT_JSON");
   const index = exported.menu_project.screens.findIndex(screen => screen.name === name);
@@ -181,16 +188,18 @@ function moveIsoTo(tx, ty) {
   for (let point = [tx, ty]; previous.get(point.join(",")) !== null;) {
     route.push(point); point = previous.get(point.join(","));
   }
-  for (const [x, y] of route.reverse()) for (const [axis, coordinate] of [["x256", x * 256], ["y256", y * 256]]) {
+  // Settle inside each tile before turning. Stopping just below its minimum
+  // coordinate leaves the actor on the previous tile and misses narrow ramps.
+  for (const [x, y] of route.reverse()) for (const [axis, coordinate] of [["x256", x * 256 + 128], ["y256", y * 256 + 128]]) {
     let reached = false;
     for (let frame = 0; frame < 100; frame++) {
       const current = isometricDiagnostic().actors.find(actor => actor.index === 0);
       const delta = coordinate - current[axis];
-      if (Math.abs(delta) < 16) { reached = true; break; }
+      if (Math.abs(delta) <= 16) { reached = true; break; }
       const key = axis === "x256" ? delta > 0 ? 144 : 96 : delta > 0 ? 160 : 80;
       run(key, Math.max(1, Math.min(4, Math.floor(Math.abs(delta) / 16))));
     }
-    assert.ok(reached, `isometric controller reaches ${x},${y} ${axis}`);
+    assert.ok(reached, `isometric controller reaches ${x},${y} ${axis}: ${JSON.stringify(isometricDiagnostic().actors[0])}`);
   }
   run(0, 8);
 }
@@ -346,7 +355,7 @@ function matchingNativeDiagnostics() {
   const directory = path.join(output, "abi");
   const diagnostic = spawnSync(process.execPath, [
     fileURLToPath(new URL("./smoke-lost-signal-mission.mjs", import.meta.url)),
-    romPath, path.dirname(path.dirname(path.resolve(romPath))), directory, "--diagnostics-only"
+    romPath, path.dirname(path.resolve(contractPath)), directory, "--diagnostics-only"
   ], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   assert.equal(diagnostic.status, 0, diagnostic.stdout + diagnostic.stderr);
   const report = JSON.parse(readFileSync(path.join(directory, "report.json"), "utf8"));
@@ -399,6 +408,69 @@ function runPlatformerTicks(keys, ticks) {
   }
   assert.fail(`platformer did not advance ${ticks} native simulation ticks`);
 }
+function finishPenedosFromCheckpoint(route) {
+  const start = route.findIndex(([label]) => label === "stair-align");
+  assert.ok(start > 0, "The platformer route includes the ladder after the checkpoint");
+  const eastCrab = exported.platformer_project.rooms[0].npcs.findIndex(npc => npc.name === "Caranguejo · Ponte do Vento");
+  const westCrab = exported.platformer_project.rooms[0].npcs.findIndex(npc => npc.name === "Caranguejo · Penedos");
+  assert.ok(eastCrab >= 0 && westCrab >= 0, "The route targets the two authored patrols");
+  const patrol = index => platformerDiagnostic().actors.find(actor => actor.index === index);
+  closeNativeDialogue();
+  const driver = campaignDriver();
+  run(2, 4);
+  assert.match(driver.animation().clip ?? "", /attack/, "B still starts the attack after loading the checkpoint");
+  capture("penedos-attack-after-load");
+  run(0, 24);
+  // This route records video frames, unlike the checkpoint approach above.
+  for (const [label, keys, frames] of route.slice(start)) {
+    if (label === "ladder-center") {
+      for (let attempt = 0; attempt < 25; attempt++) {
+        const { x } = platformerDiagnostic().platform;
+        if (x >= 216 && x <= 222) break;
+        run(x > 222 ? 32 : 16, 2);
+        run(0, 8);
+      }
+      const { x } = platformerDiagnostic().platform;
+      assert.ok(x >= 216 && x <= 222, "Nara aligns with the ladder");
+    } else if (label === "ladder-center-stop") {
+      run(0, 1);
+    } else if (label === "ladder-top") {
+      for (let frame = 0; frame < 240 && patrol(westCrab).x > 196; frame++) run(0, 1);
+      run(keys, frames);
+    } else if (label === "east-approach") {
+      // From this checkpoint the seam lands on the near edge of the gap.
+      // Double-jump over the moth and release Right before reaching the crab.
+      assert.ok(platformerDiagnostic().platform.onGround, "The seam lands before the east crossing");
+      run(1, 12);
+      run(0, 2);
+      run(17, 16);
+      for (let frame = 0; frame < 45 && platformerDiagnostic().platform.x < 628; frame++) run(16 | 256, 1);
+      capture("penedos-east-over-gap");
+      run(0, 100);
+    } else if (label === "attack-east") {
+      for (let frame = 0; frame < 100; frame++) {
+        const player = platformerDiagnostic().platform;
+        const crab = patrol(eastCrab);
+        const dx = crab.x - (player.x + Math.floor(player.width / 2));
+        const dy = crab.y - (player.y + player.height);
+        const facing = dx >= 0 ? 16 : 32;
+        run(facing, 1);
+        if (Math.abs(dx) + Math.abs(dy) <= 29) {
+          run(2, 2); // B attacks. L dashes.
+          run(0, 38);
+          break;
+        }
+      }
+      assert.equal(platformerVariable(31), 2, "B defeats the east crab on its bridge");
+      assert.equal(platformerVariable(27), 3, "The ladder route and fight preserve all three health points");
+    } else {
+      run(keys, frames);
+    }
+    if (["descend-mid", "climb-mid", "ladder-exit", "cross-east", "seam-land", "east-stand", "attack-east", "exit-load"].includes(label)) {
+      capture("penedos-" + label);
+    }
+  }
+}
 function battleDiagnostic() {
   const d = matchingNativeDiagnostics(), fields = d.layouts.battle;
   const symbols = runtimeNativeSymbols(d.symbols, 11);
@@ -421,14 +493,91 @@ function battleDiagnostic() {
   };
 }
 function campaignDriver() {
+  const readActiveAnimation = (symbol, layout, field, selector) => {
+    const { symbols, layouts } = matchingNativeDiagnostics();
+    const active = runtimeNativeSymbols(symbols, readRuntimeTelemetry(core).runtimeKind);
+    const match = active.find(s => s.name.endsWith("::" + symbol) && s.size === layouts[layout].size);
+    assert.ok(match, "Missing matching animation state " + symbol);
+    const animation = readNativeSpriteAnimator(match.address + (field ? layouts[layout][field] : 0), layouts, nativeRead8, nativeRead32);
+    return { ...animation, clip: symbols.find(s => s.address === animation.address && s.name.endsWith("_animation"))?.name,
+      visualState: selector ? nativeRead8(match.address + layouts[layout][selector]) : undefined };
+  };
   return {
     run(frames, keys) { run(keys, frames); },
     state() { const state = readRuntimeTelemetry(core); return { ...state, variables: Array.from({ length: 64 }, (_, i) => nativeVariable(i)) }; },
     dialogue() { return !!nativeUI().dialogue; }, ui: nativeUI, battle: battleDiagnostic,
+    animation() {
+      const { symbols, layouts } = matchingNativeDiagnostics();
+      const actorSymbols = runtimeNativeSymbols(symbols, readRuntimeTelemetry(core).runtimeKind);
+      const animation = readNativePlayerAnimation(actorSymbols, layouts, nativeRead8, nativeRead32);
+      return { ...animation, clip: symbols.find(s => s.address === animation.address && s.name.endsWith("_animation"))?.name };
+    },
+    cursorAnimation() { return readActiveAnimation("cursor_animator", "animator"); },
+    vehicleAnimation() { return readActiveAnimation("vehicle_animator", "animator"); },
+    aircraftAnimation() { return readActiveAnimation("player_animator", "flightAnimation", "animator", "action"); },
+    fighterAnimation(index) { return readActiveAnimation(`p${index + 1}_visual_state`, "fighterVisual", "animator", "state"); },
+    isoAnimation(index) {
+      const { symbols, layouts: { isoAnimation } } = matchingNativeDiagnostics();
+      const active = runtimeNativeSymbols(symbols, 2);
+      const array = active.find(s => s.name.endsWith("::actor_animation_states"));
+      assert.ok(array && (index + 1) * isoAnimation.size <= array.size);
+      const address = array.address + index * isoAnimation.size;
+      return { mode: nativeRead8(address + isoAnimation.mode), frame: nativeRead8(address + isoAnimation.frame_index) };
+    },
+    coast() {
+      const { symbols, layouts } = matchingNativeDiagnostics();
+      return readNativeCoastState(readRuntimeTelemetry(core).runtimeKind, symbols, layouts, nativeRead8, nativeRead32);
+    },
+    camera() {
+      const { symbols, layouts: { camera } } = matchingNativeDiagnostics();
+      const room = exported.topdown_project.rooms[readRuntimeTelemetry(core).currentRoom];
+      const matches = symbols.filter(s => s.name.endsWith("::camera") && s.size === camera.size &&
+        nativeRead32(s.address + camera.bounds_pixels + 8) === room.width_tiles * 8 &&
+        nativeRead32(s.address + camera.bounds_pixels + 12) === room.height_tiles * 8);
+      assert.equal(matches.length, 1, "The camera matches the active room");
+      const address = matches[0].address;
+      return { x: nativeRead32(address + camera.position_pixels), y: nativeRead32(address + camera.position_pixels + 4),
+        follow: !!nativeRead8(address + camera.follow_player),
+        bounds: [0, 1, 2, 3].map(i => nativeRead32(address + camera.bounds_pixels + i * 4)) };
+    },
     capture,
     frame() { const p = core._gba_framebuffer(); const pixels = core.HEAPU8.slice(p, p + 153600); for (let i = 3; i < pixels.length; i += 4) pixels[i] = 255; return pixels; },
     hardware() { const size = core._gba_state_size(), p = core._malloc(size); assert.equal(core._gba_save_state(p, size), 1); const result = decodeMGBAHardwareVideoState(core.HEAPU8.slice(p, p + size)); core._free(p); return result; }
   };
+}
+function playAuditFromPort() {
+  const checkpointSize = core._gba_state_size();
+  const checkpoint = core._malloc(checkpointSize);
+  assert.equal(core._gba_save_state(checkpoint, checkpointSize), 1);
+  const saved = core.HEAPU8.slice(checkpoint, checkpoint + checkpointSize);
+  core._free(checkpoint);
+  const port = exported.menu_project.screens[menuSceneIndex("menu_start")];
+  return playPlayerScenes(campaignDriver(), {
+    project: JSON.parse(readFileSync(templateFile)),
+    projectRoot: path.dirname(templateFile),
+    exported,
+    enter(name) {
+      const pointer = core._malloc(saved.length);
+      core.HEAPU8.set(saved, pointer);
+      assert.equal(core._gba_load_state(pointer, saved.length), 1);
+      core._free(pointer);
+      run(0, 8);
+      if (name === "porto_lumen") return;
+      const index = port.items.findIndex(item => item.label === "QA " + name);
+      assert.ok(index >= 0, "QA navigation includes " + name);
+      press(8, 100);
+      selectNativeMenuItem("menu_start", index);
+    },
+    close: closeNativeDialogue,
+    tap,
+    moveTopdownTo,
+    moveIsoTo,
+    moveDungeonTo,
+    faceDungeon,
+    clickPointClickHotspot,
+    race: readRaceState,
+    record(result) { evidence.push({ label: "player-scene", ...result }); }
+  });
 }
 function selectNativeMenuItem(name, index) {
   assert.equal(readRuntimeTelemetry(core).runtimeKind, 3);
@@ -472,8 +621,11 @@ function expectRaceBackground() {
   const layer = Number(background.layer.slice(2));
   const enabled = core._gba_audio_register(0x04000000) & 0x0F00;
   assert.equal(enabled, 0x0100 | 1 << (8 + layer), "race enables only the UI and its authored background");
-  const exportRoot = path.dirname(path.dirname(path.resolve(romPath)));
-  const source = decodePngRgba(readFileSync(path.join(exportRoot, "assets", "image", `${background.tilemap}.png`)));
+  const project = JSON.parse(readFileSync(templateFile));
+  const authoredRoom = project.rooms.find(authored => authored.name === room.name);
+  const asset = project.assets.find(authored => authored.name === authoredRoom?.backgroundAssetName);
+  assert.ok(asset?.metadata?.source, "The track has an authored background");
+  const source = decodePngRgba(readFileSync(path.join(path.dirname(templateFile), asset.metadata.source)));
   const cameraX = nativeRead32(racingSymbol("camera_x", 4));
   const cameraY = nativeRead32(racingSymbol("camera_y", 4));
   const frame = core.HEAPU8.slice(core._gba_framebuffer(), core._gba_framebuffer() + 240 * 160 * 4);
@@ -578,6 +730,12 @@ try {
   }
   expectRoom("port-after-prologue", 0, 0);
 
+  if (sceneAudit) {
+    const audit = await playAuditFromPort();
+    assert.equal(audit.failed.length, 0, "Player scene audit failures: " + audit.failed.join(", "));
+    passed = true;
+  } else {
+
   // Walk to the mechanic; the authored event recovers the aircraft and saves.
   for (let attempt = 0; attempt < 8 && readRuntimeTelemetry(core).variables[1] === 0; attempt++) {
     const mechanic = readRuntimeTelemetry(core).firstActor;
@@ -662,44 +820,11 @@ try {
       }
     }
     assert.ok(checkpointTested, "the campaign route exercised a real checkpoint");
-    function penedosLeap(glideTicks, label) {
-      for (const [keys, ticks] of [[17, 12], [16, 2], [17, 16], [272, glideTicks], [0, 40]]) {
-        runPlatformerTicks(keys, ticks);
-      }
-      capture(label);
-    }
-    runPlatformerTicks(16, 20); runPlatformerTicks(0, 15);
-    penedosLeap(45, "penedos-second-cliff");
-    runPlatformerTicks(16, 20); runPlatformerTicks(0, 15);
-    // Descend before the east cliff and use L against the actual nearby enemy.
-    // Keeping R held while descending preserves the native glide ability.
-    for (const [keys, ticks] of [[17, 12], [16, 2], [17, 16], [272, 35]]) runPlatformerTicks(keys, ticks);
-    let eastCrabDefeated = false;
-    for (let step = 0; step < 260; step++) {
-      const state = readRuntimeTelemetry(core);
-      assert.equal(state.runtimeKind, 1, "combat stays in Penedos");
-      if (platformerVariable(31) === 2) { eastCrabDefeated = true; break; }
-      const physics = platformerDiagnostic();
-      const enemy = physics.actors.find(actor => actor.visible && actor.group === 1
-        && Math.abs(actor.x - state.player.x - 8)
-          + Math.abs(actor.y - state.player.y - physics.platform.height) <= 29);
-      if (enemy) {
-        runPlatformerTicks(enemy.x >= state.player.x + 8 ? 16 : 32, 1);
-        runPlatformerTicks(512 | 256, 2); runPlatformerTicks(256, 18);
-        capture(`penedos-attack-${enemy.index}`);
-      } else runPlatformerTicks(physics.platform.onGround ? 16 : 256, 1);
-    }
-    assert.ok(eastCrabDefeated, "controller attack defeated the east crab");
-    assert.equal(platformerVariable(27), 3, "the bridge and combat preserve all three health points");
-    for (let step = 0; step < 100 && readRuntimeTelemetry(core).player.x > 600; step++) runPlatformerTicks(32, 1);
-    assert.ok(readRuntimeTelemetry(core).player.x <= 600, "controller leaves the slope after combat");
-    runPlatformerTicks(0, 15); penedosLeap(35, "penedos-leaving-east-bridge");
-    for (let step = 0; step < 100 && readRuntimeTelemetry(core).player.x < 750; step++) runPlatformerTicks(16, 1);
-    assert.ok(readRuntimeTelemetry(core).player.x >= 750, "controller approaches the final gap");
-    runPlatformerTicks(0, 15); penedosLeap(60, "penedos-final-cliff");
-    runPlatformerTicks(16, 100); run(0, 300);
+    finishPenedosFromCheckpoint(approvedRoute);
     const warehouse = expectRoom("warehouse-after-grip", 5, 0);
     assert.equal(warehouse.variables[4], 1, "native pickup awards the grip module");
+    closeNativeDialogue();
+    expectMusic("music-before-warehouse-load");
     const warehouseSave = expectCheckpoint("warehouse-checkpoint", 5, 0);
     run(2, 16); run(0, 40);
     expectRoom("warehouse-after-cancel", 5, 0);
@@ -809,9 +934,8 @@ try {
     assert.deepEqual(copyModuleSavedata(core), stormSave, "storm Load preserves the whole battery");
     if (finale) {
       closeNativeDialogue();
-      const projectFile = fileURLToPath(new URL("../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url));
-      const relayProof = await playCampaignEvolutions(campaignDriver(), JSON.parse(readFileSync(projectFile)), exported,
-        "relay", { projectRoot: path.dirname(projectFile) });
+      const relayProof = await playCampaignEvolutions(campaignDriver(), JSON.parse(readFileSync(templateFile)), exported,
+        "relay", { projectRoot: path.dirname(templateFile) });
       assert.equal(relayProof.passed, true); assert.equal(relayProof.victory, true);
       evidence.push({ label: "guardian-party-abilities-and-victory", result: relayProof });
       const fight = expectRoom("guardian-victory-to-fighting", 12, 0);
@@ -850,21 +974,28 @@ try {
       for (let wait = 0; wait < 30 && readRuntimeTelemetry(core).variables[14] !== 1; wait++) run(0, 12);
       assert.equal(readRuntimeTelemetry(core).variables[14], 1, "Continue records campaign completion");
       const raceFinishSave = expectCheckpoint("race-finished-checkpoint", 7, 0);
-      let epilogueSeen = false, titleSeen = false;
-      for (let step = 0; step < 500; step++) {
+      const epilogueRooms = new Set();
+      let titleSeen = false;
+      for (let step = 0; step < 1800; step++) {
         const state = readRuntimeTelemetry(core);
-        if (state.runtimeKind === 0 && state.currentRoom === 0 && !epilogueSeen) {
-          run(0, 90); capture("campaign-epilogue-port"); epilogueSeen = true;
+        if (state?.runtimeKind === 0 && [0, 1].includes(state.currentRoom) && !epilogueRooms.has(state.currentRoom)) {
+          epilogueRooms.add(state.currentRoom);
+          capture(state.currentRoom === 0 ? "campaign-epilogue-port" : "campaign-epilogue-lighthouse");
         }
-        if (epilogueSeen && state.runtimeKind === 3 && state.currentRoom === menuSceneIndex("title")) { titleSeen = true; break; }
-        press(2, 25);
+        if (state?.runtimeKind === 3 && state.currentRoom === menuSceneIndex("title")) { titleSeen = true; break; }
+        // A advances the result dialogue. B skips the authored epilogue.
+        if (state?.runtimeKind === 3 && nativeUI().dialogue) press(1, 16);
+        else run(0, 4);
       }
-      assert.ok(epilogueSeen && titleSeen, "the authored ending reaches its epilogue and title through controls");
+      assert.deepEqual([...epilogueRooms], [0, 1], "The epilogue visits Porto and the lighthouse");
+      assert.ok(titleSeen, "The epilogue returns to the title");
       const title = expectRoom("title-after-campaign-ending", 3, menuSceneIndex("title"));
       assert.equal(title.variables[14], 1);
-      // The epilogue explicitly saves the completed Port before returning to
-      // Title. Preserve that latest battery while checking the earlier race.
-      const finishSave = expectCheckpoint("campaign-finished-checkpoint", 0, 0);
+      // The full epilogue saves at the lighthouse before returning to Title.
+      // Preserve that latest battery while checking the earlier race separately.
+      const lighthouse = exported.topdown_project.rooms.findIndex(room => room.name === "farol_interior");
+      assert.ok(lighthouse >= 0);
+      const finishSave = expectCheckpoint("campaign-finished-checkpoint", 0, lighthouse);
       loadCheckpoint(raceFinishSave, "loaded-race-finish-results", 3, menuSceneIndex("corrida_resultados"), 7);
       assert.equal(readRuntimeTelemetry(core).variables[14], 1);
       const d = matchingNativeDiagnostics();
@@ -872,11 +1003,11 @@ try {
       assert.equal(restoredRace.laps, 3); assert.equal(restoredRace.gates, 12); assert.equal(restoredRace.result, 1);
       selectNativeMenuItem("corrida_resultados", 2); run(0, 120);
       expectRoom("replayed-finish-returns-to-map", 10, 0);
-      const restored = loadCheckpoint(finishSave, "loaded-campaign-finish", 0, 0);
+      const restored = loadCheckpoint(finishSave, "loaded-campaign-finish", 0, lighthouse);
       assert.equal(restored.variables[14], 1, "fresh-ROM Load preserves campaign completion");
       assert.equal(nativeVariable(60), 3, "Load keeps the epilogue completed without replaying it");
       assert.equal(nativeTextSlot(1), record, "the race record survives the ending and latest save/load");
-      assert.deepEqual(copyModuleSavedata(core), finishSave, "loading the completed Port preserves its battery");
+      assert.deepEqual(copyModuleSavedata(core), finishSave, "loading the completed lighthouse preserves its battery");
 
     } else {
       loadCheckpoint(stormSave, "loaded-storm-again", 11, 0, 4);
@@ -886,13 +1017,14 @@ try {
   }
   passed = true;
   console.log(`PASS: native opening, prologue, mechanic, fresh-ROM save/load, pause menus and map travel${chapterTwo ? ", Penedos upgrade, point-click chapters and checkpoints through Mercado" : ""}${chapterThree ? ", market cargo, sentinel victory, cell save/load, council, storm clear and relay entry" : ""}${finale ? ", Guardian victory, two fighting rounds, background fidelity, three racing laps, ending and fresh-ROM completion Load" : ""}`);
+  }
 } catch (error) {
   evidence.push({ label: "failure-detail", error: String(error) });
   if (readRuntimeTelemetry(core)) capture("failure");
   throw error;
 } finally {
   writeFileSync(path.join(output, "result.json"), JSON.stringify({
-    passed, skipPrologue, female, chapterTwo, chapterThree, finale, romSha256: createHash("sha256").update(rom).digest("hex"),
+    passed, skipPrologue, female, chapterTwo, chapterThree, finale, sceneAudit, romSha256: createHash("sha256").update(rom).digest("hex"),
     linkMapSha256: linkMap ? createHash("sha256").update(linkMap).digest("hex") : undefined,
     emulatedFrames, inputs, evidence,
     limitations: [finale ? "Optional branches and arbitrary mid-combat checkpoints are not exercised by this campaign route." : chapterThree ? "Relay victory, fighting match, racing finish and checkpoints in these families are not exercised." : chapterTwo ? "Challenges after entering Mercado and campaign ending are not exercised." : "Remaining challenges and campaign ending are not exercised by this first route.", "Emulator evidence does not validate physical hardware."]

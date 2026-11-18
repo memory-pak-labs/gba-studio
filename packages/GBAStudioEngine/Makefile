@@ -48,6 +48,7 @@ menu-presentation-test: $(HOST_BUILD)/menu_presentation_tests
 	python3 tests/host/menu_hud_label_tests.py
 	python3 tests/host/hud_selector_pixels_tests.py
 	python3 tests/host/menu_text_input_presentation_tests.py
+	python3 tests/host/menu_text_input_confirmation_tests.py
 	python3 tests/host/name_input_palette_tests.py
 $(HOST_BUILD)/menu_presentation_tests: tests/host/menu_presentation_tests.cpp engine/include/gbs/menu.hpp engine/include/gbs/menu_presentation.hpp
 	@mkdir -p $(@D)
@@ -688,6 +689,7 @@ topdown-player-script-animation-test:
 host-test: platformer-player-script-animation-test
 platformer-player-script-animation-test:
 	python3 tests/host/platformer_player_script_animation_tests.py
+	python3 tests/host/platformer_dash_event_tests.py
 
 .PHONY: player-animation-controls-test
 host-test: player-animation-controls-test

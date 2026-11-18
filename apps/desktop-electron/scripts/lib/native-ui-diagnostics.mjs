@@ -16,12 +16,16 @@ export const nativeLayoutFields = {
   platform: ['bounds_pixels','velocity_x256','on_ground'],
   platformNpc: ['actor','active','visible','collision_group'],
   isoActor: ['tile','position_x256','position_y256','visible','position_initialized'],
+  isoAnimation: ['direction', 'walking', 'frame_index', 'mode'],
+  flightAnimation: ['animator', 'action'],
+  fighterVisual: ['state', 'animator', 'fallback'],
   tactical: ['enabled','active_team','turn_number','active_unit_index','selected_unit_index','menu_open','menu_index','attack_mode','moving','outcome','moved_this_turn','units'],
   tacticalUnit: ['configured','actor_index','team','move_range','attack_range','hp','max_hp'],
   audioVolume: ['current','start','target','total_frames','remaining_frames']
 };
 export function nativeLayoutSource() {
   const types = {universal:'gbs::UniversalSaveData',racing:'gbs::RacingRuntimeState',sceneMenu:'gbs::MenuRuntimeState',event:'gbs::EventState', dialogue:'gbs::DialogueState', menu:'gbs::MenuState', item:'gbs::MenuItem',battle:'gbs::BattleRpgRuntimeState',camera:'gbs::Camera',animator:'gbs::SpriteAnimatorState',animation:'gbs::SpriteAnimation',actor:'gbs::Actor',platform:'gbs::PlatformerActor',platformNpc:'gbs::PlatformerNpcRuntime',isoActor:'gbs::IsoActor',tactical:'IsoTacticalRuntimeState',tacticalUnit:'IsoTacticalRuntimeUnit',audioVolume:'AudioVolumeState'};
+  Object.assign(types, {isoAnimation:'gbs::IsoActorAnimationState', flightAnimation:'gbs::ShmupPlayerAnimator', fighterVisual:'gbs::LutaVisualStateData'});
   const source=readFileSync(new URL('../../../../packages/GBAStudioEngine/examples/isometric_basic/src/main.cpp',import.meta.url),'utf8');
   const declaration=(name,sourceText=source)=>{
     const start=sourceText.indexOf('struct '+name+' {');if(start<0)throw Error('Missing native diagnostic type '+name);
@@ -30,7 +34,7 @@ export function nativeLayoutSource() {
     throw Error('Unclosed diagnostic type '+name);
   };
   const privateTypes='constexpr size_t max_actor_count=gbs::max_isometric_save_actors;\nconstexpr size_t no_tactical_unit_index=static_cast<size_t>(-1);\n'+['IsoTacticalRuntimeUnit','IsoTacticalCursorInput','IsoTacticalCursorVisual','IsoTacticalRuntimeState'].map(name=>declaration(name)).join('\n')+'\n'+declaration('AudioVolumeState',readFileSync(new URL('../../../../packages/GBAStudioEngine/engine/src/gbs_audio.cpp',import.meta.url),'utf8'));
-  return '#include <stddef.h>\n#include "gbs/racing.hpp"\n#include "gbs/menu.hpp"\n#include "gbs/event.hpp"\n#include "gbs/dialogue.hpp"\n#include "gbs/ui.hpp"\n#include "gbs/battle_rpg.hpp"\n#include "gbs/topdown.hpp"\n#include "gbs/animation.hpp"\n#include "gbs/platformer.hpp"\n#include "gbs/isometric.hpp"\n'+privateTypes+'\nextern "C" const unsigned mission_layout[] = {' + Object.entries(nativeLayoutFields).flatMap(([key,fields])=>[`sizeof(${types[key]})`,...fields.map(f=>`offsetof(${types[key]}, ${f})`)]).join(',') + '};\n';
+  return '#include <stddef.h>\n#include "gbs/racing.hpp"\n#include "gbs/menu.hpp"\n#include "gbs/event.hpp"\n#include "gbs/dialogue.hpp"\n#include "gbs/ui.hpp"\n#include "gbs/battle_rpg.hpp"\n#include "gbs/topdown.hpp"\n#include "gbs/animation.hpp"\n#include "gbs/platformer.hpp"\n#include "gbs/isometric.hpp"\n#include "gbs/shmup.hpp"\n#include "gbs/luta.hpp"\n'+privateTypes+'\nextern "C" const unsigned mission_layout[] = {' + Object.entries(nativeLayoutFields).flatMap(([key,fields])=>[`sizeof(${types[key]})`,...fields.map(f=>`offsetof(${types[key]}, ${f})`)]).join(',') + '};\n';
 }
 export function parseNativeLayouts(buffer) {
   let at=0;return Object.fromEntries(Object.entries(nativeLayoutFields).map(([key,fields])=>[key,Object.fromEntries(['size',...fields].map(f=>{const v=buffer.readUInt32LE(at);at+=4;return[f,v];}))]));
@@ -58,7 +62,10 @@ export function readNativeTopdownPlayer(symbols,layouts,read8,read32) {
 export function readNativePlayerAnimation(symbols, layouts, read8, read32) {
   const symbol = symbols.find(s => s.name.endsWith('::player_animator') && s.size === layouts.animator.size);
   if (!symbol) throw Error('Matching native player animator is required');
-  const a=symbol.address,l=layouts.animator,pointer=read32(a+l.animation)>>>0;
+  return readNativeSpriteAnimator(symbol.address, layouts, read8, read32);
+}
+export function readNativeSpriteAnimator(a, layouts, read8, read32) {
+  const l=layouts.animator,pointer=read32(a+l.animation)>>>0;
   return { address:pointer,frame:read8(a+l.frame_index),remaining:read8(a+l.frames_remaining),
     progress:read8(a+l.frame_progress_x100)|(read8(a+l.frame_progress_x100+1)<<8),playing:!!read8(a+l.playing),
     frameCount:pointer?read8(pointer+layouts.animation.frame_count):0 };
@@ -102,7 +109,7 @@ export function readNativeRacing(symbols,layouts,read8,read32,address) {
   if(address===undefined&&!symbol)throw Error('Matching racing runtime is required.');
   const a=address??symbol.address;
   return {x:read32(a+fields.position_x256)/256,y:read32(a+fields.position_y256)/256,speed:read32(a+fields.speed_x256)/256,
-    distance:read32(a+fields.distance_x256)/256,laps:read32(a+fields.lap_count),gates:read32(a+fields.checkpoint_count),
+    distance:read32(a+fields.distance_x256)/256,rivalDistance:read32(a+fields.rival_distance_x256)/256,laps:read32(a+fields.lap_count),gates:read32(a+fields.checkpoint_count),
     result:read8(a+fields.race_result),charges:read8(a+fields.boost_charges),boost:read8(a+fields.boost_frames)|(read8(a+fields.boost_frames+1)<<8),
     heading:read8(a+fields.heading),angle:read8(a+fields.heading_x256)|(read8(a+fields.heading_x256+1)<<8),elapsed:read32(a+fields.elapsed_frames)};
 }

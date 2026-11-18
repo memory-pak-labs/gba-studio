@@ -1,4 +1,4 @@
-import { access, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { applyPluginAssetPack } from "../shared/gbaStudioPluginAssets.js";
 import { loadPluginDataTables } from "./gbaStudioPluginDataTablesLoader.js";
@@ -116,16 +116,29 @@ async function extractZipArchive(zipPath: string, destinationDirectory: string):
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(execFile);
 
-  await mkdir(destinationDirectory, { recursive: true });
   if (process.platform === "win32") {
+    // Windows PowerShell can resolve an incompatible Expand-Archive module
+    // through PSModulePath. Its own .NET Framework ZIP API needs no module.
     await execFileAsync(
       "powershell",
       [
         "-NoProfile",
+        "-NonInteractive",
         "-Command",
-        `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destinationDirectory.replace(/'/g, "''")}' -Force`
+        [
+          "$ErrorActionPreference = 'Stop'",
+          "Add-Type -AssemblyName System.IO.Compression.FileSystem",
+          "[System.IO.Compression.ZipFile]::ExtractToDirectory($env:GBA_STUDIO_PLUGIN_ZIP, $env:GBA_STUDIO_PLUGIN_DESTINATION)"
+        ].join("; ")
       ],
-      { windowsHide: true }
+      {
+        windowsHide: true,
+        env: {
+          ...process.env,
+          GBA_STUDIO_PLUGIN_ZIP: zipPath,
+          GBA_STUDIO_PLUGIN_DESTINATION: destinationDirectory
+        }
+      }
     );
     return;
   }
@@ -263,7 +276,7 @@ export async function installPluginIntoProject(
         return { ok: false, error: archiveValidation.error };
       }
 
-      temporaryDirectory = path.join(projectRoot, `.plugin-install-${process.pid}-${Date.now()}`);
+      temporaryDirectory = await mkdtemp(path.join(projectRoot, ".plugin-install-"));
       await extractZipArchive(sourcePath, temporaryDirectory);
       const resolved = await findSinglePluginRoot(temporaryDirectory);
       if ("error" in resolved) {

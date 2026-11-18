@@ -1,5 +1,6 @@
 // Real ROM checks. Inputs drive gameplay; ELF symbols are read-only test oracles.
 import fs from 'node:fs';
+import { armEventVariablesOffset } from './lib/arm-event-layout.mjs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -12,6 +13,7 @@ import { decodeMGBAHardwareVideoState } from './native-scene-framebuffer-contrac
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const romPath = path.resolve(process.argv[2]), output = path.resolve(process.argv[3]);
 fs.mkdirSync(output, { recursive: true });
+const variablesOffset = armEventVariablesOffset(output);
 const symbols = spawnSync('/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm', ['-S', '-C', romPath.replace(/\.gba$/, '.elf')], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }).stdout.split('\n').map(l => { const m = l.match(/^([\da-f]+) ([\da-f]+) (\w) (.*)$/); return m ? { address: parseInt(m[1], 16), size: parseInt(m[2], 16), type: m[3], name: m[4] } : null; }).filter(Boolean);
 const sym = n => symbols.find(s => s.name.endsWith('::' + n));
 const presentation = sym('player_presentation');
@@ -87,7 +89,7 @@ function reset(battery = null) {
         assert.equal(restoreModuleSavedata(m, battery), true);
     run(240);
 }
-function state() { const t = readRuntimeTelemetry(m); return { ...t, dialogues: activeDialogue().map(a => ({ address: a, page: rd32(a + 1028), complete: rd16(a + 1052) & 255 })), camera: { x: rd32(camera.address), y: rd32(camera.address + 4) }, animation: animations[rd32(animator.address)], animationFrame: rd16(animator.address + 4) & 255, variables: Array.from({ length: 64 }, (_, i) => rd32(event.address + 192 + i * 4)), npcs: Array.from({ length: 6 }, (_, i) => ({ x: rd32(npc.address + i * 68), y: rd32(npc.address + i * 68 + 4), flags: bytes(npc.address + i * 68 + 16, 16) })), physics: actor ? bytes(actor.address + 24, 32) : null }; }
+function state() { const t = readRuntimeTelemetry(m); return { ...t, dialogues: activeDialogue().map(a => ({ address: a, page: rd32(a + 1028), complete: rd16(a + 1052) & 255 })), camera: { x: rd32(camera.address), y: rd32(camera.address + 4) }, animation: animations[rd32(animator.address)], animationFrame: rd16(animator.address + 4) & 255, variables: Array.from({ length: 64 }, (_, i) => rd32(event.address + variablesOffset + i * 4)), npcs: Array.from({ length: 6 }, (_, i) => ({ x: rd32(npc.address + i * 68), y: rd32(npc.address + i * 68 + 4), flags: bytes(npc.address + i * 68 + 16, 16) })), physics: actor ? bytes(actor.address + 24, 32) : null }; }
 function shot(name) {
     const p = m._gba_framebuffer(), rgba = m.HEAPU8.slice(p, p + 153600);
     for (let i = 3; i < rgba.length; i += 4)
@@ -118,7 +120,7 @@ try {
                 const dy = s.npcs[4].y - (s.player.y + rd32(actor.address + 12));
                 if (Math.abs(dx) + Math.abs(dy) <= 29) {
                     run(1, dx >= 0 ? 16 : 32, true);
-                    run(2, 512, true);
+                    run(2, 2, true);
                     run(38, 0, true);
                     break;
                 }
@@ -176,7 +178,7 @@ try {
             assert.equal(sample('beacon').variables[28], 1);
             assert.equal(inspectSavedataBytes(checkpointBattery).slot?.status, 'ok');
         });
-        check('L attack defeats the east crab and awards its token once', () => {
+        check('B attack defeats the east crab and awards its token once', () => {
             assert.equal(sample('attack-east').variables[31], 2);
             assert.equal(sample('attack-east').variables[28], 2);
         });
@@ -227,10 +229,10 @@ try {
         shot('left');
         check('left direction mirrors Nara', () => assert.equal(samples.at(-1).native.objects.find(o => o.index === 0).flipX, true));
         reset();
-        run(8, 18, true);
+        run(8, 528, true);
         shot('dash');
         run(50);
-        check('B activates dash animation', () => assert.ok(trace.slice(-100).some(s => s.animation === 'dash')));
+        check('L activates dash animation', () => assert.ok(trace.slice(-100).some(s => s.animation === 'dash')));
         reset();
         run(22, 16, true);
         run(30, 0, true);

@@ -120,12 +120,22 @@ int main() {
     player.velocity_x256.x = 0;
     event_state.player_animation_changed = true; event_state.player_animation_index = -3;
     consume_platformer_player_animation_request();
-    present();
-    assert(player_animator.animation == &once && player_animator.frame_index == 1);
+    present({gbs::ButtonB | gbs::ButtonRight, gbs::ButtonB, 0});
+    assert(player_animator.animation == &once && player_script_animation_active);
+    assert(player_animator.frame_index == 1);
     present();
     assert(!player_animator.playing);
     advance_platformer_runtime_animations();
     assert(player_animator.animation == &idle && !player_script_animation_active);
+    event_state.player_animation_changed = true; event_state.player_animation_index = -3;
+    consume_platformer_player_animation_request();
+    present({gbs::ButtonA, gbs::ButtonA, 0});
+    assert(!player_script_animation_active); // Jump remains responsive during an attack.
+    event_state.player_animation_changed = true; event_state.player_animation_index = -3;
+    consume_platformer_player_animation_request();
+    player.dashing = true; present();
+    assert(!player_script_animation_active); // Dash also interrupts the attack.
+    player.dashing = false;
     event_state.player_animation_changed = true; event_state.player_animation_index = -2;
     consume_platformer_player_animation_request();
     project.player_animations.hurt = &once; player_hurt_presentation_requested = true;

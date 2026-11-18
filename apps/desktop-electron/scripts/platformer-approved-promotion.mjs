@@ -19,6 +19,7 @@ export function promoteApprovedPlatformer(source) {
     p.settings.hudPresets = upsert(p.settings.hudPresets, [m.hud]);
     const update = r => r.name !== name ? r : { ...r, width: 120, height: 40, backgroundAssetName: 'penedos-approved-terrain.png',
         runtimeBaseBackgroundAssetName: 'penedos-approved-terrain.png', runtimeCompositeBackgroundAssetName: 'penedos-approved-terrain.png', backgroundRenderMode: 'tilemap', gbStudioUseBackgroundLayout: true,
+        campaign: { ...r.campaign, controls: 'Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.' },
         cameraMode: 'follow_player', cameraBounds: { x: 0, y: 0, width: 120, height: 40 }, cameraZoom: 100,
         cameraPosition: structuredClone(m.cameraPosition),
         cameraZones: [structuredClone(m.cameraZone)],
@@ -38,13 +39,14 @@ export function promoteApprovedPlatformer(source) {
     const callback = (n, sfx) => add('penedos_player_' + n, ['play_sfx penedos_' + sfx + '_candidato']);
     const jump = callback('jump', 'salto'), ground = callback('ground', 'pouso'), dash = callback('dash', 'impulso');
     const enter = ['play_music ' + m.audioItems[0].id, 'call_event aplicar_perfil_jogador', 'if_variable penedos_player_health 0', 'set_variable penedos_player_health 3', 'condition_end',
-        `attach_platform_callback jumpStart ${jump}`, `attach_platform_callback groundStart ${ground}`, `attach_platform_callback dashStart ${dash}`, 'attach_button L penedos_player_attack false'];
+        `attach_platform_callback jumpStart ${jump}`, `attach_platform_callback groundStart ${ground}`, `attach_platform_callback dashStart ${dash}`, 'attach_button B penedos_player_attack true', 'attach_button L penedos_player_dash_input true'];
     add('penedos_ao_entrar', enter);
     const health = ['add_variable penedos_player_health -1', 'if_variable penedos_player_health 0', 'set_variable penedos_player_health 3', 'condition_end'];
     const respawn = ['play_sfx penedos_impacto_candidato', ...health, 'set_platformer_state knockback', 'if_variable var_penedos_farol 1', `set_actor_position player ${m.respawn.x} ${m.respawn.y}`, 'else', `set_actor_position player ${m.entry.x} ${m.entry.y}`, 'condition_end'];
     add('penedos_teste_queda', respawn);
     add('penedos_teste_contato_inimigo', ['rate_limit 45 30', ...respawn, 'rate_limit_end']);
-    const attack = ['play_sfx penedos_impulso_candidato'];
+    add('penedos_player_dash_input', ['set_platformer_state dash']);
+    const attack = ['set_actor_animation player attack_right', 'play_sfx penedos_impulso_candidato'];
     for (const a of enemies) {
         const suffix = a.id.replace('penedos-', ''), flag = 'penedos_defeated_' + suffix.replaceAll('-', '_'), moth = suffix.startsWith('moth'), min = a.x - 2, max = a.x + 2;
         a.eventBindings.onInit = add(`penedos_${suffix}_iniciar`, [`if_variable ${flag} 2`, `set_actor_visible ${a.id} false`, `set_actor_active ${a.id} false`, 'else', `set_actor_collision_box ${a.id} -8 ${moth ? -8 : -16} 16 16`, `set_actor_animation ${a.id} idle_right`, 'condition_end']);
@@ -70,7 +72,7 @@ export function promoteApprovedPlatformer(source) {
     for (const v of variables)
         if (!p.variables.some(x => x.name === v.name))
             p.variables.push(v);
-    const text = { penedos_teste_npc_fala: 'A salta; A no ar dá outro salto. B dá impulso, R plana e CIMA sobe escadas. Use L para golpear e A perto do farol para salvar.', penedos_teste_checkpoint_fala: 'Sinal aceso. Progresso salvo! Você retorna aqui se cair ou tocar em um inimigo.' };
+    const text = { penedos_teste_npc_fala: 'A salta; A no ar dá outro salto. B ataca, L dá impulso e R plana. CIMA ou BAIXO inicia a escalada. Use A perto do farol para salvar.', penedos_teste_checkpoint_fala: 'Sinal aceso. Progresso salvo! Você retorna aqui se cair ou tocar em um inimigo.' };
     for (const d of p.dialogues)
         if (text[d.key]) {
             d.text = text[d.key];

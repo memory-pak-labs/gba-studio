@@ -825,9 +825,11 @@ void update_platformer_player_runtime_animation(gbs::InputState player_input, bo
         landed,
         player_hurt_presentation_requested
     );
-    const bool interrupted = player_hurt_presentation_requested ||
-        (player_input.held & (gbs::ButtonLeft | gbs::ButtonRight | gbs::ButtonUp | gbs::ButtonDown |
-            gbs::ButtonA | gbs::ButtonB | gbs::ButtonL | gbs::ButtonR)) != 0;
+    const bool one_shot = player_animator.animation != nullptr && !player_animator.animation->loop;
+    const bool interrupted = player_hurt_presentation_requested || player.dashing ||
+        (one_shot ? player_input.was_pressed(gbs::ButtonA)
+            : (player_input.held & (gbs::ButtonLeft | gbs::ButtonRight | gbs::ButtonUp | gbs::ButtonDown |
+                gbs::ButtonA | gbs::ButtonB | gbs::ButtonL | gbs::ButtonR)) != 0);
     player_hurt_presentation_requested = false;
     if (player_script_animation_active && !interrupted && player_animator.playing) return;
     player_script_animation_active = false;
@@ -1151,6 +1153,7 @@ bool consume_platformer_state_request(
     if (next_state < 0 || next_state > 9) {
         return false;
     }
+    if (next_state == 3 && !gbs::start_platformer_dash(player, config)) return false;
     if (next_state == 6) player_hurt_presentation_requested = true;
 
     transition_platformer_callback_state(event_state, active_state, next_state);

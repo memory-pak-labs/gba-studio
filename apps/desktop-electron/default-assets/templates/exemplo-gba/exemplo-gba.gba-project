@@ -1819,7 +1819,7 @@
       "id": "tempestade-approved-actor-boss",
       "name": "Farol da Tempestade",
       "roomName": "tempestade",
-      "x": 43,
+      "x": 22,
       "y": 7,
       "spriteSheet": "tempestade-approved-boss.png",
       "animationName": "idle",
@@ -1829,7 +1829,9 @@
         "width": 48,
         "height": 48,
         "health": 6,
-        "fireInterval": 40
+        "fireInterval": 40,
+        "velocityX": 0,
+        "velocityY": 0
       },
       "eventBindings": {
         "onInit": "tempestade_farol_entrar",
@@ -11838,7 +11840,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -12204,7 +12206,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -12570,7 +12572,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -12936,7 +12938,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -13302,7 +13304,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -13668,7 +13670,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -14034,7 +14036,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -14400,7 +14402,7 @@
       "frameWidth": 64,
       "frameHeight": 64,
       "frameCount": 4,
-      "fps": 9,
+      "fps": 20,
       "loops": true,
       "originX": 0,
       "originY": 0,
@@ -160077,16 +160079,16 @@
     {
       "key": "penedos_teste_npc_fala",
       "character": "Trabalhador",
-      "text": "A jumps; press A in the air to jump again. B dashes, R glides and UP climbs ladders. Use L to attack and A near the beacon to save.",
+      "text": "A jumps; press A in the air to jump again. B attacks, L dashes and R glides. UP or DOWN starts climbing. Use A near the beacon to save.",
       "confirmSound": "farol_sfx_dialogo",
       "textSound": "farol_sfx_texto",
       "portrait": "",
       "emote": "",
       "choices": [],
       "translations": {
-        "pt-BR": "A salta; A no ar dá outro salto. B dá impulso, R plana e CIMA sobe escadas. Use L para golpear e A perto do farol para salvar.",
-        "es": "Usa la cruceta para moverte, A para saltar y B para impulsarte. Habla conmigo pulsando A.",
-        "en": "A jumps; press A in the air to jump again. B dashes, R glides and UP climbs ladders. Use L to attack and A near the beacon to save."
+        "pt-BR": "A salta; A no ar dá outro salto. B ataca, L dá impulso e R plana. CIMA ou BAIXO inicia a escalada. Use A perto do farol para salvar.",
+        "es": "A salta; pulsa A en el aire para saltar otra vez. B ataca, L da impulso y R planea. ARRIBA o ABAJO inicia la escalada. Usa A cerca del faro para guardar.",
+        "en": "A jumps; press A in the air to jump again. B attacks, L dashes and R glides. UP or DOWN starts climbing. Use A near the beacon to save."
       },
       "translationStatus": {
         "pt-BR": "approved",
@@ -167959,7 +167961,12 @@
         },
         {
           "id": "penedos_ao_entrar-8",
-          "command": "attach_button L penedos_player_attack false",
+          "command": "attach_button B penedos_player_attack true",
+          "isEnabled": true
+        },
+        {
+          "id": "penedos-bind-dash-L",
+          "command": "attach_button L penedos_player_dash_input true",
           "isEnabled": true
         }
       ],
@@ -168752,6 +168759,11 @@
       "category": "Cena",
       "command": "noop",
       "steps": [
+        {
+          "id": "penedos-player-attack-animation",
+          "command": "set_actor_animation player attack_right",
+          "isEnabled": true
+        },
         {
           "id": "penedos_player_attack-0",
           "command": "play_sfx penedos_impulso_candidato",
@@ -173044,6 +173056,31 @@
         {
           "id": "coast_restore_penedos_vento-1",
           "command": "fade_audio_volume music 100 45 var_audio_music_volume var_audio_master_volume",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-2",
+          "command": "attach_platform_callback jumpStart penedos_player_jump",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-3",
+          "command": "attach_platform_callback groundStart penedos_player_ground",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-4",
+          "command": "attach_platform_callback dashStart penedos_player_dash",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-5",
+          "command": "attach_button B penedos_player_attack true",
+          "isEnabled": true
+        },
+        {
+          "id": "coast_restore_penedos_vento-6",
+          "command": "attach_button L penedos_player_dash_input true",
           "isEnabled": true
         }
       ]
@@ -177927,6 +177964,20 @@
         {
           "id": "nara_configurar_corrida-profile",
           "command": "set_player_speed_profile 100 170 r 0",
+          "isEnabled": true
+        }
+      ]
+    },
+    {
+      "id": "event-penedos_player_dash_input",
+      "name": "penedos_player_dash_input",
+      "roomName": "penedos_vento",
+      "category": "Cena",
+      "command": "noop",
+      "steps": [
+        {
+          "id": "penedos-dash-input",
+          "command": "set_platformer_state dash",
           "isEnabled": true
         }
       ]
@@ -183869,7 +183920,7 @@
         "objective": "Alcançar o módulo de aderência no alto das falésias.",
         "nextScene": "armazem_das_mares",
         "completionVariable": "vehicleModules.grip",
-        "controls": "Direcional move; A pula e interage; B usa o impulso curto.",
+        "controls": "Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.",
         "success": "Coletar o módulo de aderência e alcançar o Armazém das Marés.",
         "failureRecovery": "Checkpoints retomam a travessia sem apagar a campanha.",
         "tutorialDialogue": "",
@@ -183915,7 +183966,7 @@
           "lockY": true
         }
       ],
-      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B usa o impulso curto."
+      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada."
     },
     {
       "backgroundAssetName": "warehouse-frontal-bg-240x160.png",
@@ -195350,7 +195401,7 @@
               "startFrame": 0,
               "playerSpeed": 2,
               "fireCooldown": 8,
-              "scrollSpeed": 1
+              "scrollSpeed": 0
             }
           ],
           "composition": {
@@ -231441,7 +231492,7 @@
         "objective": "Alcançar o módulo de aderência no alto das falésias.",
         "nextScene": "armazem_das_mares",
         "completionVariable": "vehicleModules.grip",
-        "controls": "Direcional move; A pula e interage; B usa o impulso curto.",
+        "controls": "Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.",
         "success": "Coletar o módulo de aderência e alcançar o Armazém das Marés.",
         "failureRecovery": "Checkpoints retomam a travessia sem apagar a campanha.",
         "tutorialDialogue": "",
@@ -231487,7 +231538,7 @@
           "lockY": true
         }
       ],
-      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B usa o impulso curto."
+      "authoringNotes": "Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada."
     },
     {
       "backgroundAssetName": "warehouse-frontal-bg-240x160.png",
@@ -242922,7 +242973,7 @@
               "startFrame": 0,
               "playerSpeed": 2,
               "fireCooldown": 8,
-              "scrollSpeed": 1
+              "scrollSpeed": 0
             }
           ],
           "composition": {

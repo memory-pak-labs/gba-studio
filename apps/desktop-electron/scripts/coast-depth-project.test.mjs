@@ -89,6 +89,9 @@ describe('coastal campaign depth',()=>{
     expect(byId(regenerated.actors)).toEqual(byId(before.actors));
     expect(regenerated.variables.map(v=>v.name)).toEqual(before.variables.map(v=>v.name));
     expect(regenerated.rooms.find(r=>r.name==='galeria_das_mares').eventBindings.onRestore).toBe('coast_restore_galeria_das_mares');
+    const penedos = c.platformer_project.rooms.find(room => room.name === 'penedos_vento');
+    expect(penedos.on_restore.filter(command => command.op === 'attach_button_event').map(command => command.button))
+      .toEqual(expect.arrayContaining(['B', 'L']));
   });
   it('reads the platformer event state from its own ELF symbol',()=>{
     expect(nativeEventStatesByRuntime([{name:'(anonymous namespace)::platformer_event_state',address:0x02001000,section:'.ewram_runtime_platformer'}])).toEqual({1:0x02001000});

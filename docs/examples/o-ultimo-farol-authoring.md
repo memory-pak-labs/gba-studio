@@ -129,7 +129,7 @@ Sequência nativa: 0 quadros.
 
 ## penedos_vento · platformer
 
-Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B usa o impulso curto.
+Objetivo: Alcançar o módulo de aderência no alto das falésias. O runtime aplica movimento, salto e colisões. Os scripts dos atores montam patrulhas, conversa e checkpoint. As patrulhas usam limites e variáveis específicos deste mapa; copie-as pela timeline e ajuste esses parâmetros. Controles: Direcional move; A pula e interage; B ataca; L usa o impulso; R plana. Cima ou Baixo inicia a escalada.
 
 Sequência nativa: 0 quadros.
 

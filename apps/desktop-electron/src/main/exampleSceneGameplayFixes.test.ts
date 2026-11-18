@@ -1,0 +1,45 @@
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+import { buildEngineExportProjectContract } from "./exportEngineProject.js";
+const template = () => JSON.parse(readFileSync(new URL("../../default-assets/templates/exemplo-gba/exemplo-gba.gba-project", import.meta.url), "utf8"));
+it("authors B attack and L dash with existing events and the approved attack clip", () => {
+  const project = template();
+  const commands = (name: string) => project.events.find((event: any) => event.name === name)?.steps.map((step: any) => step.command);
+  expect(commands("penedos_ao_entrar")).toContain("attach_button B penedos_player_attack true");
+  expect(commands("penedos_ao_entrar")).toContain("attach_button L penedos_player_dash_input true");
+  expect(commands("penedos_player_dash_input")).toEqual(["set_platformer_state dash"]);
+  expect(commands("penedos_player_attack")).toContain("set_actor_animation player attack_right");
+  expect(commands("penedos_player_attack").some((command: string) => command.startsWith("wait "))).toBe(false);
+  const clip = project.animations.find((animation: any) => animation.id === "penedos-approved-nara-attack");
+  expect(clip).toMatchObject({ frameCount: 3, loops: false });
+  const exported = buildEngineExportProjectContract(project).platformer_project!;
+  expect(exported.scripts.some(script => script.script.some(command => command.op === "set_platformer_state" && command.state === "dash"))).toBe(true);
+});
+it("restores the authored Penedos controls and platform callbacks after loading a checkpoint", () => {
+  const platformer = buildEngineExportProjectContract(template()).platformer_project!;
+  const room = platformer.rooms.find(room => room.name === "penedos_vento")!;
+  const enter = room.on_enter ?? [];
+  const isControl = (command: (typeof enter)[number]) =>
+    command.op === "attach_platform_callback" ||
+    (command.op === "attach_button_event" && (command.button === "B" || command.button === "L"));
+  const authored = enter.filter(isControl);
+  expect(authored).toHaveLength(5);
+  expect(room.on_restore?.filter(isControl)).toEqual(authored);
+});
+it("stops every boss-wave background and keeps the boss in the arena until defeated", () => {
+  const project = template();
+  const exported = buildEngineExportProjectContract(project).shmup_project!;
+  const travel = exported.backgrounds!.find(background => background.name === "tempestade_inicial")!;
+  const arena = exported.backgrounds!.find(background => background.name === "tempestade_farol")!;
+  expect(travel.layers.some(layer => layer.scroll.x > 0)).toBe(true);
+  expect(arena.layers.length).toBeGreaterThan(0);
+  expect(arena.layers.every(layer => layer.scroll.x === 0 && layer.scroll.y === 0)).toBe(true);
+  const wave = exported.waves.find(wave => wave.name === "tempestade_farol")!;
+  expect(wave.enemies).toHaveLength(1);
+  const boss = wave.enemies[0]!;
+  expect(boss.velocity).toEqual({ x: 0, y: 0 });
+  expect(boss.position.x).toBeGreaterThan(120);
+  expect(boss.position.x + boss.size.x).toBeLessThanOrEqual(240);
+  expect(boss.health).toBe(6);
+  expect(wave.on_clear?.some(command => command.op === "warp_runtime")).toBe(true);
+});

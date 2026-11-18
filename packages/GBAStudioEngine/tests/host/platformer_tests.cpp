@@ -584,6 +584,33 @@ void test_platformer_derives_animation_state() {
     assert(gbs::platformer_player_animation_for_state(idle_only, gbs::PlatformerActorAnimationState::Run) == &idle);
 }
 
+void test_platformer_requires_vertical_intent_to_grab_ladders() {
+    const uint8_t flags[] = {
+        0, gbs::TileLadder, 0,
+        0, gbs::TileLadder, 0,
+        0, gbs::TileLadder, 0,
+        gbs::TileSolid, gbs::TileSolid, gbs::TileSolid
+    };
+    const gbs::TileMap map { flags, 3, 4 };
+    auto actor = gbs::platformer_actor_from_rect({8, 8, 8, 8});
+    gbs::update_platformer_actor(map, actor, {}, test_config);
+    assert(!actor.on_ladder);
+    assert(gbs::platformer_actor_animation_state(actor) != gbs::PlatformerActorAnimationState::Climb);
+    assert(actor.velocity_x256.y > 0); // Falling through a ladder keeps gravity.
+    gbs::update_platformer_actor(map, actor, {gbs::ButtonUp, gbs::ButtonUp, 0}, test_config);
+    assert(actor.on_ladder);
+    const int y = actor.bounds_pixels.y;
+    update_frames(map, actor, 20, {});
+    assert(actor.on_ladder && actor.bounds_pixels.y == y);
+    gbs::update_platformer_actor(map, actor, {gbs::ButtonA, gbs::ButtonA, 0}, test_config);
+    assert(!actor.on_ladder && actor.velocity_x256.y < 0);
+    gbs::update_platformer_actor(map, actor, {gbs::ButtonA | gbs::ButtonUp, 0, 0}, test_config);
+    assert(!actor.on_ladder); // Holding jump does not immediately regrab.
+    actor = gbs::platformer_actor_from_rect({8, 8, 8, 8});
+    gbs::update_platformer_actor(map, actor, {gbs::ButtonDown, gbs::ButtonDown, 0}, test_config);
+    assert(actor.on_ladder && actor.velocity_x256.y > 0);
+}
+
 void test_platformer_climbs_ladder_without_gravity() {
     const uint8_t flags[] = {
         0, gbs::TileLadder, 0,
@@ -1171,6 +1198,7 @@ int main() {
     test_wide_platformer_lands_on_slope_beside_solid_cliff();
     test_platformer_enters_ladder_approach_lane_before_wall();
     test_platformer_derives_animation_state();
+    test_platformer_requires_vertical_intent_to_grab_ladders();
     test_platformer_climbs_ladder_without_gravity();
     test_platformer_plus_supports_variable_jump_and_air_control();
     test_platformer_plus_can_drop_through_one_way_platforms();
