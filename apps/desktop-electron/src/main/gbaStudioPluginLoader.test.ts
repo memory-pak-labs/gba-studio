@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile, mkdir, symlink } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile, mkdir, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,8 +14,8 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-async function makeProjectRoot(): Promise<{ projectRoot: string; projectPath: string }> {
-  const projectRoot = await mkdtemp(path.join(os.tmpdir(), "gba-plugin-project-"));
+async function makeProjectRoot(prefix = "gba-plugin-project-"): Promise<{ projectRoot: string; projectPath: string }> {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), prefix));
   tempDirs.push(projectRoot);
   const projectPath = path.join(projectRoot, "demo.gba-project");
   await writeFile(projectPath, serializeGBAProjectFile({
@@ -26,14 +26,28 @@ async function makeProjectRoot(): Promise<{ projectRoot: string; projectPath: st
 }
 
 describe("gbaStudioPluginLoader", () => {
-  it("finishes installing a downloaded native ZIP before cleaning the temporary archive", async () => {
-    const { projectPath } = await makeProjectRoot();
+  it.each(["downloaded", "local"])("installs a %s native ZIP and cleans up temporary files", async (source) => {
+    const { projectRoot, projectPath } = await makeProjectRoot("gba-plugin projeto D'Ávila [ZIP]-");
     // Stored ZIP containing only the temporary recipePack's plugin.json.
     const archive = Buffer.from("UEsDBBQAAAAAAPCoQl3J1QPYWAEAAFgBAAALAAAAcGx1Z2luLmpzb257ImlkIjogInRlc3QvbmF0aXZlIiwgInR5cGUiOiAicmVjaXBlUGFjayIsICJ2ZXJzaW9uIjogIjEuMC4wIiwgInNka1ZlcnNpb24iOiAiMS4wLjAiLCAiZ2JhU3R1ZGlvVmVyc2lvbiI6ICI+PTAuMS4wIiwgIm5hbWUiOiAiTmF0aXZlIHRlc3Qgb25seSIsICJhdXRob3IiOiAiUUEiLCAiZGVzY3JpcHRpb24iOiAiVGVtcG9yYXJ5IGZpeHR1cmUiLCAicmVjaXBlcyI6IFt7ImlkIjogIndhaXQiLCAidGl0bGUiOiAiV2FpdCIsICJjYXRlZ29yeSI6ICJDb250cm9sZSIsICJzdGVwcyI6IFt7ImNvbW1hbmQiOiAid2FpdCAxMiIsICJjYXRlZ29yeSI6ICJDb250cm9sZSIsICJkZXRhaWwiOiAiV2FpdCJ9XX1dfVBLAQIUAxQAAAAAAPCoQl3J1QPYWAEAAFgBAAALAAAAAAAAAAAAAACAAQAAAABwbHVnaW4uanNvblBLBQYAAAAAAQABADkAAACBAQAAAAA=", "base64");
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(Uint8Array.from(archive)));
-    const result = await installPluginFromRepositoryEntry(projectPath, "https://example.com/repository.json", { id: "test/native", type: "recipePack", version: "1.0.0", gbaStudioVersion: ">=0.1.0", name: "Native test only", author: "QA", description: "Temporary fixture", filename: "native.zip" });
-    expect(result.ok).toBe(true);
+    const archivePath = path.join(projectRoot, "native [receitas].zip");
+    if (source === "local") {
+      await writeFile(archivePath, archive);
+    } else {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(Uint8Array.from(archive)));
+    }
+    const result = source === "local"
+      ? await installPluginIntoProject(projectPath, archivePath)
+      : await installPluginFromRepositoryEntry(projectPath, "https://example.com/repository.json", {
+        id: "test/native", type: "recipePack", version: "1.0.0", gbaStudioVersion: ">=0.1.0",
+        name: "Native test only", author: "QA", description: "Temporary fixture", filename: "native.zip"
+      });
+    expect(result.ok, result.error).toBe(true);
     expect(result.registry?.recipes).toEqual([expect.objectContaining({ id: "test/native/wait" })]);
+    expect((await readdir(projectRoot)).filter(name => name.startsWith(".plugin-"))).toEqual([]);
+    if (source === "local") {
+      await expect(readFile(archivePath)).resolves.toEqual(archive);
+    }
   });
 
   it("rejects a foreign catalog entry before downloading, even when called directly", async () => {
