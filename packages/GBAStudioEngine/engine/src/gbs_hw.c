@@ -144,7 +144,7 @@ static void commit_shadow_affine_transforms(void);
 static void release_scene_raster_overrides(void);
 static void release_scene_raster_mask(void);
 static void begin_scene_raster_overrides(void) __attribute__((noinline, target("arm"), long_call));
-static inline void apply_scene_raster_line(unsigned line) __attribute__((always_inline, target("arm")));
+static inline void apply_scene_raster_line(const GbsSceneRasterTable* table, unsigned line) __attribute__((always_inline, target("arm")));
 
 static uint8_t shadow_bg_character_base[4];
 static uint8_t shadow_bg_character_base_pending_mask;
@@ -373,18 +373,21 @@ void gbs_hw_irq_dispatch(void) {
         return;
     }
 
-    if ((pending & 2u) && (scene_raster_tables[scene_raster_active].enabled || actor_wave_active.count)) {
+    const GbsSceneRasterTable* table = &scene_raster_tables[scene_raster_active];
+    /* Keep one table address in a register instead of rematerializing it per effect. */
+    __asm__ ("" : "+r"(table));
+    if ((pending & 2u) && (table->enabled || actor_wave_active.count)) {
         unsigned line = (unsigned)REG_VCOUNT + ((REG_DISPSTAT & 2u) != 0);
         if (line == 228u) {
-            scene_raster_phase = (uint8_t)(scene_raster_phase + scene_raster_tables[scene_raster_active].speed);
-            scene_raster_base_x = shadow_bg_scroll_x[scene_raster_tables[scene_raster_active].layer];
+            scene_raster_phase = (uint8_t)(scene_raster_phase + table->speed);
+            scene_raster_base_x = shadow_bg_scroll_x[table->layer];
             line = 0;
         }
-        if (line == 0 && (scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK))) {
+        if (line == 0 && (table->enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK))) {
             begin_scene_raster_overrides();
         }
         if (line < 160u) {
-            apply_scene_raster_line(line);
+            apply_scene_raster_line(table, line);
             if (actor_wave_active.count) apply_actor_wave_line(line);
         }
         if (pending == 2u && !hblank_dispatch_required) {
@@ -1177,8 +1180,7 @@ void gbs_hw_reset_scene_raster(void) {
     gbs_scene_raster_interrupt_state(actor_wave_active.count != 0);
     gbs_hw_audio_unlock_state(ime);
 }
-static inline void apply_scene_raster_line(unsigned line) {
-    const GbsSceneRasterTable* table = &scene_raster_tables[scene_raster_active];
+static inline void apply_scene_raster_line(const GbsSceneRasterTable* table, unsigned line) {
     if (table->enabled & GBS_RASTER_RIPPLE) {
         int offset = 0;
         if (line >= table->top && line < table->bottom) offset = table->wave[(uint8_t)(table->line_phase[line] + scene_raster_phase)];

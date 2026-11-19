@@ -898,7 +898,8 @@ int main() {
         code = """#include <stdint.h>
 #include <assert.h>
 uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0,REG_VCOUNT=0,REG_DISPSTAT=0;
-struct { int enabled, speed, layer; } scene_raster_tables[2];
+typedef struct { int enabled, speed, layer; } GbsSceneRasterTable;
+GbsSceneRasterTable scene_raster_tables[2];
 struct { int count; } actor_wave_staged,actor_wave_active;
 uint16_t scene_raster_base_x,shadow_bg_scroll_x[4];
 uint8_t scene_raster_phase;
@@ -928,7 +929,7 @@ void commit_shadow_bg_tilemaps(void){assert(REG_VCOUNT==160);++map_commits;}
 void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
 void commit_shadow_affine_transforms(void){}
 void commit_paged_affine_frame(void){}
-void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
+void commit_scene_raster_frame(void){} void apply_scene_raster_line(const GbsSceneRasterTable* table, unsigned line){}
 void commit_pcm_stream_block(void){}
 void gbs_audio_vblank_update(void){
  if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}
