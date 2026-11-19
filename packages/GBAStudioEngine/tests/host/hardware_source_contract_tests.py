@@ -43,6 +43,7 @@ class HardwareSourceContractTests(unittest.TestCase):
     def test_gradient_preserves_its_scanline_color_when_the_scene_sets_backdrop(self):
         code = """#include <stdint.h>
 #include <assert.h>
+enum { GBS_RASTER_BACKDROP = 2 };
 uint16_t shadow_backdrop_color, palette[1];
 #define MEM_PALETTE palette
 struct {uint8_t enabled;} scene_raster_tables[2];int scene_raster_active;
@@ -829,9 +830,13 @@ int main() {
     def test_disabling_one_window_preserves_the_other_window_outside_mask(self):
         parameters = "uint16_t left,uint16_t right,uint16_t top,uint16_t bottom,uint16_t inside_mask,uint16_t outside_mask,int enabled"
         code = "#include <stdint.h>\n#include <assert.h>\nuint16_t REG_WIN0H,REG_WIN0V,REG_WIN1H,REG_WIN1V,REG_WININ,REG_WINOUT,REG_DISPCNT;\n"
+        code += "enum { GBS_RASTER_MASK = 16 }; uint8_t scene_raster_overrides; uint16_t scene_raster_base_winin, scene_raster_base_winout;\n"
+        code += "void release_scene_raster_mask(void)" + function_body(self.source, "release_scene_raster_mask") + "\n"
         for window in (0, 1):
             code += "void window" + str(window) + "(" + parameters + "){" + function_body(self.source, "gbs_hw_set_window" + str(window)) + "}\n"
-        code += "int main(void){window0(0,120,0,160,63,0,1);window1(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==0);window1(0,120,0,160,31,4,1);window0(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==4);}"
+        code += "int main(void){window0(0,120,0,160,63,0,1);window1(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==0);window1(0,120,0,160,31,4,1);window0(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==4);"
+        code += "scene_raster_base_winin=0x3F00;scene_raster_base_winout=0x3510;scene_raster_overrides=GBS_RASTER_MASK;"
+        code += "window1(2,15,0,160,31,7,1);assert(scene_raster_overrides==0 && (REG_DISPCNT&0x6000)==0x4000 && REG_WINOUT==0x3507);}"
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory)/"windows.c"; source.write_text(code)
             binary = Path(directory)/"windows"
@@ -861,6 +866,9 @@ void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
 static void commit_hblank_bg_scroll(void){assert(REG_VCOUNT == 160);++affine_commits;}
 void gbs_hw_mix_audio_with_hblank(void){}
+enum { GBS_RASTER_PALETTE = 4, GBS_RASTER_ALPHA = 8, GBS_RASTER_MASK = 16 };
+static uint8_t scene_raster_overrides;
+void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
 void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
 void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""

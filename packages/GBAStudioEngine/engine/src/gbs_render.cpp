@@ -702,20 +702,61 @@ bool scale_perspective_background(HBlankAffineRasterLine* lines, size_t count, u
     return true;
 }
 
+static unsigned interpolate_scanline(unsigned from, unsigned to, unsigned top, unsigned bottom, unsigned y) {
+    const unsigned span = bottom - top - 1;
+    const unsigned distance = y <= top ? 0 : y >= bottom - 1 ? span : y - top;
+    return (from * (span - distance) + to * distance) / span;
+}
+
+static uint16_t interpolate_scanline_color(uint16_t from, uint16_t to, unsigned top, unsigned bottom, unsigned y) {
+    uint16_t color = 0;
+    for (unsigned shift = 0; shift <= 10; shift += 5) {
+        color |= static_cast<uint16_t>(interpolate_scanline((from >> shift) & 31, (to >> shift) & 31, top, bottom, y) << shift);
+    }
+    return color;
+}
+
+static bool valid_scanline_band(unsigned top, unsigned bottom) {
+    return bottom <= 160 && bottom >= top + 2;
+}
+
+static bool valid_scanline_layer(uint8_t mask, DisplayMode mode) {
+    return mask == 4 || (mask == 2 && mode != DisplayMode::Mode2Affine) ||
+        (mask == 8 && mode != DisplayMode::Mode1TextAffine);
+}
+
 bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mode) {
     const auto& r = effects.ripple; const auto& g = effects.gradient;
+    const auto& p = effects.palette; const auto& a = effects.alpha; const auto& m = effects.mask;
     if (r.enabled && (r.amplitude > 16 || r.wavelength < 8 || r.wavelength > 160 || r.speed > 8 ||
         r.top >= r.bottom || r.bottom > 160 || r.layer == BackgroundLayer::BG0 || !is_valid_background_layer(r.layer) ||
         (mode != DisplayMode::Mode0Text && !(mode == DisplayMode::Mode1TextAffine && r.layer == BackgroundLayer::BG1)))) return false;
     if (g.enabled && (static_cast<int>(mode) > 2 || g.from > 32767 || g.to > 32767 || g.bottom > 160 || g.bottom < g.top + 2)) return false;
+    if ((p.enabled || a.enabled || m.enabled) && static_cast<int>(mode) > 2) return false;
+    if (p.enabled && (!valid_scanline_band(p.top, p.bottom) || p.index == 0 || p.index > 223 || p.from > 32767 || p.to > 32767)) return false;
+    if (a.enabled && (!valid_scanline_band(a.top, a.bottom) || a.from > 16 || a.to > 16 ||
+        !valid_scanline_layer(a.first, mode) || (a.second != 32 && !valid_scanline_layer(a.second, mode)) || a.first == a.second)) return false;
+    if (m.enabled && (!valid_scanline_band(m.top, m.bottom) || !valid_scanline_layer(m.layer, mode) ||
+        m.leftTop >= m.rightTop || m.rightTop > 240 || m.leftBottom >= m.rightBottom || m.rightBottom > 240)) return false;
+    const auto& old_p = cached_scene_raster.palette;
+    const auto& old_a = cached_scene_raster.alpha;
+    const auto& old_m = cached_scene_raster.mask;
     const auto& old_r = cached_scene_raster.ripple;
     const auto& old_g = cached_scene_raster.gradient;
     if (scene_raster_cached && mode == cached_scene_raster_mode &&
         r.enabled == old_r.enabled && r.layer == old_r.layer && r.amplitude == old_r.amplitude &&
         r.wavelength == old_r.wavelength && r.speed == old_r.speed && r.top == old_r.top && r.bottom == old_r.bottom &&
-        g.enabled == old_g.enabled && g.from == old_g.from && g.to == old_g.to && g.top == old_g.top && g.bottom == old_g.bottom) return true;
+        g.enabled == old_g.enabled && g.from == old_g.from && g.to == old_g.to && g.top == old_g.top && g.bottom == old_g.bottom &&
+        p.enabled == old_p.enabled && p.index == old_p.index && p.from == old_p.from && p.to == old_p.to && p.top == old_p.top && p.bottom == old_p.bottom &&
+        a.enabled == old_a.enabled && a.first == old_a.first && a.second == old_a.second && a.from == old_a.from && a.to == old_a.to && a.top == old_a.top && a.bottom == old_a.bottom &&
+        m.enabled == old_m.enabled && m.layer == old_m.layer && m.leftTop == old_m.leftTop && m.rightTop == old_m.rightTop &&
+        m.leftBottom == old_m.leftBottom && m.rightBottom == old_m.rightBottom && m.top == old_m.top && m.bottom == old_m.bottom) return true;
     GbsSceneRasterTable* table = gbs_hw_begin_scene_raster_update();
-    table->enabled = (r.enabled ? 1 : 0) | (g.enabled ? 2 : 0);
+    table->enabled = (r.enabled ? GBS_RASTER_RIPPLE : 0) | (g.enabled ? GBS_RASTER_BACKDROP : 0) |
+        (p.enabled ? GBS_RASTER_PALETTE : 0) | (a.enabled ? GBS_RASTER_ALPHA : 0) | (m.enabled ? GBS_RASTER_MASK : 0);
+    table->palette_index = p.index;
+    table->blend_control = static_cast<uint16_t>(a.first | (1u << 6) | (a.second << 8));
+    table->mask_layer = m.layer;
     table->layer = static_cast<uint8_t>(r.enabled ? r.layer : BackgroundLayer::BG2); table->speed = r.speed; table->top = r.top; table->bottom = r.bottom;
     if (r.enabled) {
         for (unsigned phase = 0; phase < 256; ++phase) {
@@ -724,13 +765,18 @@ bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mod
         }
         for (unsigned y = r.top; y < r.bottom; ++y) table->line_phase[y] = static_cast<uint8_t>((y-r.top)*256/r.wavelength);
     }
-    if (g.enabled) {
-        const unsigned span = g.bottom - g.top - 1;
-        for (unsigned y = 0; y < 160; ++y) {
-            const unsigned distance = y <= g.top ? 0 : y >= g.bottom - 1u ? span : y-g.top;
-            uint16_t color = 0;
-            for (unsigned shift = 0; shift <= 10; shift += 5) color |= static_cast<uint16_t>((((g.from >> shift)&31)*(span-distance)+((g.to >> shift)&31)*distance)/span << shift);
-            table->colors[y] = color;
+    for (unsigned y = 0; y < 160; ++y) {
+        if (g.enabled) table->colors[y] = interpolate_scanline_color(g.from, g.to, g.top, g.bottom, y);
+        if (p.enabled) table->palette[y] = interpolate_scanline_color(p.from, p.to, p.top, p.bottom, y);
+        if (a.enabled) {
+            const unsigned eva = interpolate_scanline(a.from, a.to, a.top, a.bottom, y);
+            table->alpha[y] = static_cast<uint16_t>(eva | ((16 - eva) << 8));
+        }
+        if (m.enabled) {
+            const bool inside_band = y >= m.top && y < m.bottom;
+            const unsigned left = inside_band ? interpolate_scanline(m.leftTop, m.leftBottom, m.top, m.bottom, y) : 0;
+            const unsigned right = inside_band ? interpolate_scanline(m.rightTop, m.rightBottom, m.top, m.bottom, y) : 240;
+            table->window[y] = static_cast<uint16_t>((left << 8) | right);
         }
     }
     gbs_hw_submit_scene_raster_update();

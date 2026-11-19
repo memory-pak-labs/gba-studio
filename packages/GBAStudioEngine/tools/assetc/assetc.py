@@ -14909,7 +14909,7 @@ def scene_raster_effects_literal(value, mode):
         return value
     def color(value):
         if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-            raise SystemExit("video.raster.gradient precisa de cores #rrggbb")
+            raise SystemExit("video.raster precisa de cores #rrggbb")
         rgb = int(value[1:], 16)
         return ((rgb >> 19) & 31) | (((rgb >> 11) & 31) << 5) | (((rgb >> 3) & 31) << 10)
     r, g = ripple.get("enabled") is True, gradient.get("enabled") is True
@@ -14926,9 +14926,53 @@ def scene_raster_effects_literal(value, mode):
     if g and end - start < 2:
         raise SystemExit("Gradiente requer ao menos duas linhas")
     first, last = color(gradient.get("from", "#3858a0")), color(gradient.get("to", "#b0d8f8"))
+    palette, alpha, mask = (value.get(kind, {}) for kind in ("palette", "alpha", "mask"))
+    def band(control):
+        if not isinstance(control, dict):
+            raise SystemExit("video.raster: cada efeito por linha precisa ser objeto")
+        enabled = control.get("enabled") is True
+        top = number(control, "top", 0, 0, 158)
+        bottom = number(control, "bottom", 160, 2, 160)
+        if enabled and (mode not in (0, 1, 2) or bottom - top < 2):
+            raise SystemExit("Efeito por linha requer duas linhas ou mais e modo tiled ou affine")
+        return enabled, top, bottom
+    def targets(control, key, default, backdrop=False):
+        targets = {"BG1": 2, "BG2": 4, "BG3": 8}
+        if backdrop:
+            targets["BACKDROP"] = 32
+        layer = control.get(key, default)
+        if not isinstance(layer, str) or layer not in targets or (mode == 1 and layer == "BG3") or (mode == 2 and layer == "BG1"):
+            raise SystemExit(f"Camada inválida em video.raster.{key}")
+        return targets[layer]
+    p, p_top, p_bottom = band(palette)
+    a, a_top, a_bottom = band(alpha)
+    m, m_top, m_bottom = band(mask)
+    palette_literal = "gbs::SceneScanlinePalette {}"
+    alpha_literal = "gbs::SceneScanlineAlpha {}"
+    mask_literal = "gbs::SceneScanlineMask {}"
+    if p:
+        index = number(palette, "index", 17, 1, 223)
+        p_from, p_to = color(palette.get("from", "#ffac48")), color(palette.get("to", "#4868d8"))
+        palette_literal = f"gbs::SceneScanlinePalette {{ true, {index}, {p_from}, {p_to}, {p_top}, {p_bottom} }}"
+    if a:
+        a_first, a_second = targets(alpha, "first", "BG2"), targets(alpha, "second", "BACKDROP", backdrop=True)
+        if a_first == a_second:
+            raise SystemExit("Transparência por linha requer camadas diferentes")
+        a_from, a_to = number(alpha, "from", 16, 0, 16), number(alpha, "to", 6, 0, 16)
+        alpha_literal = f"gbs::SceneScanlineAlpha {{ true, {a_first}, {a_second}, {a_from}, {a_to}, {a_top}, {a_bottom} }}"
+    if m:
+        m_layer = targets(mask, "layer", "BG2")
+        left_top, right_top = number(mask, "leftTop", 96, 0, 239), number(mask, "rightTop", 144, 1, 240)
+        left_bottom, right_bottom = number(mask, "leftBottom", 20, 0, 239), number(mask, "rightBottom", 220, 1, 240)
+        if left_top >= right_top or left_bottom >= right_bottom:
+            raise SystemExit("As bordas da máscara por linha estão invertidas")
+        mask_literal = (f"gbs::SceneScanlineMask {{ true, {m_layer}, {left_top}, {right_top}, "
+                        f"{left_bottom}, {right_bottom}, {m_top}, {m_bottom} }}")
     return ("gbs::SceneRasterEffects { "
             f"gbs::SceneRipple {{ {'true' if r else 'false'}, gbs::BackgroundLayer::{layer}, {amplitude}, {wavelength}, {speed}, {top}, {bottom} }}, "
-            f"gbs::SceneGradient {{ {'true' if g else 'false'}, {first}, {last}, {start}, {end} }} }}")
+            f"gbs::SceneGradient {{ {'true' if g else 'false'}, {first}, {last}, {start}, {end} }}, "
+            f"{palette_literal}, {alpha_literal}, {mask_literal} }}")
+
 
 
 def video_composition_literal(project, description, asset_report=None):

@@ -42,6 +42,23 @@ void test_scene_raster_tables_preserve_rgb555_and_wave_ranges() {
     assert(!gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text));
 }
 
+void test_scanline_palette_alpha_and_mask_tables() {
+    gbs::SceneRasterEffects effects {};
+    effects.palette = {true, 19, 31, 31744, 10, 13};
+    effects.alpha = {true, 4, 32, 16, 0, 10, 13};
+    effects.mask = {true, 4, 10, 230, 50, 190, 10, 13};
+    assert(gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text));
+    assert(raster_table.palette_index == 19 && raster_table.palette[10] == 31);
+    assert(raster_table.palette[11] == (15 | (15 << 10)) && raster_table.palette[12] == 31744);
+    assert(raster_table.alpha[10] == 16 && raster_table.alpha[11] == 0x0808 && raster_table.alpha[12] == 0x1000);
+    assert(raster_table.window[9] == 0x00F0 && raster_table.window[10] == 0x0AE6);
+    assert(raster_table.window[11] == 0x1ED2 && raster_table.window[12] == 0x32BE && raster_table.window[13] == 0x00F0);
+    raster_submitted = false;
+    assert(gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text) && !raster_submitted);
+    effects.mask.leftBottom = 200;
+    assert(!gbs::set_scene_raster_effects(effects, gbs::DisplayMode::Mode0Text) && !raster_submitted);
+}
+
 int bg_layer_enabled[4] {};
 int bg_layer_priority[4] {};
 int affine_map_screen_base = 0;
@@ -1222,6 +1239,7 @@ void test_perspective_scale_keeps_the_horizon_and_dma_reset_line() {
 
 int main() {
     test_scene_raster_tables_preserve_rgb555_and_wave_ranges();
+    test_scanline_palette_alpha_and_mask_tables();
     test_map_markers_follow_the_scaled_image_and_camera();
     test_perspective_scale_keeps_the_horizon_and_dma_reset_line();
     test_scene_background_video_keeps_the_fixed_ui_plane();

@@ -6,6 +6,7 @@ import { useMemo, type ReactElement } from "react";
 import {
   normalizeSceneComposition,
   sceneCompositionIssues,
+  sceneCompositionVideoMode,
   type SceneCompositionConfig,
   type SceneCompositionLayer,
   type SceneCompositionLayerKind,
@@ -370,7 +371,7 @@ export function SceneCompositionInspector({
         );
       })}
 
-      <SceneRasterEffectsEditor value={normalized.effects.raster} enabled={normalized.enabled} onChange={raster => update({ effects: { ...normalized.effects, raster } })} />
+      <SceneRasterEffectsEditor value={normalized.effects.raster} enabled={normalized.enabled} videoMode={sceneCompositionVideoMode(normalized)} onChange={raster => update({ effects: { ...normalized.effects, raster } })} />
 
       <fieldset className="scene-composition-effect-card">
         <legend>{ui("Efeitos de vídeo")}</legend>

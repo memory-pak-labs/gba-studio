@@ -681,6 +681,7 @@
     ],
     "render_runtime": [
       "scene_raster_effects",
+      "scene_scanline_controls",
       "background_parallax",
       "visual_effect_controller",
       "visual_effect_target_layers",

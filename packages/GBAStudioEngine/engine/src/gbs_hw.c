@@ -107,10 +107,16 @@ static GbsSceneRasterTable scene_raster_tables[2] __attribute__((section(".ewram
 static uint8_t scene_raster_active, scene_raster_staging, scene_raster_phase;
 static uint16_t scene_raster_base_x;
 static volatile uint8_t scene_raster_ready;
+static uint8_t scene_raster_overrides;
+static uint16_t scene_raster_base_palette, scene_raster_base_blend, scene_raster_base_alpha;
+static uint16_t scene_raster_base_winin, scene_raster_base_winout;
 static uint8_t hblank_dispatch_required;
 void gbs_hw_set_hblank_dispatch_required(int required) { hblank_dispatch_required = required != 0; }
 extern void gbs_scene_raster_interrupt_state(int enabled);
 static void commit_scene_raster_frame(void);
+static void release_scene_raster_overrides(void);
+static void release_scene_raster_mask(void);
+static void begin_scene_raster_overrides(void) __attribute__((noinline, target("arm"), long_call));
 static inline void apply_scene_raster_line(unsigned line) __attribute__((always_inline, target("arm")));
 
 static uint8_t shadow_bg_character_base[4];
@@ -297,6 +303,7 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
         keypad_irq_pending = 1;
     }
     if ((pending & 1u) != 0) {
+        if (scene_raster_overrides) release_scene_raster_overrides();
         if (affine_hblank_frame_ready && !render_publication_blocked && affine_hblank_enabled) {
             affine_hblank_frame_ready = 0;
             commit_hblank_bg_scroll();
@@ -330,6 +337,9 @@ void gbs_hw_irq_dispatch(void) {
             scene_raster_phase = (uint8_t)(scene_raster_phase + scene_raster_tables[scene_raster_active].speed);
             scene_raster_base_x = shadow_bg_scroll_x[scene_raster_tables[scene_raster_active].layer];
             line = 0;
+        }
+        if (line == 0 && (scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK))) {
+            begin_scene_raster_overrides();
         }
         if (line < 160u) apply_scene_raster_line(line);
         if (pending == 2u && !hblank_dispatch_required) {
@@ -452,7 +462,7 @@ static void commit_shadow_bg_scroll(void) {
         }
         volatile uint16_t* scroll = (volatile uint16_t*)(0x04000010 + layer * 4);
         const GbsSceneRasterTable* raster = &scene_raster_tables[scene_raster_active];
-        if (!(raster->enabled & 1u) || raster->layer != layer) scroll[0] = shadow_bg_scroll_x[layer];
+        if (!(raster->enabled & GBS_RASTER_RIPPLE) || raster->layer != layer) scroll[0] = shadow_bg_scroll_x[layer];
         scroll[1] = shadow_bg_scroll_y[layer];
     }
     shadow_bg_scroll_pending_mask = 0;
@@ -1054,6 +1064,54 @@ static void write_obj_square_tiles(void) {
     }
 }
 
+/* The authored effects borrow registers for visible lines. Restore the base
+   state before VBlank uploads and yield to transitions or other window users. */
+static void release_scene_raster_mask(void) {
+    if (!(scene_raster_overrides & GBS_RASTER_MASK)) return;
+    scene_raster_overrides &= (uint8_t)~GBS_RASTER_MASK;
+    REG_DISPCNT = (uint16_t)(REG_DISPCNT & ~(1u << 13));
+    REG_WININ = scene_raster_base_winin;
+    REG_WINOUT = scene_raster_base_winout;
+}
+
+static void release_scene_raster_overrides(void) {
+    release_scene_raster_mask();
+    if (scene_raster_overrides & GBS_RASTER_ALPHA) {
+        REG_BLDCNT = scene_raster_base_blend;
+        REG_BLDALPHA = scene_raster_base_alpha;
+    }
+    if (scene_raster_overrides & GBS_RASTER_PALETTE) {
+        MEM_PALETTE[scene_raster_tables[scene_raster_active].palette_index] = scene_raster_base_palette;
+    }
+    scene_raster_overrides = 0;
+}
+
+static void begin_scene_raster_overrides(void) {
+    if (render_publication_blocked || render_handoff_fallback_active) return;
+    const GbsSceneRasterTable* table = &scene_raster_tables[scene_raster_active];
+    uint8_t active = 0;
+    if (table->enabled & GBS_RASTER_PALETTE) {
+        scene_raster_base_palette = MEM_PALETTE[table->palette_index];
+        active |= GBS_RASTER_PALETTE;
+    }
+    if ((table->enabled & GBS_RASTER_ALPHA) && !(REG_BLDCNT & 0xC0u)) {
+        scene_raster_base_blend = REG_BLDCNT;
+        scene_raster_base_alpha = REG_BLDALPHA;
+        REG_BLDCNT = table->blend_control;
+        active |= GBS_RASTER_ALPHA;
+    }
+    if ((table->enabled & GBS_RASTER_MASK) && !(REG_DISPCNT & 0xE000u)) {
+        scene_raster_base_winin = REG_WININ;
+        scene_raster_base_winout = REG_WINOUT;
+        REG_WIN0V = 160u;
+        REG_WININ = (uint16_t)((scene_raster_base_winin & 0xFF00u) | 0x3Fu);
+        REG_WINOUT = (uint16_t)((scene_raster_base_winout & 0xFF00u) | (0x3Fu & ~table->mask_layer));
+        REG_DISPCNT = (uint16_t)(REG_DISPCNT | (1u << 13));
+        active |= GBS_RASTER_MASK;
+    }
+    scene_raster_overrides = active;
+}
+
 GbsSceneRasterTable* gbs_hw_begin_scene_raster_update(void) {
     const uint16_t ime = gbs_hw_audio_lock_state();
     scene_raster_ready = 0;
@@ -1068,6 +1126,7 @@ void gbs_hw_submit_scene_raster_update(void) {
 void gbs_hw_reset_scene_raster(void) {
     const uint16_t ime = gbs_hw_audio_lock_state();
     scene_raster_ready = 0;
+    if (scene_raster_overrides) release_scene_raster_overrides();
     scene_raster_tables[0].enabled = scene_raster_tables[1].enabled = 0;
     scene_raster_phase = 0;
     gbs_scene_raster_interrupt_state(0);
@@ -1075,18 +1134,23 @@ void gbs_hw_reset_scene_raster(void) {
 }
 static inline void apply_scene_raster_line(unsigned line) {
     const GbsSceneRasterTable* table = &scene_raster_tables[scene_raster_active];
-    if (table->enabled & 1u) {
+    if (table->enabled & GBS_RASTER_RIPPLE) {
         int offset = 0;
         if (line >= table->top && line < table->bottom) offset = table->wave[(uint8_t)(table->line_phase[line] + scene_raster_phase)];
         REG16(0x04000010u + table->layer * 4u) = (uint16_t)(scene_raster_base_x + offset);
     }
-    if (table->enabled & 2u) MEM_PALETTE[0] = table->colors[line];
+    if (table->enabled & GBS_RASTER_BACKDROP) MEM_PALETTE[0] = table->colors[line];
+    const uint8_t overrides = scene_raster_overrides;
+    if (overrides & GBS_RASTER_PALETTE) MEM_PALETTE[table->palette_index] = table->palette[line];
+    if (overrides & GBS_RASTER_ALPHA) REG_BLDALPHA = table->alpha[line];
+    if (overrides & GBS_RASTER_MASK) REG_WIN0H = table->window[line];
 }
 static void commit_scene_raster_frame(void) {
     if (scene_raster_ready && !render_publication_blocked && REG_VCOUNT >= 160u) {
+        if (scene_raster_overrides) release_scene_raster_overrides();
         const GbsSceneRasterTable* previous = &scene_raster_tables[scene_raster_active];
-        if (previous->enabled & 1u) REG16(0x04000010u + previous->layer * 4u) = shadow_bg_scroll_x[previous->layer];
-        if (previous->enabled & 2u) MEM_PALETTE[0] = shadow_backdrop_color;
+        if (previous->enabled & GBS_RASTER_RIPPLE) REG16(0x04000010u + previous->layer * 4u) = shadow_bg_scroll_x[previous->layer];
+        if (previous->enabled & GBS_RASTER_BACKDROP) MEM_PALETTE[0] = shadow_backdrop_color;
         scene_raster_active = scene_raster_staging;
         scene_raster_ready = 0;
         scene_raster_phase = 0;
@@ -1189,6 +1253,7 @@ void gbs_hw_wait_vblank(void) {
         while (REG_VCOUNT < 160) {
         }
     }
+    if (!vblank_irq_enabled && scene_raster_overrides) release_scene_raster_overrides();
     const uint32_t publication_start = gbs_hw_frame_counter_ticks();
     if (!render_publication_blocked) {
         commit_shadow_bg_controls();
@@ -1233,6 +1298,7 @@ void gbs_hw_set_render_publication_blocked(int blocked) {
 }
 
 void gbs_hw_set_render_handoff_fallback(void) {
+    if (scene_raster_overrides) release_scene_raster_overrides();
     /* Mode 0 with no BG/OBJ layers guarantees a deterministic black frame
      * while the next runtime rebuilds VRAM, tilemaps and OAM. The display
      * output is restored from the staged BG mask on a later VBlank. */
@@ -1508,7 +1574,7 @@ void gbs_hw_chisflash_rumble_set(int enabled) {
 
 void gbs_hw_set_backdrop(uint16_t color) {
     shadow_backdrop_color = color;
-    if (!(scene_raster_tables[scene_raster_active].enabled & 2u)) MEM_PALETTE[0] = color;
+    if (!(scene_raster_tables[scene_raster_active].enabled & GBS_RASTER_BACKDROP)) MEM_PALETTE[0] = color;
 }
 
 uint16_t gbs_hw_get_backdrop(void) {
@@ -2153,12 +2219,14 @@ void gbs_hw_set_bg_mosaic(int layer, int enabled) {
 }
 
 void gbs_hw_set_blending(uint16_t first_targets, uint16_t second_targets, uint16_t mode, uint16_t eva, uint16_t evb, uint16_t intensity) {
+    scene_raster_overrides &= (uint8_t)~GBS_RASTER_ALPHA;
     REG_BLDCNT = (uint16_t)((first_targets & 0x3Fu) | ((mode & 0x3u) << 6) | ((second_targets & 0x3Fu) << 8));
     REG_BLDALPHA = (uint16_t)((eva & 0x1Fu) | ((evb & 0x1Fu) << 8));
     REG_BLDY = (uint16_t)(intensity & 0x1Fu);
 }
 
 void gbs_hw_disable_blending(void) {
+    scene_raster_overrides &= (uint8_t)~GBS_RASTER_ALPHA;
     REG_BLDCNT = 0;
     REG_BLDALPHA = 0;
     REG_BLDY = 0;
@@ -2173,6 +2241,7 @@ void gbs_hw_disable_mosaic(void) {
 }
 
 void gbs_hw_set_window0(uint16_t left, uint16_t right, uint16_t top, uint16_t bottom, uint16_t inside_mask, uint16_t outside_mask, int enabled) {
+    release_scene_raster_mask();
     REG_WIN0H = (uint16_t)(((left & 0xFFu) << 8) | (right & 0xFFu));
     REG_WIN0V = (uint16_t)(((top & 0xFFu) << 8) | (bottom & 0xFFu));
     REG_WININ = (uint16_t)((REG_WININ & 0xFF00u) | (inside_mask & 0x3Fu));
@@ -2186,6 +2255,7 @@ void gbs_hw_set_window0(uint16_t left, uint16_t right, uint16_t top, uint16_t bo
 }
 
 void gbs_hw_set_window1(uint16_t left, uint16_t right, uint16_t top, uint16_t bottom, uint16_t inside_mask, uint16_t outside_mask, int enabled) {
+    release_scene_raster_mask();
     REG_WIN1H = (uint16_t)(((left & 0xFFu) << 8) | (right & 0xFFu));
     REG_WIN1V = (uint16_t)(((top & 0xFFu) << 8) | (bottom & 0xFFu));
     REG_WININ = (uint16_t)((REG_WININ & 0x00FFu) | ((inside_mask & 0x3Fu) << 8));
@@ -2199,6 +2269,7 @@ void gbs_hw_set_window1(uint16_t left, uint16_t right, uint16_t top, uint16_t bo
 }
 
 void gbs_hw_set_obj_window(uint16_t inside_mask, uint16_t outside_mask, int enabled) {
+    release_scene_raster_mask();
     if (enabled) {
         REG_WINOUT = (uint16_t)((outside_mask & 0x3Fu) | ((inside_mask & 0x3Fu) << 8));
         REG_DISPCNT = (uint16_t)(REG_DISPCNT | (1u << 15));

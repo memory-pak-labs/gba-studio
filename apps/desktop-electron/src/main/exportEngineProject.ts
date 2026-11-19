@@ -1,4 +1,4 @@
-import { hasSceneRasterEffects, normalizeSceneRasterEffects } from "../shared/sceneRasterEffects.js";
+import { hasSceneRasterEffects, hasSceneScanlineControls, normalizeSceneRasterEffects, sceneRasterEffectIssues } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
 import { projectCartridgeRumbleProfile, type CartridgeRumbleProfile } from "../shared/cartridgeRumble.js";
 import { isPcmAudio } from "../shared/audioPcm.js";
@@ -2747,9 +2747,20 @@ function buildRoomVideoComposition(data: GBAProjectData, room: Record<string, un
   const composition = roomSceneComposition(room);
   if (!composition.enabled || !hasSceneRasterEffects(composition.effects.raster)) return video;
   const raster = normalizeSceneRasterEffects(composition.effects.raster);
-  if (raster.ripple.enabled && ((video.display_mode !== 0 && !(video.display_mode === 1 && raster.ripple.layer === "BG1")) || (roomSceneType(room) === "racing" && raster.ripple.layer !== "BG1" && racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation === "pseudo3d")))
+  const perspective = roomSceneType(room) === "racing" &&
+    racingSceneConfigFromRuntime(room.runtime, data.settings)?.presentation === "pseudo3d";
+  if (raster.ripple.enabled && ((video.display_mode !== 0 && !(video.display_mode === 1 && raster.ripple.layer === "BG1")) ||
+    (perspective && raster.ripple.layer !== "BG1"))) {
     throw new Error(`Cena ${roomName(room,0)}: a ondulação exige uma camada regular livre; o plano affine/perspectiva já controla BG2.`);
-  return { ...video, raster };
+  }
+  if (hasSceneScanlineControls(raster) && perspective) {
+    const issues = sceneRasterEffectIssues(raster, composition.mode, composition.effects.hblank.enabled, 1);
+    if (issues.length) throw new Error(`Composição inválida na cena ${roomName(room,0)}: ${issues.join(" ")}`);
+  }
+  const { palette, alpha, mask, ...baseRaster } = raster;
+  return { ...video, raster: {
+    ...baseRaster, ...(palette?.enabled ? { palette } : {}), ...(alpha?.enabled ? { alpha } : {}), ...(mask?.enabled ? { mask } : {})
+  } };
 }
 
 function buildRoomVideoCompositionBase(
@@ -11180,6 +11191,7 @@ function buildEngineExportProjectContractUncached(
   });
   features.push(...cameraZoneFeatures);
   if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneRasterEffects(c.effects.raster); })) features.push("render_runtime.scene_raster_effects");
+  if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneScanlineControls(c.effects.raster); })) features.push("render_runtime.scene_scanline_controls");
   if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
   if (projectCartridgeRumbleProfile(data) !== "none") features.push("rumble.rumble_project_configuration", "rumble.rumble_chisflash_v12_opt_in");
   if (hasQueuedMultiplayerCommands(data)) features.push("link.link_queued_events", "link.link_queued_messages", "link.link_nonblocking_irq", "link.link_automatic_recovery");

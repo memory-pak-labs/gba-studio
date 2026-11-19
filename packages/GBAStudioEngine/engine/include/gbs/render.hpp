@@ -233,8 +233,33 @@ struct SceneGradient {
     uint16_t from = 0x5167, to = 0x7f76;
     uint8_t top = 0, bottom = 80;
 };
-struct SceneRasterEffects { SceneRipple ripple {}; SceneGradient gradient {}; };
-constexpr bool has_scene_raster_effects(const SceneRasterEffects& effects) { return effects.ripple.enabled || effects.gradient.enabled; }
+struct SceneScanlinePalette {
+    bool enabled = false;
+    uint8_t index = 17;
+    uint16_t from = 0, to = 0;
+    uint8_t top = 0, bottom = 160;
+};
+struct SceneScanlineAlpha {
+    bool enabled = false;
+    uint8_t first = 4, second = 32;
+    uint8_t from = 16, to = 6, top = 0, bottom = 160;
+};
+struct SceneScanlineMask {
+    bool enabled = false;
+    uint8_t layer = 4;
+    uint8_t leftTop = 96, rightTop = 144, leftBottom = 20, rightBottom = 220;
+    uint8_t top = 0, bottom = 160;
+};
+struct SceneRasterEffects {
+    SceneRipple ripple {};
+    SceneGradient gradient {};
+    SceneScanlinePalette palette {};
+    SceneScanlineAlpha alpha {};
+    SceneScanlineMask mask {};
+};
+constexpr bool has_scene_raster_effects(const SceneRasterEffects& effects) {
+    return effects.ripple.enabled || effects.gradient.enabled || effects.palette.enabled || effects.alpha.enabled || effects.mask.enabled;
+}
 bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mode);
 
 struct VideoComposition {

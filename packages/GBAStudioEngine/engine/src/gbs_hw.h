@@ -21,11 +21,22 @@ enum {
     GBS_HW_HUD_COMPONENT_FOREGROUND_BAR = 5
 };
 
+enum {
+    GBS_RASTER_RIPPLE = 1,
+    GBS_RASTER_BACKDROP = 2,
+    GBS_RASTER_PALETTE = 4,
+    GBS_RASTER_ALPHA = 8,
+    GBS_RASTER_MASK = 16
+};
+
 typedef struct {
     int16_t wave[256];
     uint8_t line_phase[160];
     uint16_t colors[160];
     uint8_t enabled, layer, speed, top, bottom;
+    uint8_t palette_index, mask_layer;
+    uint16_t blend_control;
+    uint16_t palette[160], alpha[160], window[160];
 } GbsSceneRasterTable;
 GbsSceneRasterTable* gbs_hw_begin_scene_raster_update(void);
 void gbs_hw_submit_scene_raster_update(void);

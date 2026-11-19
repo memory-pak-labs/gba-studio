@@ -4110,7 +4110,17 @@
           ]
         },
         "bitmap": { "type": ["object", "null"] },
-        "raster": {"type": "object", "properties": {"ripple": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "layer": {"enum": ["BG1", "BG2", "BG3"]}, "amplitude": {"type": "integer", "minimum": 0, "maximum": 16}, "wavelength": {"type": "integer", "minimum": 8, "maximum": 160}, "speed": {"type": "integer", "minimum": 0, "maximum": 8}, "top": {"type": "integer", "minimum": 0, "maximum": 159}, "bottom": {"type": "integer", "minimum": 1, "maximum": 160}}, "additionalProperties": false}, "gradient": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "from": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "to": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "top": {"type": "integer", "minimum": 0, "maximum": 158}, "bottom": {"type": "integer", "minimum": 2, "maximum": 160}}, "additionalProperties": false}}, "additionalProperties": false}
+        "raster": {
+          "type": "object",
+          "properties": {
+            "ripple": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "layer": {"enum": ["BG1", "BG2", "BG3"]}, "amplitude": {"type": "integer", "minimum": 0, "maximum": 16}, "wavelength": {"type": "integer", "minimum": 8, "maximum": 160}, "speed": {"type": "integer", "minimum": 0, "maximum": 8}, "top": {"type": "integer", "minimum": 0, "maximum": 159}, "bottom": {"type": "integer", "minimum": 1, "maximum": 160}}, "additionalProperties": false},
+            "gradient": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "from": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "to": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "top": {"type": "integer", "minimum": 0, "maximum": 158}, "bottom": {"type": "integer", "minimum": 2, "maximum": 160}}, "additionalProperties": false},
+            "palette": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "top": {"type": "integer", "minimum": 0, "maximum": 158}, "bottom": {"type": "integer", "minimum": 2, "maximum": 160}, "index": {"type": "integer", "minimum": 1, "maximum": 223}, "from": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}, "to": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"}}, "additionalProperties": false},
+            "alpha": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "top": {"type": "integer", "minimum": 0, "maximum": 158}, "bottom": {"type": "integer", "minimum": 2, "maximum": 160}, "first": {"enum": ["BG1", "BG2", "BG3"]}, "second": {"enum": ["BG1", "BG2", "BG3", "BACKDROP"]}, "from": {"type": "integer", "minimum": 0, "maximum": 16}, "to": {"type": "integer", "minimum": 0, "maximum": 16}}, "additionalProperties": false},
+            "mask": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "top": {"type": "integer", "minimum": 0, "maximum": 158}, "bottom": {"type": "integer", "minimum": 2, "maximum": 160}, "layer": {"enum": ["BG1", "BG2", "BG3"]}, "leftTop": {"type": "integer", "minimum": 0, "maximum": 239}, "rightTop": {"type": "integer", "minimum": 1, "maximum": 240}, "leftBottom": {"type": "integer", "minimum": 0, "maximum": 239}, "rightBottom": {"type": "integer", "minimum": 1, "maximum": 240}}, "additionalProperties": false}
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createBlankProjectData } from "../shared/newProject.js";
 import { defaultSceneComposition } from "../shared/sceneComposition.js";
-import { normalizeSceneRasterEffects } from "../shared/sceneRasterEffects.js";
+import { normalizeSceneRasterEffects, sceneScanlineControls } from "../shared/sceneRasterEffects.js";
 import { updateRoomFieldsInProject } from "../shared/roomsWorkspace.js";
 import { prepareEngineProjectExport } from "./exportEngineProject.js";
 import { writeEngineSchemaExport } from "./engineProjectExport.js";
@@ -19,8 +19,23 @@ describe.skipIf(!output)("authored raster effects through project, assetc and na
     const source = createBlankProjectData({ name: "Ondas e céu", includeStarterContent: false });
     const before = JSON.stringify(source), room = (source.rooms as any[])[0];
     const composition = defaultSceneComposition(); composition.enabled = true;
-    composition.effects.raster = normalizeSceneRasterEffects({ ripple: { enabled: true, layer: "BG1" }, gradient: { enabled: true } });
-    const data = updateRoomFieldsInProject(source, room.id, { runtime: { type: "topdown", config: { composition } } });
+    const raster = normalizeSceneRasterEffects({
+      ripple: { enabled: true, layer: "BG1" },
+      gradient: { enabled: true, from: "#000000", to: "#000000" },
+      palette: { enabled: true, index: 1, from: "#ff0000", to: "#0000ff" },
+      alpha: { enabled: true, first: "BG2", second: "BACKDROP", from: 16, to: 4 },
+      mask: { enabled: true, layer: "BG2", leftTop: 96, rightTop: 144, leftBottom: 32, rightBottom: 208, top: 16, bottom: 144 }
+    });
+    composition.effects.raster = raster;
+    const { encodePngRgba } = await import(/* @vite-ignore */ pathToFileURL(path.resolve("scripts/lib/png-icons.mjs")).href);
+    const width = 240, height = 160;
+    const pixels = new Uint8Array(width * height * 4);
+    for (let i = 0; i < pixels.length; i += 4) { pixels[i + 1] = 255; pixels[i + 3] = 255; }
+    await mkdir(path.join(root, "Assets"), { recursive: true });
+    await writeFile(path.join(root, "Assets/solid.png"), encodePngRgba({ width, height, pixels }));
+    const data = updateRoomFieldsInProject({
+      ...source, assets: [...(Array.isArray(source.assets) ? source.assets : []), { id: "solid", name: "solid.png", kind: "Background", metadata: { source: "Assets/solid.png", width, height, colorMode: "4bpp" } }]
+    }, room.id, { backgroundAssetName: "solid.png", runtime: { type: "topdown", config: { composition } } });
     const projectPath = path.join(root, "copy.gba-project"); await writeFile(projectPath, JSON.stringify(data));
     const reopened = JSON.parse(await readFile(projectPath, "utf8"));
     const destination = path.join(root, "export"), evidence: Record<string, unknown> = { passed: false };
@@ -45,11 +60,32 @@ describe.skipIf(!output)("authored raster effects through project, assetc and na
       for (let i = 0; i < 17; ++i) core._gba_run_frame();
       const nextPhase = byte(at("scene_raster_phase"));
       expect(nextPhase).not.toBe(phase);
-      const active = byte(at("scene_raster_active"));
-      expect(byte(at("scene_raster_tables") + active * 998 + 992)).toBe(3);
+      const frame = core.HEAPU8.slice(core._gba_framebuffer(), core._gba_framebuffer() + width * height * 4);
+      // Web mGBA expands RGB555 to RGB888 before applying the alpha weights.
+      let mismatches = 0;
+      let firstMismatch: { x: number; y: number; channel: number; actual: number; expected: number } | undefined;
+      for (let y = 0; y < height; ++y) {
+        const { paletteColor, alpha, left, right } = sceneScanlineControls(raster, y);
+        for (let x = 0; x < width; ++x) {
+          const index = (y * width + x) * 4;
+          frame[index + 3] = 255;
+          for (let channel = 0; channel < 3; ++channel) {
+            const value = (paletteColor! >> (channel * 5)) & 31;
+            const expected = x >= left && x < right ? (((value << 3) | (value >> 2)) * alpha!) >> 4 : 0;
+            const actual = frame[index + channel];
+            if (actual !== expected) {
+              ++mismatches;
+              firstMismatch ??= { x, y, channel, actual, expected };
+            }
+          }
+        }
+      }
+      await writeFile(path.join(root, "scanline-rom.png"), encodePngRgba({ width, height, pixels: frame }));
+      Object.assign(evidence, { romBytes: rom.length, phase, nextPhase, comparedPixels: width * height, mismatches, firstMismatch });
+      expect(mismatches, JSON.stringify(firstMismatch)).toBe(0);
       expect(core._gba_audio_register(0x04000200) & 3).toBe(3);
       expect(JSON.stringify(source)).toBe(before);
-      Object.assign(evidence, { passed: true, romBytes: rom.length, phase, nextPhase, active, projectPreserved: true });
+      Object.assign(evidence, { passed: true, projectPreserved: true });
     } finally {
       core?._gba_destroy();
       await writeFile(path.join(root, "evidence.json"), JSON.stringify(evidence, null, 2));
