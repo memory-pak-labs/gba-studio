@@ -8,7 +8,7 @@ start = source.index('void gbs_hw_load_affine_bg_tilemap(')
 end = source.index('\nvoid gbs_hw_set_display_mode(', start)
 selector = source[source.index('bool gbs_hw_set_affine_map_screen_base('):start]
 loader = source[start:end].replace('(volatile uint16_t*)(0x06000000 + affine_screenblock_base * 0x800)', 'fake_vram + affine_screenblock_base * 0x400')
-commit_start=source.index('static void commit_shadow_bg_tilemaps(')
+commit_start=source.index('static void commit_shadow_bg_tilemaps(void) {')
 commit_end=source.index('static void commit_shadow_bg_scroll(',commit_start)
 commit=source[commit_start:commit_end]
 mode_start=source.index('void gbs_hw_set_display_mode(')
@@ -74,7 +74,7 @@ void commit_hblank_bg_scroll() {}
 void commit_pcm_stream_block() {}
 void gbs_audio_vblank_update() {}
 constexpr uint8_t GBS_RASTER_BACKDROP = 2;
-uint8_t scene_raster_overrides = 0;
+uint8_t scene_raster_overrides = 0, scanline_frame_ready = 0;
 void release_scene_raster_overrides() { assert(scene_raster_overrides == 0); }
 void commit_shadow_affine_transforms() {}
 void commit_scene_raster_frame() {}

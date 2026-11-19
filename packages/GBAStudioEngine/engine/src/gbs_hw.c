@@ -114,6 +114,7 @@ static GbsSceneRasterTable scene_raster_tables[2] __attribute__((section(".ewram
 static uint8_t scene_raster_active, scene_raster_staging, scene_raster_phase;
 static uint16_t scene_raster_base_x;
 static volatile uint8_t scene_raster_ready;
+static volatile uint8_t scanline_frame_ready;
 static uint8_t scene_raster_overrides;
 static uint16_t scene_raster_base_palette, scene_raster_base_blend, scene_raster_base_alpha;
 static uint16_t scene_raster_base_winin, scene_raster_base_winout;
@@ -126,6 +127,9 @@ static GbsAffinePageRect paged_affine_resident;
 static volatile uint8_t paged_affine_ready;
 static void commit_paged_affine_frame(void);
 static void commit_scene_raster_frame(void);
+static void commit_shadow_bg_controls(void);
+static void commit_shadow_oam(void);
+static void commit_shadow_bg_tilemaps(void);
 static void commit_shadow_affine_transforms(void);
 static void release_scene_raster_overrides(void);
 static void release_scene_raster_mask(void);
@@ -325,6 +329,17 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
         else if (affine_hblank_enabled) rearm_active_affine_hblank();
         commit_shadow_affine_transforms();
         commit_scene_raster_frame();
+        if (scanline_frame_ready) {
+            scanline_frame_ready = 0;
+            if (!render_publication_blocked &&
+                (scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK))) {
+                // DMA stalls the CPU. Publish completed shadow uploads in VBlank
+                // before a long stereo mix can return during visible scanlines.
+                commit_shadow_bg_controls();
+                commit_shadow_oam();
+                commit_shadow_bg_tilemaps();
+            }
+        }
         commit_pcm_stream_block();
         /* Mixing may extend into visible scanlines. The assembly wrapper
            permits only the bounded raster service to preempt it, preserving
@@ -1174,6 +1189,7 @@ static void commit_scene_raster_frame(void) {
 }
 
 void gbs_hw_init(void) {
+    scanline_frame_ready = 0;
     gbs_hw_stage_paged_affine(0);
     affine_upload_screenblock_base = affine_screenblock_base;
     shadow_display_mode = 0;
@@ -1264,6 +1280,7 @@ void gbs_hw_wait_vblank(void) {
         // The audio IRQ can outlast VBlank. Publish the completed affine
         // table at the start of that IRQ, before mixing delays this thread.
         if (affine_hblank_enabled && !render_publication_blocked) affine_hblank_frame_ready = 1;
+        if (!render_publication_blocked) scanline_frame_ready = 1;
         gbs_bios_vblank_intr_wait();
     } else {
         while (REG_VCOUNT >= 160) {

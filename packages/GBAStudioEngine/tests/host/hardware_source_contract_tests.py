@@ -914,12 +914,21 @@ static void rearm_active_affine_hblank(void){++arms;}
 static void commit_hblank_bg_scroll(void){assert(REG_VCOUNT == 160);++affine_commits;}
 void gbs_hw_mix_audio_with_hblank(void){}
 enum { GBS_RASTER_PALETTE = 4, GBS_RASTER_ALPHA = 8, GBS_RASTER_MASK = 16 };
-static uint8_t scene_raster_overrides;
+static uint8_t scene_raster_overrides, scanline_frame_ready;
+static int oam_commits, bg_commits, map_commits;
+void commit_shadow_bg_controls(void){++bg_commits;}
+void commit_shadow_oam(void){assert(REG_VCOUNT==160);++oam_commits;}
+void commit_shadow_bg_tilemaps(void){assert(REG_VCOUNT==160);++map_commits;}
 void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
 void commit_shadow_affine_transforms(void){}
 void commit_paged_affine_frame(void){}
 void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
-void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+void commit_pcm_stream_block(void){}
+void gbs_audio_vblank_update(void){
+ if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}
+ if(scene_raster_tables[scene_raster_active].enabled){assert(oam_commits==1&&bg_commits==1&&map_commits==1);REG_VCOUNT=56;}
+}
+void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""
 void dispatch(void) {"""+irq+"""}
 int main(void){
@@ -931,6 +940,9 @@ int main(void){
  render_publication_blocked=0;audio_must_follow_commit=1;dispatch();
  assert(affine_commits==1 && affine_hblank_frame_ready==0 && REG_VCOUNT==24);
  audio_must_follow_commit=0;dispatch();assert(affine_commits==1);
+ REG_VCOUNT=160; scene_raster_tables[0].enabled=GBS_RASTER_MASK; scanline_frame_ready=1;
+ dispatch();assert(!scanline_frame_ready && oam_commits==1 && REG_VCOUNT==56);
+ REG_VCOUNT=160;dispatch();assert(oam_commits==1); // no publication before the producer signals completion
 }
 """
         with tempfile.TemporaryDirectory() as directory:
