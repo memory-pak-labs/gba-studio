@@ -1,5 +1,8 @@
 #include <cassert>
 #include "gbs/audio.hpp"
+#include "gbs/event.hpp"
+
+extern "C" void gbs_event_pcm_sfx_instance(gbs::EventOp, int, int, int, int);
 
 namespace {
 
@@ -881,6 +884,25 @@ void test_pcm_sfx_instance_replacement_expiry_and_voice_stealing() {
     assert(!gbs::set_pcm_sfx_instance_speed(3, 200));
 }
 
+void test_pcm_instance_event_priority_controls_voice_stealing() {
+    gbs::audio_init();
+    const int8_t tone[] = { 12 };
+    const gbs::PcmAsset asset { tone, 1, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+    gbs::bind_pcm_sfx_instance_assets(&asset, 1);
+    const auto play = gbs::EventOp::PlayPcmSfxInstance;
+    gbs_event_pcm_sfx_instance(play, 1, 0, 15, 256); // priority 255
+    gbs_event_pcm_sfx_instance(play, 2, 0, 15, 1);   // priority 0
+    for (int id = 3; id <= 4; ++id) gbs_event_pcm_sfx_instance(play, id, 0, 15, 0); // default 8
+    assert(gbs::audio_pcm_active_sfx_count() == 4);
+    assert(gbs::play_pcm_sfx(asset, { 15, 2 }));
+    assert(!gbs::stop_pcm_sfx_instance(2));
+    assert(!gbs::play_pcm_sfx(asset, { 15, 1 }));
+    assert(gbs::stop_pcm_sfx_instance(1));
+    assert(gbs::stop_pcm_sfx_instance(3));
+    assert(gbs::stop_pcm_sfx_instance(4));
+    gbs::bind_pcm_sfx_instance_assets(nullptr, 0);
+}
+
 void test_pcm_mixer_uses_linear_interpolation_at_hardware_frame_rate() {
     gbs::audio_init();
     const int8_t samples[] = { 0, 100, 0, -100 };
@@ -1739,6 +1761,7 @@ int main() {
     test_pcm_mixer_accepts_multiple_sfx_voices();
     test_pcm_sfx_instance_changes_preserve_cursor_and_other_voice();
     test_pcm_sfx_instance_replacement_expiry_and_voice_stealing();
+    test_pcm_instance_event_priority_controls_voice_stealing();
     test_pcm_mixer_uses_linear_interpolation_at_hardware_frame_rate();
     test_pcm_mixer_preserves_signed_samples_for_fifo_bytes();
     test_pcm_volume_rounding_matches_integer_gains();

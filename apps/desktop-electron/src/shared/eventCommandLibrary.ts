@@ -1089,7 +1089,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Música e efeitos sonoros",
     "section": null,
     "isFavorite": false,
-    "commandTemplate": "play_sfx_instance {pcmSfx} 1"
+    "commandTemplate": "play_sfx_instance {pcmSfx} 1 8"
   },
   {
     "id": "audio.stop_sfx_instance",

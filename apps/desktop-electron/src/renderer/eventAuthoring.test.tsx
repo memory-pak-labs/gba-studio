@@ -62,6 +62,10 @@ describe("event authoring flows", () => {
     expect(within(effect).getAllByRole("option").map(option => (option as HTMLOptionElement).value)).toEqual(["Sample A.wav", "Sample B"]);
     await user.selectOptions(effect, "Sample B");
     expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 0, { command: 'play_sfx_instance "Sample B" 1' });
+    const priority = screen.getByLabelText("Prioridade (0–255) do evento");
+    expect(priority).toHaveValue("8");
+    fireEvent.change(priority, { target: { value: "200" } });
+    expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 0, { command: 'play_sfx_instance "Sample A.wav" 1 200' });
     await user.click(screen.getByRole("button", { name: "Passo 2: Ajustar pan da instância" }));
     await user.selectOptions(screen.getByLabelText("Instância do evento"), "4");
     expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 1, { command: "set_sfx_instance_pan 4 0" });

@@ -11,7 +11,7 @@ extern "C" __attribute__((weak)) void gbs_debug_record_event(const void*, unsign
 #include "gbs/multiplayer_events.hpp"
 
 // Host event tests can link the script interpreter without the audio mixer.
-extern "C" __attribute__((weak)) void gbs_event_pcm_sfx_instance(gbs::EventOp, int, int, int) {}
+extern "C" __attribute__((weak)) void gbs_event_pcm_sfx_instance(gbs::EventOp, int, int, int, int) {}
 
 namespace gbs {
 
@@ -632,7 +632,7 @@ EventStepResult execute_event_command(
     case EventOp::StopPcmSfxInstance:
     case EventOp::SetPcmSfxInstanceSpeed:
     case EventOp::SetPcmSfxInstancePan:
-        gbs_event_pcm_sfx_instance(command.op, command.a, command.b, command.c);
+        gbs_event_pcm_sfx_instance(command.op, command.a, command.b, command.c, command.d);
         break;
     case EventOp::ClearVariable:
         if (is_valid_event_variable(command.a)) {

@@ -11176,6 +11176,11 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             volume = event_int(command, "volume", 15)
             if not 0 <= index <= 32767 or not 0 <= volume <= 15:
                 raise SystemExit(f"{op}: invalid PCM index or volume")
+            if "priority" in command:
+                priority = event_int(command, "priority", -1)
+                if not 0 <= priority <= 255:
+                    raise SystemExit(f"{op}: priority must be 0–255")
+                return (op, instance, index, volume, priority + 1)
             return (op, instance, index, volume)
         if op == "StopPcmSfxInstance":
             return (op, instance, 0, 0)

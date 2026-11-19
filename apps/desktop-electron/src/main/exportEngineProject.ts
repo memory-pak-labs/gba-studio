@@ -4614,7 +4614,10 @@ function compileEventStep(
       }
       const pcmName = audioPack.document.pcm[resolved.index]?.name;
       const volume = audioPack.document.sfx.find(sfx => sfx.name === pcmName)?.pcm_volume ?? 15;
-      return [{ op: verb, index: resolved.index, instance: control.instance, volume }];
+      return [{
+        op: verb, index: resolved.index, instance: control.instance, volume,
+        ...(control.priority === undefined ? {} : { priority: control.priority })
+      }];
     }
     return [{
       op: verb,
