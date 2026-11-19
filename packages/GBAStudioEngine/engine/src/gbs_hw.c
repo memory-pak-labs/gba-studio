@@ -97,6 +97,12 @@ static uint8_t shadow_bg_map_size_pending_mask;
 static uint16_t shadow_bg_scroll_x[4];
 static uint16_t shadow_bg_scroll_y[4];
 static uint8_t shadow_bg_scroll_pending_mask;
+typedef struct {
+    int16_t pa, pb, pc, pd;
+    int32_t x, y;
+} GbsHwAffineTransform;
+static GbsHwAffineTransform shadow_affine_transforms[2] __attribute__((section(".ewram_bss")));
+static volatile uint8_t shadow_affine_pending_mask;
 static uint16_t shadow_bg_enabled_bits;
 static uint8_t shadow_bg_enabled_pending;
 static uint8_t render_publication_blocked;
@@ -114,6 +120,7 @@ static uint8_t hblank_dispatch_required;
 void gbs_hw_set_hblank_dispatch_required(int required) { hblank_dispatch_required = required != 0; }
 extern void gbs_scene_raster_interrupt_state(int enabled);
 static void commit_scene_raster_frame(void);
+static void commit_shadow_affine_transforms(void);
 static void release_scene_raster_overrides(void);
 static void release_scene_raster_mask(void);
 static void begin_scene_raster_overrides(void) __attribute__((noinline, target("arm"), long_call));
@@ -309,6 +316,7 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
             commit_hblank_bg_scroll();
         } else if (window1_hblank_active) rearm_active_window1_hblank();
         else if (affine_hblank_enabled) rearm_active_affine_hblank();
+        commit_shadow_affine_transforms();
         commit_scene_raster_frame();
         commit_pcm_stream_block();
         /* Mixing may extend into visible scanlines. The assembly wrapper
@@ -1188,6 +1196,7 @@ void gbs_hw_init(void) {
     if (render_publication_blocked) {
         gbs_hw_set_render_handoff_fallback();
     }
+    shadow_affine_pending_mask = 0;
     shadow_bg_character_base_pending_mask = 0;
     shadow_bg_priority_pending_mask = 0;
     /* Priority 0 draws in front. UI on BG0, world room on BG1. */
@@ -1253,7 +1262,10 @@ void gbs_hw_wait_vblank(void) {
         while (REG_VCOUNT < 160) {
         }
     }
-    if (!vblank_irq_enabled && scene_raster_overrides) release_scene_raster_overrides();
+    if (!vblank_irq_enabled) {
+        if (scene_raster_overrides) release_scene_raster_overrides();
+        commit_shadow_affine_transforms();
+    }
     const uint32_t publication_start = gbs_hw_frame_counter_ticks();
     if (!render_publication_blocked) {
         commit_shadow_bg_controls();
@@ -2089,18 +2101,33 @@ void gbs_hw_set_affine_bg_wrap(int layer, int enabled) {
 }
 
 void gbs_hw_set_affine_bg_transform(int layer, int16_t pa, int16_t pb, int16_t pc, int16_t pd, int32_t reference_x_8, int32_t reference_y_8) {
-    volatile uint16_t* matrix = affine_bg_matrix_registers(layer);
-    volatile uint32_t* reference = affine_bg_reference_registers(layer);
-    if (matrix == 0 || reference == 0) {
-        return;
-    }
+    if (layer != 2 && layer != 3) return;
+    const uint16_t ime = gbs_hw_audio_lock_state();
+    const unsigned slot = (unsigned)(layer - 2);
+    shadow_affine_transforms[slot] = (GbsHwAffineTransform){pa, pb, pc, pd, reference_x_8, reference_y_8};
+    shadow_affine_pending_mask |= (uint8_t)(1u << slot);
+    gbs_hw_audio_unlock_state(ime);
+}
 
-    matrix[0] = (uint16_t)pa;
-    matrix[1] = (uint16_t)pb;
-    matrix[2] = (uint16_t)pc;
-    matrix[3] = (uint16_t)pd;
-    reference[0] = (uint32_t)reference_x_8;
-    reference[1] = (uint32_t)reference_y_8;
+static void commit_shadow_affine_transforms(void) {
+    if (!shadow_affine_pending_mask || render_publication_blocked || REG_VCOUNT < 160u || REG_VCOUNT >= 227u) return;
+    for (unsigned slot = 0; slot < 2; ++slot) {
+        const uint8_t bit = (uint8_t)(1u << slot);
+        const int layer = (int)slot + 2;
+        // The per-line DMA owns these registers until the affine raster ends.
+        if (!(shadow_affine_pending_mask & bit) || (affine_hblank_enabled && affine_hblank_layer == layer)) continue;
+        volatile uint16_t* matrix = affine_bg_matrix_registers(layer);
+        volatile uint32_t* reference = affine_bg_reference_registers(layer);
+        const GbsHwAffineTransform* transform = &shadow_affine_transforms[slot];
+        // Writing BGxX/BGxY restarts the affine origin at the current scanline.
+        matrix[0] = (uint16_t)transform->pa;
+        matrix[1] = (uint16_t)transform->pb;
+        matrix[2] = (uint16_t)transform->pc;
+        matrix[3] = (uint16_t)transform->pd;
+        reference[0] = (uint32_t)transform->x;
+        reference[1] = (uint32_t)transform->y;
+        shadow_affine_pending_mask &= (uint8_t)~bit;
+    }
 }
 
 void gbs_hw_load_bitmap16(uint16_t mode, const uint16_t* pixels, uint16_t width, uint16_t height, uint16_t page) {

@@ -73,6 +73,7 @@ void gbs_audio_vblank_update() {}
 constexpr uint8_t GBS_RASTER_BACKDROP = 2;
 uint8_t scene_raster_overrides = 0;
 void release_scene_raster_overrides() { assert(scene_raster_overrides == 0); }
+void commit_shadow_affine_transforms() {}
 void commit_scene_raster_frame() {}
 void gbs_emit_vblank_interrupt() {}
 ''' + backdrop + palette + fallback + wait + r'''
