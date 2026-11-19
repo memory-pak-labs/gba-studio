@@ -326,11 +326,26 @@ async function main() {
         assertContains(welcomeText, "Template básico");
         assertContains(welcomeText, "Comece do zero, sem cenas ou assets de partida.");
         const preview = await cdp.send("Runtime.evaluate", {
-          expression: "({ complete: document.querySelector('.welcome-template-preview')?.complete, width: document.querySelector('.welcome-template-preview')?.naturalWidth })",
+          expression: `
+            (async () => Promise.all([...document.querySelectorAll(".welcome-template-preview")].map(async (element) => {
+              const isImage = element instanceof HTMLImageElement;
+              if (isImage) await element.decode();
+              const { width, height } = element.getBoundingClientRect();
+              return {
+                width, height, isImage,
+                fullFrame: isImage
+                  ? element.naturalWidth === 240 && element.naturalHeight === 160 && getComputedStyle(element).objectFit === "contain"
+                  : getComputedStyle(element).backgroundImage !== "none"
+              };
+            })))()
+          `,
+          awaitPromise: true,
           returnByValue: true
         });
-        if (!preview.result?.value?.complete || preview.result.value.width !== 240) {
-          throw new Error(`Expected loaded 240px example template preview. Result: ${JSON.stringify(preview.result?.value)}`);
+        const previews = preview.result?.value;
+        if (previews?.length !== 3 || previews.filter((item) => item.isImage).length !== 2
+          || previews.some((item) => !item.fullFrame || item.width <= 0 || Math.abs(item.width - item.height * 1.5) > 1)) {
+          throw new Error(`Expected three visible GBA previews in the 240×160 aspect ratio. Result: ${JSON.stringify(previews)}`);
         }
         await captureScreenshot(cdp, welcomeScreenshotPath);
 

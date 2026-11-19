@@ -18,27 +18,23 @@ export interface ProjectTemplateDefinition {
   id: ProjectTemplateID;
   title: string;
   detail: string;
-  icon: string;
 }
 
 export const projectTemplateDefinitions: ProjectTemplateDefinition[] = [
   {
     id: "exemplo-gba",
     title: "O Último Farol",
-    detail: "Showcase completo de cenas e runtimes nativos para Game Boy Advance.",
-    icon: "GBA"
+    detail: "Showcase completo de cenas e runtimes nativos para Game Boy Advance."
   },
   {
     id: "blank",
     title: "Template básico",
-    detail: "Com sprites, fundos, HUDs e recursos de diálogo prontos para usar.",
-    icon: "▦"
+    detail: "Com sprites, fundos, HUDs e recursos de diálogo prontos para usar."
   },
   {
     id: "empty",
     title: "Projeto em branco",
-    detail: "Comece do zero, sem cenas ou assets de partida.",
-    icon: "+"
+    detail: "Comece do zero, sem cenas ou assets de partida."
   }
 ];
 
