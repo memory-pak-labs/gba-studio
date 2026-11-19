@@ -1,3 +1,4 @@
+import { isSfxInstanceVerb, parseSfxInstanceCommand } from "./sfxInstanceCommands.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "./audioMixing.js";
 import { isScaleEvent, parseScaleEvent } from "./eventTransforms.js";
 import { parseEventInstruction, sceneEntryPlan, eventWaitFrames, type SceneEntryReason } from "./eventExecutionContract.js";
@@ -4736,6 +4737,17 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       currentState = updateDebug(activeMusic && !activeMusicAsset
         ? appendDiagnostic(nextState, `Musica nao encontrada nos assets: ${activeMusic}.`)
         : nextState);
+      break doCommand;
+    }
+
+    if (isSfxInstanceVerb(verb)) {
+      try {
+        const control = parseSfxInstanceCommand(verb, parts);
+        const detail = "audio" in control ? control.audio : "percent" in control ? `${control.percent}%` : "";
+        currentState = updateDebug(appendLog(currentState, resolvedEventName, command, "audio", [control.instance, detail].filter(Boolean).join(" · ")));
+      } catch (error) {
+        currentState = appendUnsupported(currentState, resolvedEventName, command, (error as Error).message);
+      }
       break doCommand;
     }
 

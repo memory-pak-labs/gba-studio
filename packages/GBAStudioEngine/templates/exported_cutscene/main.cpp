@@ -835,6 +835,7 @@ int initialize_cutscene_runtime() {
     deferred_step = -1;
     deferred_skip = false;
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+    gbs::bind_pcm_sfx_instance_assets(project.pcm_assets, project.pcm_asset_count);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(2, 1, 6));
     // Reset the scene binding before any entry script or first dialogue page.

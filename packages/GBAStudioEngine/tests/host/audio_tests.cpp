@@ -833,6 +833,54 @@ void test_pcm_mixer_accepts_multiple_sfx_voices() {
     assert(last_pcm_first_sample < 127);
 }
 
+void test_pcm_sfx_instance_changes_preserve_cursor_and_other_voice() {
+    gbs::audio_init();
+    const int8_t pattern[] = { 16, 32, 48, 64, 80 };
+    const int8_t reference[] = { 6 };
+    const gbs::PcmAsset effect { pattern, 5, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+    const gbs::PcmAsset other { reference, 1, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+
+    assert(gbs::play_pcm_sfx_instance(effect, 1));
+    assert(gbs::play_pcm_sfx_instance(other, 2, { 15, 8, 0, -127 }));
+    gbs::audio_update();
+    assert(gbs::set_pcm_sfx_instance_speed(1, 200));
+    assert(gbs::set_pcm_sfx_instance_pan(1, 100));
+    assert(!gbs::set_pcm_sfx_instance_speed(1, 0));
+    assert(!gbs::set_pcm_sfx_instance_pan(1, -101));
+    gbs::audio_update();
+    // 528 samples leave the first voice on index 3 of the five-sample loop.
+    assert(last_pcm_samples[0] == 6 && last_pcm_samples[1] == 6);
+    assert(last_pcm_right_samples[0] == 64 && last_pcm_right_samples[1] == 16);
+    assert(gbs::stop_pcm_sfx_instance(1));
+    assert(!gbs::stop_pcm_sfx_instance(1));
+    assert(!gbs::set_pcm_sfx_instance_speed(1, 100));
+    gbs::audio_update();
+    assert(gbs::audio_pcm_active_sfx_count() == 1);
+    assert(last_pcm_first_sample == 6 && last_pcm_right_first_sample == 0);
+}
+
+void test_pcm_sfx_instance_replacement_expiry_and_voice_stealing() {
+    gbs::audio_init();
+    const int8_t samples[] = { 10 };
+    const gbs::PcmAsset looping { samples, 1, gbs::PCM_MIXER_SAMPLE_RATE_HZ, true };
+    const gbs::PcmAsset once { samples, 1, gbs::PCM_MIXER_SAMPLE_RATE_HZ, false };
+    assert(!gbs::play_pcm_sfx_instance(looping, 0));
+    assert(!gbs::play_pcm_sfx_instance(looping, 5));
+    assert(gbs::play_pcm_sfx_instance(looping, 1));
+    assert(gbs::play_pcm_sfx_instance(once, 1));
+    assert(gbs::audio_pcm_active_sfx_count() == 1);
+    gbs::audio_update();
+    assert(!gbs::set_pcm_sfx_instance_pan(1, 100));
+    assert(gbs::play_pcm_sfx_instance(looping, 1, { 15, 1 }));
+    for (int id = 2; id <= 4; ++id) assert(gbs::play_pcm_sfx_instance(looping, id));
+    assert(gbs::play_pcm_sfx(looping));
+    assert(!gbs::stop_pcm_sfx_instance(1));
+    assert(gbs::stop_pcm_sfx_instance(2));
+    assert(gbs::audio_pcm_active_sfx_count() == 3);
+    gbs::stop_pcm_sfx();
+    assert(!gbs::set_pcm_sfx_instance_speed(3, 200));
+}
+
 void test_pcm_mixer_uses_linear_interpolation_at_hardware_frame_rate() {
     gbs::audio_init();
     const int8_t samples[] = { 0, 100, 0, -100 };
@@ -1689,6 +1737,8 @@ int main() {
     test_pcm_music_uses_partial_loop_points();
     test_pcm_sfx_mixes_with_pcm_music_channel();
     test_pcm_mixer_accepts_multiple_sfx_voices();
+    test_pcm_sfx_instance_changes_preserve_cursor_and_other_voice();
+    test_pcm_sfx_instance_replacement_expiry_and_voice_stealing();
     test_pcm_mixer_uses_linear_interpolation_at_hardware_frame_rate();
     test_pcm_mixer_preserves_signed_samples_for_fifo_bytes();
     test_pcm_volume_rounding_matches_integer_gains();

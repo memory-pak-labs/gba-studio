@@ -1,5 +1,6 @@
 #include "gbs/profiler.hpp"
 #include "gbs/audio.hpp"
+#include "gbs/event.hpp"
 #include "gbs_hw.h"
 
 #if !defined(__arm__) && !defined(__thumb__)
@@ -58,6 +59,7 @@ struct PcmPlayback {
     uint16_t age;
     bool playing;
     bool native_sfx = false;
+    uint8_t instance = 0;
     uint8_t sample_gain = 255;
     bool sample_linear_pan = false;
     const gbs::PcmInterpolationMap* prepared_mix_map = nullptr;
@@ -117,6 +119,8 @@ bool pcm_cache_padded = false;
 #undef GBS_AUDIO_FAST_RAM
 uint8_t pcm_mix_buffer_index = 0;
 uint16_t pcm_voice_age = 1;
+const gbs::PcmAsset* pcm_sfx_instance_assets = nullptr;
+size_t pcm_sfx_instance_asset_count = 0;
 bool pcm_output_active = false;
 uint32_t pcm_submitted_blocks = 0;
 bool music_muted = false;
@@ -320,6 +324,7 @@ void reset_pcm_playback(PcmPlayback& playback) {
     playback.age = 0;
     playback.playing = false;
     playback.native_sfx = false;
+    playback.instance = 0;
     playback.sample_gain = 255;
     playback.sample_linear_pan = false;
     playback.prepared_mix_map = nullptr;
@@ -440,6 +445,7 @@ void start_pcm_playback(PcmPlayback& playback, const gbs::PcmAsset& asset, uint8
     playback.priority = priority;
     playback.pan = pan;
     playback.age = pcm_voice_age++;
+    playback.instance = 0;
     playback.playing = true;
     playback.sample_gain = 255;
     playback.sample_linear_pan = false;
@@ -1225,6 +1231,49 @@ PcmPlayback* find_pcm_sfx_slot(uint8_t priority) {
     return nullptr;
 }
 
+bool valid_pcm_sfx_instance(int instance) {
+    return instance >= 1 && instance <= static_cast<int>(gbs::PCM_MIXER_MAX_SFX_VOICES);
+}
+
+PcmPlayback* find_pcm_sfx_instance(int instance) {
+    if (!valid_pcm_sfx_instance(instance)) return nullptr;
+    for (PcmPlayback& voice : pcm_sfx) {
+        if (voice.playing && voice.instance == instance) return &voice;
+    }
+    return nullptr;
+}
+
+void stop_pcm_output_if_idle() {
+    if (!any_pcm_playing() && pcm_output_active) {
+        gbs_hw_audio_stop_pcm8_stream();
+        pcm_output_active = false;
+    }
+}
+
+bool start_pcm_sfx(const gbs::PcmAsset& asset, const gbs::PcmSfxOptions& options, int instance) {
+    if (sfx_muted || pcm_sfx_muted) {
+        return false;
+    }
+    if (!gbs::is_valid_pcm_asset(asset)) {
+        return false;
+    }
+    if (!gbs::is_valid_pcm_volume(options.volume) || !gbs::is_valid_pcm_pan(options.pan)) {
+        return false;
+    }
+
+    [[maybe_unused]] const AudioStateLock lock;
+    PcmPlayback* slot = find_pcm_sfx_instance(instance);
+    if (slot == nullptr) slot = find_pcm_sfx_slot(options.priority);
+    if (slot == nullptr) {
+        return false;
+    }
+
+    start_pcm_playback(*slot, asset, options.priority, options.volume, options.sample_rate_hz, options.pan);
+    slot->native_sfx = false;
+    slot->instance = static_cast<uint8_t>(instance);
+    return true;
+}
+
 } // namespace
 
 namespace gbs {
@@ -1596,25 +1645,45 @@ bool play_pcm_sfx(const PcmAsset& asset) {
 }
 
 bool play_pcm_sfx(const PcmAsset& asset, const PcmSfxOptions& options) {
-    if (sfx_muted || pcm_sfx_muted) {
-        return false;
-    }
-    if (!is_valid_pcm_asset(asset)) {
-        return false;
-    }
-    if (!is_valid_pcm_volume(options.volume) || !is_valid_pcm_pan(options.pan)) {
-        return false;
-    }
+    return start_pcm_sfx(asset, options, 0);
+}
 
+bool play_pcm_sfx_instance(const PcmAsset& asset, int instance, const PcmSfxOptions& options) {
+    return valid_pcm_sfx_instance(instance) && start_pcm_sfx(asset, options, instance);
+}
+
+bool stop_pcm_sfx_instance(int instance) {
     [[maybe_unused]] const AudioStateLock lock;
-    PcmPlayback* slot = find_pcm_sfx_slot(options.priority);
-    if (slot == nullptr) {
-        return false;
-    }
-
-    start_pcm_playback(*slot, asset, options.priority, options.volume, options.sample_rate_hz, options.pan);
-    slot->native_sfx = false;
+    PcmPlayback* voice = find_pcm_sfx_instance(instance);
+    if (voice == nullptr) return false;
+    reset_pcm_playback(*voice);
+    stop_pcm_output_if_idle();
     return true;
+}
+
+bool set_pcm_sfx_instance_speed(int instance, int percent) {
+    if (percent < 25 || percent > 400) return false;
+    [[maybe_unused]] const AudioStateLock lock;
+    PcmPlayback* voice = find_pcm_sfx_instance(instance);
+    if (voice == nullptr) return false;
+    voice->source_rate_hz = (voice->asset->sample_rate_hz * percent + 50u) / 100u;
+    voice->step_fp = pcm_step_for_asset(*voice->asset, voice->source_rate_hz);
+    voice->step_reciprocal = 0xFFFFFFFFu / voice->step_fp;
+    return true;
+}
+
+bool set_pcm_sfx_instance_pan(int instance, int percent) {
+    if (percent < -100 || percent > 100) return false;
+    [[maybe_unused]] const AudioStateLock lock;
+    PcmPlayback* voice = find_pcm_sfx_instance(instance);
+    if (voice == nullptr) return false;
+    voice->pan = static_cast<int8_t>(percent * 127 / 100);
+    return true;
+}
+
+void bind_pcm_sfx_instance_assets(const PcmAsset* assets, size_t count) {
+    pcm_sfx_instance_assets = assets;
+    pcm_sfx_instance_asset_count = count;
 }
 
 bool play_pcm_sfx(const PcmAsset& asset, uint8_t priority, uint8_t volume) {
@@ -1624,10 +1693,7 @@ bool play_pcm_sfx(const PcmAsset& asset, uint8_t priority, uint8_t volume) {
 void stop_pcm_sfx() {
     [[maybe_unused]] const AudioStateLock lock;
     reset_pcm_sfx_state();
-    if (!any_pcm_playing() && pcm_output_active) {
-        gbs_hw_audio_stop_pcm8_stream();
-        pcm_output_active = false;
-    }
+    stop_pcm_output_if_idle();
 }
 
 bool play_pcm_music(const PcmAsset& asset) {
@@ -1760,4 +1826,26 @@ AudioRuntimeUsage audio_runtime_usage() {
 
 extern "C" void gbs_audio_vblank_update(void) {
     gbs::audio_vblank_update();
+}
+
+extern "C" void gbs_event_pcm_sfx_instance(gbs::EventOp op, int instance, int operand, int volume) {
+    switch (op) {
+    case gbs::EventOp::PlayPcmSfxInstance:
+        if (pcm_sfx_instance_assets != nullptr && operand >= 0 &&
+            static_cast<size_t>(operand) < pcm_sfx_instance_asset_count && volume >= 0 && volume <= 15) {
+            gbs::play_pcm_sfx_instance(pcm_sfx_instance_assets[operand], instance, { static_cast<uint8_t>(volume) });
+        }
+        break;
+    case gbs::EventOp::StopPcmSfxInstance:
+        gbs::stop_pcm_sfx_instance(instance);
+        break;
+    case gbs::EventOp::SetPcmSfxInstanceSpeed:
+        gbs::set_pcm_sfx_instance_speed(instance, operand);
+        break;
+    case gbs::EventOp::SetPcmSfxInstancePan:
+        gbs::set_pcm_sfx_instance_pan(instance, operand);
+        break;
+    default:
+        break;
+    }
 }

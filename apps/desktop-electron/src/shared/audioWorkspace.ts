@@ -764,7 +764,7 @@ function visitAudioReferences(data: GBAProjectData, visit: (reference: AudioRefe
     authored.delete(step);
     function commandReference(command: string, write: (command: string) => void): void {
       const parts = sceneChangeCommandParts(command);
-      if (!["play_music", "play_sfx", "run_audio_routine", "set_text_sfx"].includes(parts[0] ?? "") || !parts[1]) return;
+      if (!["play_music", "play_sfx", "play_sfx_instance", "run_audio_routine", "set_text_sfx"].includes(parts[0] ?? "") || !parts[1]) return;
       visit({ name: parts[1], usage, update(nextName) {
         parts[1] = nextName;
         write(nextName ? sceneChangeCommand(parts) : "noop");

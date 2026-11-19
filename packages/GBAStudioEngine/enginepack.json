@@ -1325,6 +1325,7 @@
       "runtime_bus_fade",
       "runtime_bus_mute_all_profiles",
       "pcm_sfx_event_options",
+      "pcm_sfx_instances",
       "pcm_music_mix",
       "pcm_block_streaming",
       "pcm_stream_status",

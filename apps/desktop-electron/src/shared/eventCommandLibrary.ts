@@ -1084,6 +1084,38 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "commandTemplate": "play_sfx {sfx}"
   },
   {
+    "id": "audio.play_sfx_instance",
+    "title": "Tocar efeito em instância",
+    "category": "Música e efeitos sonoros",
+    "section": null,
+    "isFavorite": false,
+    "commandTemplate": "play_sfx_instance {pcmSfx} 1"
+  },
+  {
+    "id": "audio.stop_sfx_instance",
+    "title": "Parar instância de som",
+    "category": "Música e efeitos sonoros",
+    "section": null,
+    "isFavorite": false,
+    "commandTemplate": "stop_sfx_instance 1"
+  },
+  {
+    "id": "audio.set_sfx_instance_speed",
+    "title": "Ajustar velocidade da instância",
+    "category": "Música e efeitos sonoros",
+    "section": null,
+    "isFavorite": false,
+    "commandTemplate": "set_sfx_instance_speed 1 100"
+  },
+  {
+    "id": "audio.set_sfx_instance_pan",
+    "title": "Ajustar pan da instância",
+    "category": "Música e efeitos sonoros",
+    "section": null,
+    "isFavorite": false,
+    "commandTemplate": "set_sfx_instance_pan 1 0"
+  },
+  {
     "id": "audio.text_sfx",
     "title": "Definir efeito sonoro do texto",
     "category": "Música e efeitos sonoros",

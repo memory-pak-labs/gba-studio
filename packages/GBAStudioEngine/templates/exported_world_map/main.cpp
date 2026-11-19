@@ -547,6 +547,7 @@ int initialize_world_map_runtime() {
     gbs::init_event_state(event_state);
     gbs::init_scene_script_runner(scene_scripts);
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+    gbs::bind_pcm_sfx_instance_assets(project.pcm_assets, project.pcm_asset_count);
     gbs::init_hud(hud);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(1, 6, 12));

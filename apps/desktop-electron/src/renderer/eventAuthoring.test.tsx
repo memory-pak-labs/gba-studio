@@ -41,6 +41,32 @@ describe("event authoring flows", () => {
     expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 0, { command: "set_audio_mixing_rate 21024" });
   });
 
+  it("offers only PCM effects and keeps the chosen instance when editing sound commands", async () => {
+    const data = {
+      audioItems: [
+        { name: "Sample A.wav", kind: "SFX", format: "WAV" },
+        { name: "Sample B", kind: "SFX", synthesis: "PCM" },
+        { name: "PSG", kind: "SFX", synthesis: "PSG" },
+        { name: "Música", kind: "Musica", synthesis: "PCM" }
+      ],
+      events: [{ id: "mix", name: "mix", category: "Cena", steps: [
+        { command: 'play_sfx_instance "Sample A.wav" 1' },
+        { command: "set_sfx_instance_pan 1 0" }
+      ] }]
+    };
+    const props = callbacks();
+    const user = userEvent.setup();
+    render(<EventInspectorPanel {...props} projectData={data} presentation={deriveEventsWorkspacePresentation(data)} eventName="mix" triggerLabel="Ao iniciar" />);
+    await user.click(screen.getByRole("button", { name: "Passo 1: Tocar efeito em instância" }));
+    const effect = screen.getByLabelText("Efeito PCM do evento");
+    expect(within(effect).getAllByRole("option").map(option => (option as HTMLOptionElement).value)).toEqual(["Sample A.wav", "Sample B"]);
+    await user.selectOptions(effect, "Sample B");
+    expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 0, { command: 'play_sfx_instance "Sample B" 1' });
+    await user.click(screen.getByRole("button", { name: "Passo 2: Ajustar pan da instância" }));
+    await user.selectOptions(screen.getByLabelText("Instância do evento"), "4");
+    expect(props.onUpdateEventStep).toHaveBeenLastCalledWith("mix", 1, { command: "set_sfx_instance_pan 4 0" });
+  });
+
   it("edits an optional scene arrival without shifting coordinates", async () => {
     const data = { scenas: [{ name: "Caverna" }], events: [{ id: "go", name: "go", category: "Cena", steps: [{ command: "change_scene Caverna" }] }] };
     const props = callbacks();

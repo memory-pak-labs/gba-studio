@@ -1,3 +1,4 @@
+import { isSfxInstanceVerb, parseSfxInstanceCommand } from "./sfxInstanceCommands.js";
 import { isScaleEvent, parseScaleEvent, scaleEventTokens } from "./eventTransforms.js";
 import { sceneChangeCommandParts } from "./sceneChangeCommand.js";
 import { parseVisibilityPreset, visibilityPresetVerbs } from "./visibilityPresets.js";
@@ -87,6 +88,9 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
   }
   if (isLutaEventVerb(verb)) {
     try { parseLutaEventCommand(command); } catch (error) { return error instanceof Error ? error.message : "Evento de Luta inválido."; }
+  }
+  if (isSfxInstanceVerb(verb)) {
+    try { parseSfxInstanceCommand(verb, parts.slice(1)); } catch (error) { return (error as Error).message; }
   }
   const integer = (value: string | undefined, max: number) => value !== undefined && /^\d+$/.test(value) && Number(value) <= max;
   if (verb === "set_player_speed_profile" && (parts.length !== 5 || !integer(parts[1],400) || Number(parts[1])<1 || !integer(parts[2],400) || Number(parts[2])<Number(parts[1]) || !["a","b","l","r"].includes(parts[3] ?? "") || !integer(parts[4],32767))) return "Perfil requer caminhada e corrida entre 1 e 400%, corrida igual ou maior, botão A/B/L/R e custo não negativo.";

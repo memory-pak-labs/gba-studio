@@ -2383,6 +2383,41 @@ describe("prepareEngineProjectExport", () => {
     ]);
   });
 
+  it("exports PCM instance commands in script order with the authored effect gain", () => {
+    const contract = buildEngineExportProjectContract(project({
+      assets: [{ id: "sample", name: "Alarm tone.wav", kind: "Audio", metadata: { source: "Assets/sounds/alarm.wav" } }],
+      audioItems: [{ name: "Alarm tone.wav", kind: "SFX", format: "WAV", exportID: "alarm", volume: 60 }],
+      events: [{ name: "instance_mix", category: "Audio", steps: [
+        { command: 'play_sfx_instance "Alarm tone.wav" 1' },
+        { command: "play_sfx_instance alarm 2" },
+        { command: "set_sfx_instance_speed 1 200" },
+        { command: "set_sfx_instance_pan 2 -100" },
+        { command: "stop_sfx_instance 1" }
+      ] }]
+    }));
+
+    expect(contract.topdown_project?.scripts.find(script => script.name === "instance_mix")?.script).toEqual([
+      { op: "play_sfx_instance", instance: 1, index: 0, volume: 9 },
+      { op: "play_sfx_instance", instance: 2, index: 0, volume: 9 },
+      { op: "set_sfx_instance_speed", instance: 1, percent: 200 },
+      { op: "set_sfx_instance_pan", instance: 2, percent: -100 },
+      { op: "stop_sfx_instance", instance: 1 }
+    ]);
+    expect(contract.requires.features).toContain("audio.pcm_sfx_instances");
+  });
+
+  it.each([
+    ["stop_sfx_instance 0", /1–4/],
+    ["set_sfx_instance_speed 1 401", /25–400/],
+    ["set_sfx_instance_pan 1 -101", /100/],
+    ["play_sfx_instance noise 1", /PCM/]
+  ])("rejects invalid instance authoring %s", (command, error) => {
+    expect(() => buildEngineExportProjectContract(project({
+      audioItems: [{ name: "noise", kind: "SFX", synthesis: "PSG" }],
+      events: [{ name: "instance_mix", category: "Audio", steps: [{ command }] }]
+    }))).toThrow(error);
+  });
+
   it("exports state and inventory event commands using the numeric variable/item slots the Engine assetc expects", () => {
     // O assetc real (GBAStudioEngine/tools/assetc/assetc.py) nao aceita chaves string ("key") nem
     // o op "set_flag" (nao existe no motor - flags sao variaveis 0/1). Ele exige indices numericos

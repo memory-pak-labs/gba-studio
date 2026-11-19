@@ -1,3 +1,4 @@
+import { isSfxInstanceAudio, isSfxInstanceVerb, parseSfxInstanceCommand } from "../shared/sfxInstanceCommands.js";
 import { hasSceneRasterEffects, hasSceneScanlineControls, normalizeSceneRasterEffects, sceneRasterEffectIssues } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
 import { projectCartridgeRumbleProfile, type CartridgeRumbleProfile } from "../shared/cartridgeRumble.js";
@@ -254,6 +255,7 @@ export interface EngineExportProjectEventCommand {
   x?: number;
   y?: number;
   index?: number;
+  instance?: number;
   key?: string;
   value?: string | number | boolean;
   amount?: number;
@@ -4587,6 +4589,26 @@ function compileEventStep(
 
   const integrationIssue = eventCommandIntegrationIssue(sceneChangeCommand(parts), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
   if (integrationIssue) throw new Error(integrationIssue);
+
+  if (isSfxInstanceVerb(verb)) {
+    const control = parseSfxInstanceCommand(verb, parts.slice(1));
+    if (control.verb === "play_sfx_instance") {
+      const audioIndex = audioIndexByName(audioItems, control.audio);
+      const audio = audioItems[audioIndex];
+      const resolved = resolveAudioPlayback(audioItems, audioPack, control.audio, false);
+      if (!audioPack || !audio || !isSfxInstanceAudio(data, audio) || resolved?.op !== "play_pcm_sfx") {
+        throw new Error(`Instância de som requer um efeito PCM ou WAV compilado: ${control.audio}`);
+      }
+      const pcmName = audioPack.document.pcm[resolved.index]?.name;
+      const volume = audioPack.document.sfx.find(sfx => sfx.name === pcmName)?.pcm_volume ?? 15;
+      return [{ op: verb, index: resolved.index, instance: control.instance, volume }];
+    }
+    return [{
+      op: verb,
+      instance: control.instance,
+      ...("percent" in control ? { percent: control.percent } : {})
+    }];
+  }
 
   if (isScaleEvent(verb)) {
     const scale = parseScaleEvent(parts);
@@ -11355,6 +11377,9 @@ function buildEngineExportProjectContractUncached(
   if (advancedTools.compiled.hasResources) {
     features.push("advanced_tools_data");
   }
+  if (expandEventProcedures(projectArray(data, "events")).events.some(event => eventSteps(event).some(step =>
+    isSfxInstanceVerb(commandParts(stringField(step, "command", ""))[0] ?? "")
+  ))) features.push("audio.pcm_sfx_instances");
   const exportCoverage = auditExportEventCommandCoverage(data);
   const spriteVramWarnings = auditProjectSpriteVramWarnings(data);
   const spriteVramExportNotices = auditProjectSpriteVramExportNotices(data);

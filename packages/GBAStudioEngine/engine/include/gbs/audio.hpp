@@ -578,6 +578,13 @@ void stop_tracker_music();
 bool play_pcm_sfx(const PcmAsset& asset);
 bool play_pcm_sfx(const PcmAsset& asset, const PcmSfxOptions& options);
 bool play_pcm_sfx(const PcmAsset& asset, uint8_t priority, uint8_t volume);
+// A project can address one PCM effect per ID (1 through PCM_MIXER_MAX_SFX_VOICES).
+// Replaying an ID replaces that voice. Expired or evicted voices release their IDs.
+bool play_pcm_sfx_instance(const PcmAsset& asset, int instance, const PcmSfxOptions& options = {});
+bool stop_pcm_sfx_instance(int instance);
+bool set_pcm_sfx_instance_speed(int instance, int percent);
+bool set_pcm_sfx_instance_pan(int instance, int percent);
+void bind_pcm_sfx_instance_assets(const PcmAsset* assets, size_t count);
 void stop_pcm_sfx();
 bool play_pcm_music(const PcmAsset& asset);
 bool play_pcm_music(const PcmAsset& asset, uint8_t volume);

@@ -1694,6 +1694,7 @@ int initialize_platformer_runtime() {
     gbs::init_event_state(event_state);
     event_state.supports_temporal_actor_motion = true;
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+    gbs::bind_pcm_sfx_instance_assets(project.pcm_assets, project.pcm_asset_count);
     gbs::clear_scripted_movements(platformer_scripted_movements);
     platformer_player_script_speed = 100;
     gbs::init_event_runner(platformer_event_runner);

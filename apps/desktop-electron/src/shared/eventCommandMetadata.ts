@@ -1,3 +1,4 @@
+import { isSfxInstanceVerb } from "./sfxInstanceCommands.js";
 import { scaleEventVerbs } from "./eventTransforms.js";
 import { TILE_REPLACEMENT_COLLISIONS } from "./tileReplacement.js";
 
@@ -44,6 +45,10 @@ const parameterLabels: Record<string, string[]> = {
   pause_scene_type: ["Lógica da cena"], resume_scene_type: ["Lógica da cena"], run_audio_routine: ["Música tracker"],
   fade_in: ["Duração (quadros)"], fade_out: ["Duração (quadros)"],
   set_audio_mixing_rate: ["Frequência de mixagem (Hz)"],
+  play_sfx_instance: ["Efeito PCM", "Instância"],
+  stop_sfx_instance: ["Instância"],
+  set_sfx_instance_speed: ["Instância", "Velocidade (25–400%)"],
+  set_sfx_instance_pan: ["Instância", "Pan (−100 a 100%)"],
   play_music: ["Música"], play_sfx: ["Efeito sonoro"], set_music_volume: ["Volume"],
   fade_audio_volume: ["Canal", "Volume da cena (%)", "Duração (quadros)", "Variável do volume preferido (opcional)", "Variável do volume geral (opcional)"],
   show_dialogue: ["Diálogo"], show_choice: ["Diálogo de escolhas", "Variável de resposta"],
@@ -111,6 +116,10 @@ const descriptions: Record<string, string> = {
   set_background: "Troca o fundo de uma cutscene durante a sequência.",
   show_dialogue: "Mostra o texto de um diálogo para o jogador.",
   show_choice: "Mostra opções de resposta e permite usar a escolha na lógica.",
+  play_sfx_instance: "Toca o efeito PCM ou WAV no ID selecionado. Reutilizar o ID substitui o efeito anterior.",
+  stop_sfx_instance: "Interrompe o efeito que está tocando nesse ID.",
+  set_sfx_instance_speed: "Muda a velocidade do efeito em reprodução. 100% restaura a velocidade original.",
+  set_sfx_instance_pan: "Move o efeito em reprodução entre esquerda (−100%), centro (0%) e direita (100%).",
   play_music: "Começa a reprodução da música selecionada.", play_sfx: "Reproduz um efeito sonoro.",
   stop_music: "Interrompe a música atual.", wait: "Aguarda uma duração em quadros antes de continuar.",
   set_variable: "Guarda um valor em uma variável do projeto.", if_variable: "Executa um dos caminhos conforme o valor da variável.",
@@ -146,6 +155,7 @@ export function eventCommandParameterLabel(verb: string, tokenIndex: number, fal
 export function eventCommandParameterChoices(verb: string, tokenIndex: number): string[] | null {
   if (verb === "multiplayer_queue_open" && tokenIndex === 1) return ["2", "3", "4"];
   if (verb === "multiplayer_queue_open" && tokenIndex === 2) return ["9600", "38400", "57600", "115200"];
+  if (isSfxInstanceVerb(verb) && tokenIndex === (verb === "play_sfx_instance" ? 2 : 1)) return ["1", "2", "3", "4"];
   if (verb === "set_audio_mixing_rate" && tokenIndex === 1) return ["10512", "21024", "31536"];
   if (scaleEventVerbs.some(v => v === verb && v.includes("background")) && tokenIndex === 1) return ["BG2", "BG3"];
   if ((verb === "replace_tile" && tokenIndex === 5) || (verb === "replace_tile_sequence" && tokenIndex === 6)) return TILE_REPLACEMENT_COLLISIONS;

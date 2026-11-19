@@ -9963,6 +9963,10 @@ def event_op_from_json(value):
         "play_sfx": "PlaySfx",
         "sfx": "PlaySfx",
         "play_pcm_sfx": "PlayPcmSfx",
+        "play_sfx_instance": "PlayPcmSfxInstance",
+        "stop_sfx_instance": "StopPcmSfxInstance",
+        "set_sfx_instance_speed": "SetPcmSfxInstanceSpeed",
+        "set_sfx_instance_pan": "SetPcmSfxInstancePan",
         "pcm_sfx": "PlayPcmSfx",
         "clear_variable": "ClearVariable",
         "clear_var": "ClearVariable",
@@ -11154,6 +11158,23 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             event_int(command, ["other_actor", "other_actor_index", "other"], 0),
             event_value_offset(event_direction_index(command, ["relation", "direction", "value"]), event_int(command, ["offset"], 0)),
         )
+    if op in ("PlayPcmSfxInstance", "StopPcmSfxInstance", "SetPcmSfxInstanceSpeed", "SetPcmSfxInstancePan"):
+        instance = event_int(command, "instance")
+        if not 1 <= instance <= 4:
+            raise SystemExit(f"{op}: instance must be 1–4")
+        if op == "PlayPcmSfxInstance":
+            index = event_int(command, "index", -1)
+            volume = event_int(command, "volume", 15)
+            if not 0 <= index <= 32767 or not 0 <= volume <= 15:
+                raise SystemExit(f"{op}: invalid PCM index or volume")
+            return (op, instance, index, volume)
+        if op == "StopPcmSfxInstance":
+            return (op, instance, 0, 0)
+        percent = event_int(command, "percent", -32768)
+        minimum, maximum = (25, 400) if op == "SetPcmSfxInstanceSpeed" else (-100, 100)
+        if not minimum <= percent <= maximum:
+            raise SystemExit(f"{op}: percent must be {minimum}–{maximum}")
+        return (op, instance, percent, 0)
     if op == "PlayPcmSfx":
         return (
             op,
