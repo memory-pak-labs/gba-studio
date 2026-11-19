@@ -134,6 +134,8 @@ bool is_valid_inventory_item(int index) {
     return index >= 0 && static_cast<size_t>(index) < max_event_inventory_items;
 }
 
+constexpr uint8_t actor_scanline_wave_effect = 2;
+
 bool is_valid_actor_state_slot(int index) {
     return index >= 0 && static_cast<size_t>(index) < max_event_actor_state_slots;
 }
@@ -760,6 +762,23 @@ EventStepResult execute_event_command(
         if (pause_on_wait) {
             ++index;
             return EventStepResult::Pause;
+        }
+        break;
+    case EventOp::ActorScanlineWave:
+        if (command.a >= -1 && command.a < static_cast<int>(max_event_actor_state_slots)) {
+            if (state.transform_room != state.current_room) reset_event_transforms(state);
+            const int slot = command.a + 1;
+            if (command.c > 0) {
+                // Reserve a bounded HBlank budget for one metasprite.
+                for (size_t i = 0; i <= max_event_actor_state_slots; ++i) {
+                    if (state.actor_effect_kind[i] == actor_scanline_wave_effect) state.actor_effect_frames[i] = 0;
+                }
+                state.actor_effect_kind[slot] = actor_scanline_wave_effect;
+                state.actor_effect_frames[slot] = command.b;
+                state.actor_effect_intensity[slot] = clamp_int(command.c, 0, 100);
+            } else if (state.actor_effect_kind[slot] == actor_scanline_wave_effect) {
+                state.actor_effect_frames[slot] = 0;
+            }
         }
         break;
     case EventOp::ActorEffects:
@@ -1763,6 +1782,9 @@ bool consume_runtime_transition(
 void reset_event_transforms(EventState& state) {
     for (auto& scale : state.actor_scales) scale = EventScale {};
     for (auto& scale : state.background_scales) scale = EventScale {};
+    for (size_t index = 0; index <= max_event_actor_state_slots; ++index) {
+        if (state.actor_effect_kind[index] == actor_scanline_wave_effect) state.actor_effect_frames[index] = 0;
+    }
     state.transform_room = state.current_room;
 }
 
@@ -2052,6 +2074,14 @@ int event_actor_effect_offset_x(const EventState& state, int actor_index) {
     if (slot < 0 || slot > static_cast<int>(max_event_actor_state_slots) || state.actor_effect_frames[slot] <= 0 || state.actor_effect_kind[slot] != 1) return 0;
     const int distance=state.actor_effect_intensity[slot]/25;
     return state.event_frame_counter%2 == 0 ? distance : -distance;
+}
+
+int event_actor_wave_amplitude(const EventState& state, int actor_index) {
+    if (actor_index < -1 || actor_index >= static_cast<int>(max_event_actor_state_slots)) return 0;
+    const int slot = actor_index + 1;
+    if (state.transform_room != state.current_room || state.actor_effect_frames[slot] <= 0 ||
+        state.actor_effect_kind[slot] != actor_scanline_wave_effect) return 0;
+    return (state.actor_effect_intensity[slot] * 8 + 50) / 100;
 }
 
 void format_event_clock(const EventState& state, char (&display)[6]) {

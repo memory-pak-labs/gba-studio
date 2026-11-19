@@ -27,7 +27,7 @@ describe("reviewed event block catalog", () => {
   });
   it("retains all historical definitions with every GBA integration resolved", () => {
     const matrix=buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(220);
+    expect(matrix).toHaveLength(221);
     expect(matrix.find(d=>d.id === "audio.set_mixing_rate")).toMatchObject({verb:"set_audio_mixing_rate",status:"native"});
     expect(matrix.filter(d=>d.status === "pending")).toEqual([]);
     expect(matrix.filter(d=>d.status === "native")).toHaveLength(210);

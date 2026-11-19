@@ -2239,6 +2239,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
                 player.facing == gbs::PlatformerFacing::Left,
                 gbs::visual_effect_sprite_mosaic_enabled(visual_effects)
             );
+            gbs::stage_event_actor_wave(event_state, -1, 0, player_metasprite->part_count);
             next_world_sprite_index = player_metasprite->part_count;
         } else if (player_event_active && player_metasprite == nullptr) {
             // Keep player physics and camera behavior active without rendering a
@@ -2298,6 +2299,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
                 platformer_npc_runtimes[index].actor.direction == 2, // Event direction: left.
                 gbs::visual_effect_sprite_mosaic_enabled(visual_effects)
             );
+            gbs::stage_event_actor_wave(event_state, static_cast<int>(index), next_world_sprite_index, npc_metasprite->part_count);
             next_world_sprite_index += npc_metasprite->part_count;
         }
         // Clear a closed menu before drawing overlapping dialogue regions.

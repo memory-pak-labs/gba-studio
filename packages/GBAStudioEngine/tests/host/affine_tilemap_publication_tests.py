@@ -52,6 +52,11 @@ uint32_t affine_screenblock_count_for_map_size(uint32_t size) { return size<4 ? 
 void gbs_hw_enqueue_vblank_dma16(const void* from,volatile uint16_t* to,uint32_t words) { std::memcpy((void*)to,from,words*2); }
 ''' + selector + loader + commit + mode + r'''
 struct {uint8_t enabled;} scene_raster_tables[2];int scene_raster_active=0;
+struct {uint8_t count;} actor_wave_staged{}, actor_wave_active{};
+int scanline_effect_active() { return scene_raster_tables[scene_raster_active].enabled || actor_wave_active.count; }
+void commit_actor_wave_frame() {}
+void gbs_scene_raster_interrupt_state(int) {}
+
 uint16_t fake_palette[256]{}, fake_control=0, fake_ie=1, fake_status=8, fake_vcount=160;
 uint16_t shadow_bg_enabled_bits=0x500;
 uint8_t render_publication_blocked=0, render_handoff_fallback_active=0;

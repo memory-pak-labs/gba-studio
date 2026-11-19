@@ -848,7 +848,7 @@ function commandParametersForCommand(
     const id = occurrence === 0 ? baseID : `${baseID}${occurrence + 1}`;
     const defaultValue = placeholder ? "" : templatePart ?? "";
     const value = parts[tokenIndex] ?? (parts[0] === "play_sfx_instance" && tokenIndex === 3 ? defaultValue : "");
-    const resourceOptions = kind === "actor" && (isOtherActor || parts[0] === "lantern" || parts[0] === "reveal_area" || /^(set|animate|reset)_actor_scale$/.test(parts[0] ?? ""))
+    const resourceOptions = kind === "actor" && (isOtherActor || parts[0] === "lantern" || parts[0] === "reveal_area" || parts[0] === "actor_scanline_wave" || /^(set|animate|reset)_actor_scale$/.test(parts[0] ?? ""))
       ? [...new Set([/_actor_scale$/.test(parts[0] ?? "") ? "Player" : "player", ...options.actor])]
       : commandParameterOptions(kind, options);
     const parameterOptions = eventCommandParameterChoices(parts[0] ?? "", tokenIndex) ?? (constantOperandIndices(parts[0] ?? "").includes(tokenIndex)

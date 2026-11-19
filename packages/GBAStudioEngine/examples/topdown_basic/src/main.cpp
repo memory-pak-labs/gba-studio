@@ -3888,6 +3888,9 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                             player_sprite ? player_sprite->animation_count : project.player.animation_count),
                         project.player.affine_obj.enabled ? &project.player.affine_obj : nullptr
                     );
+                    if (player_metasprite->part_count <= oam_sprites_per_actor) {
+                        gbs::stage_event_actor_wave(event_state, -1, first_oam_index, player_metasprite->part_count);
+                    }
                     continue;
                 }
 
@@ -3917,6 +3920,9 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
                             npc_sprite ? npc_sprite->animation_count : project.rooms[current_room].npcs[index].animation_count),
                         npc_runtimes[index].affine_obj.enabled ? &npc_runtimes[index].affine_obj : nullptr
                     );
+                    if (npc_metasprite->part_count <= oam_sprites_per_actor) {
+                        gbs::stage_event_actor_wave(event_state, static_cast<int>(index), first_oam_index, npc_metasprite->part_count);
+                    }
                 }
             }
             render_runtime_projectiles(render_camera, npc_oam_start + static_cast<uint16_t>((draw_slot_count > 0 ? draw_slot_count-1 : 0) * oam_sprites_per_actor));

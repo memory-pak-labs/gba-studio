@@ -4548,6 +4548,13 @@ function runScriptFrameCommands(state: PreviewRuntimeState, frame: PreviewRuntim
       currentState = appendUnsupported(currentState, resolvedEventName, command, eventCommandReview(verb)?.message ?? support.reason ?? "Bloco indisponível.");
       break doCommand;
     }
+    if (verb === "actor_scanline_wave") {
+      const issue = eventCommandIntegrationIssue(command, currentState.currentRoom?.sceneType);
+      currentState = issue
+        ? appendUnsupported(currentState, resolvedEventName, command, issue)
+        : appendLog(currentState, resolvedEventName, command, "event", "Veja a ondulação por linha no Play da ROM.");
+      break doCommand;
+    }
     if(integratedNativeSimulationVerbs.has(verb)) {
       try {
         const issue=eventCommandIntegrationIssue(sceneChangeCommand([verb, ...parts]),currentState.currentRoom?.sceneType);

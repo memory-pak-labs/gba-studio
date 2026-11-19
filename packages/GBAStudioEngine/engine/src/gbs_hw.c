@@ -118,6 +118,13 @@ static volatile uint8_t scanline_frame_ready;
 static uint8_t scene_raster_overrides;
 static uint16_t scene_raster_base_palette, scene_raster_base_blend, scene_raster_base_alpha;
 static uint16_t scene_raster_base_winin, scene_raster_base_winout;
+enum { actor_wave_max_parts = 8, obj_hblank_access_bit = 1u << 5 };
+typedef struct {
+    uint8_t first, count, amplitude, phase;
+} GbsActorWaveRange;
+static GbsActorWaveRange actor_wave_staged __attribute__((section(".ewram_bss")));
+static GbsActorWaveRange actor_wave_active __attribute__((section(".ewram_bss")));
+static uint16_t actor_wave_attr1[actor_wave_max_parts] __attribute__((section(".ewram_bss")));
 static uint8_t hblank_dispatch_required;
 void gbs_hw_set_hblank_dispatch_required(int required) { hblank_dispatch_required = required != 0; }
 extern void gbs_scene_raster_interrupt_state(int enabled);
@@ -127,6 +134,9 @@ static GbsAffinePageRect paged_affine_resident __attribute__((section(".ewram_bs
 static volatile uint8_t paged_affine_ready;
 static void commit_paged_affine_frame(void);
 static void commit_scene_raster_frame(void);
+static void commit_actor_wave_frame(void);
+static void apply_actor_wave_line(unsigned line) __attribute__((noinline, target("arm"), long_call));
+static int scanline_effect_active(void);
 static void commit_shadow_bg_controls(void);
 static void commit_shadow_oam(void);
 static void commit_shadow_bg_tilemaps(void);
@@ -332,10 +342,12 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
         if (scanline_frame_ready) {
             scanline_frame_ready = 0;
             if (!render_publication_blocked &&
-                (scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK))) {
+                ((scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK)) ||
+                 actor_wave_staged.count || actor_wave_active.count)) {
                 // DMA stalls the CPU. Publish completed shadow uploads in VBlank
                 // before a long stereo mix can return during visible scanlines.
                 commit_shadow_bg_controls();
+                commit_actor_wave_frame();
                 commit_shadow_oam();
                 commit_shadow_bg_tilemaps();
             }
@@ -344,7 +356,7 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
         /* Mixing may extend into visible scanlines. The assembly wrapper
            permits only the bounded raster service to preempt it, preserving
            the IRQ context and using the system stack for nested work. */
-        if (scene_raster_tables[scene_raster_active].enabled && !hblank_dispatch_required && (REG_IE & 2u)) {
+        if (scanline_effect_active() && !hblank_dispatch_required && (REG_IE & 2u)) {
             gbs_hw_mix_audio_with_hblank();
         } else gbs_audio_vblank_update();
     }
@@ -361,7 +373,7 @@ void gbs_hw_irq_dispatch(void) {
         return;
     }
 
-    if ((pending & 2u) && scene_raster_tables[scene_raster_active].enabled) {
+    if ((pending & 2u) && (scene_raster_tables[scene_raster_active].enabled || actor_wave_active.count)) {
         unsigned line = (unsigned)REG_VCOUNT + ((REG_DISPSTAT & 2u) != 0);
         if (line == 228u) {
             scene_raster_phase = (uint8_t)(scene_raster_phase + scene_raster_tables[scene_raster_active].speed);
@@ -371,7 +383,10 @@ void gbs_hw_irq_dispatch(void) {
         if (line == 0 && (scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK))) {
             begin_scene_raster_overrides();
         }
-        if (line < 160u) apply_scene_raster_line(line);
+        if (line < 160u) {
+            apply_scene_raster_line(line);
+            if (actor_wave_active.count) apply_actor_wave_line(line);
+        }
         if (pending == 2u && !hblank_dispatch_required) {
             REG_IF = pending;
             BIOS_IRQ_FLAGS = (uint16_t)(BIOS_IRQ_FLAGS | pending);
@@ -1159,7 +1174,7 @@ void gbs_hw_reset_scene_raster(void) {
     if (scene_raster_overrides) release_scene_raster_overrides();
     scene_raster_tables[0].enabled = scene_raster_tables[1].enabled = 0;
     scene_raster_phase = 0;
-    gbs_scene_raster_interrupt_state(0);
+    gbs_scene_raster_interrupt_state(actor_wave_active.count != 0);
     gbs_hw_audio_unlock_state(ime);
 }
 static inline void apply_scene_raster_line(unsigned line) {
@@ -1184,12 +1199,59 @@ static void commit_scene_raster_frame(void) {
         scene_raster_active = scene_raster_staging;
         scene_raster_ready = 0;
         scene_raster_phase = 0;
-        gbs_scene_raster_interrupt_state(scene_raster_tables[scene_raster_active].enabled != 0);
+        gbs_scene_raster_interrupt_state(scanline_effect_active());
+    }
+}
+
+static int scanline_effect_active(void) {
+    return scene_raster_tables[scene_raster_active].enabled || actor_wave_active.count;
+}
+
+void gbs_hw_stage_actor_scanline_wave(int first, int count, int amplitude, uint32_t phase) {
+    if (first < 0 || count < 1 || count > actor_wave_max_parts || first > 128 - count ||
+        amplitude < 1 || amplitude > 8) return;
+    actor_wave_staged = (GbsActorWaveRange){ (uint8_t)first, (uint8_t)count, (uint8_t)amplitude, (uint8_t)phase };
+}
+
+static void commit_actor_wave_frame(void) {
+    if (!actor_wave_active.count && !actor_wave_staged.count) return;
+    // Return the previous OAM slots to their baseline before publishing the new OAM shadow.
+    // The dialogue renderer can reorder OAM, so yield while that ordering is active.
+    for (unsigned i = 0; i < actor_wave_active.count; ++i) {
+        MEM_OAM[(actor_wave_active.first + i) * 4 + 1] = actor_wave_attr1[i];
+    }
+    actor_wave_active = actor_wave_staged;
+    actor_wave_staged.count = 0;
+    if (dialogue_oam_front || render_handoff_fallback_active || (hblank_dma_active_mask & (1u << 3))) {
+        actor_wave_active.count = 0;
+    }
+    if (actor_wave_active.count) {
+        for (unsigned i = 0; i < actor_wave_active.count; ++i) {
+            actor_wave_attr1[i] = shadow_oam[(actor_wave_active.first + i) * 4 + 1];
+        }
+        REG_DISPCNT |= obj_hblank_access_bit;
+    } else {
+        REG_DISPCNT &= (uint16_t)~obj_hblank_access_bit;
+    }
+    gbs_scene_raster_interrupt_state(scanline_effect_active());
+}
+
+static void apply_actor_wave_line(unsigned line) {
+    static const int8_t wave[32] = {
+         0,  3,  6,  9, 11, 13, 15, 16, 16, 16, 15, 13, 11,  9,  6,  3,
+         0, -3, -6, -9,-11,-13,-15,-16,-16,-16,-15,-13,-11, -9, -6, -3
+    };
+    const int offset = wave[(line + actor_wave_active.phase) & 31u] * actor_wave_active.amplitude / 16;
+    volatile uint16_t* attr1 = &MEM_OAM[actor_wave_active.first * 4 + 1];
+    for (unsigned i = 0; i < actor_wave_active.count; ++i) {
+        const uint16_t original = actor_wave_attr1[i];
+        attr1[i * 4] = (uint16_t)((original & ~511u) | ((original + offset) & 511u));
     }
 }
 
 void gbs_hw_init(void) {
     scanline_frame_ready = 0;
+    actor_wave_staged.count = actor_wave_active.count = 0;
     gbs_hw_stage_paged_affine(0);
     affine_upload_screenblock_base = affine_screenblock_base;
     shadow_display_mode = 0;
@@ -1292,6 +1354,7 @@ void gbs_hw_wait_vblank(void) {
     if (!vblank_irq_enabled) {
         if (scene_raster_overrides) release_scene_raster_overrides();
         commit_shadow_affine_transforms();
+        if (!render_publication_blocked) commit_actor_wave_frame();
     }
     const uint32_t publication_start = gbs_hw_frame_counter_ticks();
     if (!render_publication_blocked) {
@@ -1338,6 +1401,8 @@ void gbs_hw_set_render_publication_blocked(int blocked) {
 
 void gbs_hw_set_render_handoff_fallback(void) {
     if (scene_raster_overrides) release_scene_raster_overrides();
+    actor_wave_staged.count = actor_wave_active.count = 0;
+    gbs_scene_raster_interrupt_state(scanline_effect_active());
     /* Mode 0 with no BG/OBJ layers guarantees a deterministic black frame
      * while the next runtime rebuilds VRAM, tilemaps and OAM. The display
      * output is restored from the staged BG mask on a later VBlank. */
@@ -3618,7 +3683,7 @@ uint32_t gbs_hw_audio_lock_observer_state(void) {
     const uint16_t ime = REG_IME;
     REG_IME = 0;
     const uint16_t ie = REG_IE;
-    if (scene_raster_tables[scene_raster_active].enabled && !hblank_dispatch_required) {
+    if (scanline_effect_active() && !hblank_dispatch_required) {
         /* The bounded raster service never observes or mutates audio state. */
         REG_IE = ie & 2u;
         REG_IME = ime;
