@@ -42,7 +42,7 @@ bool string_equals(const char* left, const char* right) {
 char choice_page_buffer[dialogue_page_buffer_capacity] GBS_DIALOGUE_EWRAM;
 constexpr int dialogue_box_text_columns = 26;
 
-DialogueBoxLayout drawn_dialogue_regions[3] = {};
+DialogueBoxLayout drawn_dialogue_regions[3] GBS_DIALOGUE_EWRAM {};
 size_t drawn_dialogue_region_count = 0;
 
 void clear_drawn_dialogue_regions() {

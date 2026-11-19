@@ -68,7 +68,7 @@ struct PagedAffineBackground {
     bool wrap;
     AffineBgTransform last_transform;
 };
-PagedAffineBackground paged_affine {};
+PagedAffineBackground paged_affine GBS_RENDER_EWRAM {};
 
 bool stage_paged_affine(const AffineBgTransform& authored) {
     auto transform = authored;

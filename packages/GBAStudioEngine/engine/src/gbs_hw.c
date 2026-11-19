@@ -121,9 +121,9 @@ static uint16_t scene_raster_base_winin, scene_raster_base_winout;
 static uint8_t hblank_dispatch_required;
 void gbs_hw_set_hblank_dispatch_required(int required) { hblank_dispatch_required = required != 0; }
 extern void gbs_scene_raster_interrupt_state(int enabled);
-static GbsPagedAffineFrame paged_affine_staged;
-static GbsPagedAffineFrame paged_affine_committed;
-static GbsAffinePageRect paged_affine_resident;
+static GbsPagedAffineFrame paged_affine_staged __attribute__((section(".ewram_bss")));
+static GbsPagedAffineFrame paged_affine_committed __attribute__((section(".ewram_bss")));
+static GbsAffinePageRect paged_affine_resident __attribute__((section(".ewram_bss")));
 static volatile uint8_t paged_affine_ready;
 static void commit_paged_affine_frame(void);
 static void commit_scene_raster_frame(void);
