@@ -52,8 +52,9 @@ describe("WelcomeScreen i18n", () => {
     expect(screen.getByLabelText("App language")).toHaveValue("en-US");
     expect(screen.getByRole("heading", { name: "Create project" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start from example" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Basic template/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Blank project/ })).toBeInTheDocument();
-    expect(screen.getByText("No demo scenes, with all scene types and authoring resources available.")).toBeInTheDocument();
+    expect(screen.getByText("Start from scratch with no scenes or starter assets.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Choose when creating")).toBeInTheDocument();
     expect(screen.getByText("A folder named after the project will be created at the selected destination.")).toBeInTheDocument();
     expect(screen.getByText("Complete project with 36 scenes and 13 native runtimes for Game Boy Advance.")).toBeInTheDocument();
@@ -65,8 +66,9 @@ describe("WelcomeScreen i18n", () => {
     expect(screen.getByLabelText("Idioma de la app")).toHaveValue("es-ES");
     expect(screen.getByRole("heading", { name: "Crear proyecto" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Empezar con el ejemplo" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Plantilla básica/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Proyecto en blanco/ })).toBeInTheDocument();
-    expect(screen.getByText("Sin escenas de demostración, con todos los tipos de escena y recursos de creación disponibles.")).toBeInTheDocument();
+    expect(screen.getByText("Empieza desde cero, sin escenas ni recursos iniciales.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plantillas" })).toBeInTheDocument();
     expect(screen.getByText("Proyecto completo con 36 escenas y 13 runtimes nativos para Game Boy Advance.")).toBeInTheDocument();
   });
@@ -138,6 +140,25 @@ describe("WelcomeScreen i18n", () => {
     expect(onCreateProject).toHaveBeenCalledWith("Novo projeto", "exemplo-gba");
   });
 
+  it("envia opções distintas para o template básico e o projeto em branco", async () => {
+    const user = userEvent.setup();
+    const onCreateProject = vi.fn();
+    render(
+      <StudioI18nProvider>
+        <WelcomeScreen
+          status="Pronto."
+          onCreateProject={onCreateProject}
+          onOpenProject={vi.fn()}
+          onOpenRecentProject={vi.fn()}
+        />
+      </StudioI18nProvider>
+    );
+
+    await user.click(screen.getByRole("button", { name: /Template básico/ }));
+    await user.click(screen.getByRole("button", { name: /Projeto em branco/ }));
+    expect(onCreateProject.mock.calls).toEqual([["Novo projeto", "blank"], ["Novo projeto", "empty"]]);
+  });
+
   it("bloqueia novas criacoes enquanto o destino esta sendo escolhido", async () => {
     const user = userEvent.setup();
     let finishCreation: (() => void) | undefined;
@@ -157,6 +178,7 @@ describe("WelcomeScreen i18n", () => {
 
     await user.click(screen.getByRole("button", { name: "Começar com o exemplo" }));
     expect(screen.getByRole("button", { name: "Criando projeto..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Template básico/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Projeto em branco/ })).toBeDisabled();
 
     finishCreation?.();
@@ -190,7 +212,7 @@ describe("WelcomeScreen i18n", () => {
     expect(onOpenProject).not.toHaveBeenCalled();
   });
 
-  it("mostra o Exemplo GBA e o projeto em branco na galeria", () => {
+  it("mostra três opções de criação na galeria", () => {
     render(
       <StudioI18nProvider>
         <WelcomeScreen
@@ -203,7 +225,8 @@ describe("WelcomeScreen i18n", () => {
     );
 
     const templateCards = screen.getAllByRole("button").filter((button) => button.classList.contains("welcome-template-card"));
-    expect(templateCards).toHaveLength(2);
+    expect(templateCards).toHaveLength(3);
+    expect(screen.getByText("Template básico")).toBeInTheDocument();
     expect(screen.getByText("Projeto em branco")).toBeInTheDocument();
     expect(screen.queryByText("Showcase de Perfis")).not.toBeInTheDocument();
     expect(screen.getByText("Exemplo GBA Completo")).toBeInTheDocument();
@@ -220,7 +243,7 @@ describe("WelcomeScreen i18n", () => {
     await user.clear(screen.getByLabelText("Nome do projeto"));
     await user.type(screen.getByLabelText("Nome do projeto"), "Meu jogo");
     await user.click(screen.getByRole("button", { name: /Projeto em branco/ }));
-    expect(onCreateProject).toHaveBeenCalledWith("Meu jogo", "blank");
+    expect(onCreateProject).toHaveBeenCalledWith("Meu jogo", "empty");
     expect(screen.getByRole("button", { name: /Projeto em branco/ })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: /Projeto em branco/ }));
     expect(onCreateProject).toHaveBeenCalledTimes(2);

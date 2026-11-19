@@ -13,6 +13,7 @@ export interface CreateBlankProjectOptions {
   exportFolder?: string;
   sceneType?: string;
   includeStarterContent?: boolean;
+  includeInitialScene?: boolean;
 }
 
 const INITIAL_ROOM_ID = "room-1";
@@ -449,8 +450,8 @@ export function createBlankProjectData(options: CreateBlankProjectOptions): GBAP
   const name = normalizedProjectName(options.name);
   const sceneType = normalizeSceneTypeId(options.sceneType, "topdown");
   const includeStarterContent = options.includeStarterContent !== false;
-  const room = initialRoom(sceneType, includeStarterContent);
-  const initialActor = includeStarterContent ? initialPlayerActor(sceneType) : null;
+  const room = options.includeInitialScene === false ? null : initialRoom(sceneType, includeStarterContent);
+  const initialActor = room && includeStarterContent ? initialPlayerActor(sceneType) : null;
 
   return {
     schemaVersion: 1,
@@ -511,8 +512,8 @@ export function createBlankProjectData(options: CreateBlankProjectOptions): GBAP
         children: []
       }
     ] : [],
-    scenas: [room],
-    rooms: [room],
+    scenas: room ? [room] : [],
+    rooms: room ? [room] : [],
     actors: initialActor ? [initialActor] : [],
     triggers: [],
     dialogues: [],
@@ -522,9 +523,7 @@ export function createBlankProjectData(options: CreateBlankProjectOptions): GBAP
     events: [],
     audioItems: [],
     editorState: {
-      activeScenaID: INITIAL_ROOM_ID,
-      activeScenaName: INITIAL_ROOM_NAME,
-      startScenaID: INITIAL_ROOM_ID,
+      ...(room ? { activeScenaID: INITIAL_ROOM_ID, activeScenaName: INITIAL_ROOM_NAME, startScenaID: INITIAL_ROOM_ID } : {}),
       scenaConnections: [],
       eventGraphPositions: {}
     },
@@ -533,7 +532,7 @@ export function createBlankProjectData(options: CreateBlankProjectOptions): GBAP
         gameTitle: name,
         author: "GBA Studio User",
         version: "1.0.0",
-        startScene: INITIAL_ROOM_NAME,
+        startScene: room ? INITIAL_ROOM_NAME : "",
         startSceneType: sceneType,
         startPlayer: initialActor ? DEFAULT_PLAYER_NAME : "",
         defaultLanguage: "pt-BR",
