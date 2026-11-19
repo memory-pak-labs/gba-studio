@@ -30,7 +30,7 @@ describe("reviewed event block catalog", () => {
     expect(matrix).toHaveLength(221);
     expect(matrix.find(d=>d.id === "audio.set_mixing_rate")).toMatchObject({verb:"set_audio_mixing_rate",status:"native"});
     expect(matrix.filter(d=>d.status === "pending")).toEqual([]);
-    expect(matrix.filter(d=>d.status === "native")).toHaveLength(210);
+    expect(matrix.filter(d=>d.status === "native")).toHaveLength(211);
     expect(matrix.filter(d=>d.status === "not-applicable")).toHaveLength(2);
   });
   it("explains an old menu block using its product name and actual integration boundary, preserving saved commands", () => {
