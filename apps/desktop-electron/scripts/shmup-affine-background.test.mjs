@@ -85,6 +85,6 @@ describe("GBA affine background compiler", () => {
 
     const compiled = compileAffine(input, output);
     expect(compiled.status).not.toBe(0);
-    expect(compiled.stderr).toContain("mapa quadrado");
+    expect(compiled.stderr).toContain("PNG quadrado");
   });
 });
