@@ -4,6 +4,7 @@
 #include "gbs/event.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs_hw.h"
+#include "gbs_paged_affine.h"
 #include "gbs_room_tilemap.h"
 #include "gbs/tile_edits.hpp"
 
@@ -11,6 +12,7 @@
 extern "C" __attribute__((weak)) GbsSceneRasterTable* gbs_hw_begin_scene_raster_update() { static GbsSceneRasterTable table {}; return &table; }
 extern "C" __attribute__((weak)) void gbs_hw_submit_scene_raster_update() {}
 extern "C" __attribute__((weak)) void gbs_hw_reset_scene_raster() {}
+extern "C" __attribute__((weak)) void gbs_hw_stage_paged_affine(const GbsPagedAffineFrame*) {}
 // Pure render host fixtures omit the DMA transport. Full queue tests link the
 // strong implementation, which replaces this no-queue host stub.
 namespace gbs {
@@ -57,6 +59,39 @@ int background_scroll_x[4] {};
 DisplayMode background_display_mode = DisplayMode::Mode0Text;
 uint8_t event_affine_background_mask = 0;
 AffineBgTransform event_affine_background_base[2] {};
+struct PagedAffineBackground {
+    const AffineTileMapAsset* map;
+    BackgroundLayer layer;
+    Vec2i camera;
+    Vec2i parallax_256;
+    uint8_t blank;
+    bool wrap;
+    AffineBgTransform last_transform;
+};
+PagedAffineBackground paged_affine {};
+
+bool stage_paged_affine(const AffineBgTransform& authored) {
+    auto transform = authored;
+    transform.reference_x_8 += paged_affine.camera.x * paged_affine.parallax_256.x;
+    transform.reference_y_8 += paged_affine.camera.y * paged_affine.parallax_256.y;
+    const auto bounds = gbs_affine_page_bounds(transform.pa, transform.pb, transform.pc, transform.pd,
+        transform.reference_x_8, transform.reference_y_8);
+    if (!gbs_affine_page_fits(bounds)) return false;
+    const GbsPagedAffineFrame frame {
+        paged_affine.map->entries, paged_affine.map->width, static_cast<uint8_t>(paged_affine.layer),
+        static_cast<uint8_t>(paged_affine.wrap), paged_affine.blank, transform.pa, transform.pb,
+        transform.pc, transform.pd, transform.reference_x_8, transform.reference_y_8, bounds
+    };
+    paged_affine.last_transform = authored;
+    gbs_hw_stage_paged_affine(&frame);
+    return true;
+}
+
+void clear_paged_affine() {
+    if (paged_affine.map == nullptr) return;
+    paged_affine = {};
+    gbs_hw_stage_paged_affine(nullptr);
+}
 AffineSpriteTransform explicit_sprite_matrices[32] GBS_RENDER_EWRAM {};
 AffineSpriteTransform scaled_sprite_matrices[16] GBS_RENDER_EWRAM {};
 uint8_t scaled_sprite_matrix_slots[16] GBS_RENDER_EWRAM {};
@@ -433,6 +468,7 @@ bool load_affine_tilemap(BackgroundLayer layer, const AffineTileMapAsset& asset)
         return false;
     }
 
+    if (paged_affine.layer == layer) clear_paged_affine();
     gbs_hw_load_affine_bg_tilemap(static_cast<int>(layer), asset.entries, asset.width, asset.height, static_cast<uint32_t>(size));
     return true;
 }
@@ -584,6 +620,7 @@ void set_display_mode(DisplayMode mode) {
     if (!is_valid_display_mode(mode)) {
         return;
     }
+    if (mode != DisplayMode::Mode1TextAffine && mode != DisplayMode::Mode2Affine) clear_paged_affine();
     background_display_mode = mode;
     gbs_hw_set_display_mode(static_cast<uint16_t>(mode));
 }
@@ -592,11 +629,20 @@ void set_affine_bg_wrap(BackgroundLayer layer, bool enabled) {
     if (!is_valid_affine_background_layer(layer)) {
         return;
     }
+    if (paged_affine.map != nullptr && paged_affine.layer == layer) {
+        paged_affine.wrap = enabled;
+        stage_paged_affine(paged_affine.last_transform);
+        return;
+    }
     gbs_hw_set_affine_bg_wrap(static_cast<int>(layer), enabled ? 1 : 0);
 }
 
 void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& transform) {
     if (!is_valid_affine_background_layer(layer)) {
+        return;
+    }
+    if (paged_affine.map != nullptr && paged_affine.layer == layer) {
+        if (stage_paged_affine(transform)) event_affine_background_base[static_cast<int>(layer) - 2] = transform;
         return;
     }
     event_affine_background_base[static_cast<int>(layer)-2] = transform;
@@ -644,11 +690,19 @@ bool event_background_transform(const EventState& state, int index, AffineBgTran
 }
 }
 
+void set_paged_affine_camera(Vec2i position_pixels) {
+    paged_affine.camera = position_pixels;
+}
+
 bool render_event_background_scale(const EventState& state) {
     bool applied = false;
     for (int index = 0; index < 2; ++index) {
         AffineBgTransform transform {};
         if (!event_background_transform(state,index,transform)) continue;
+        if (paged_affine.map != nullptr && static_cast<int>(paged_affine.layer) == index + 2) {
+            applied = stage_paged_affine(transform) || applied;
+            continue;
+        }
         gbs_hw_set_affine_bg_transform(index+2,transform.pa,transform.pb,transform.pc,transform.pd,
             transform.reference_x_8,transform.reference_y_8);
         applied = true;
@@ -661,8 +715,11 @@ bool project_event_background_point(const EventState& state, BackgroundLayer lay
     if (!event_background_transform(state,static_cast<int>(layer)-2,matrix)) return false;
     const int64_t determinant = int64_t(matrix.pa)*matrix.pd - int64_t(matrix.pb)*matrix.pc;
     if (!determinant) return false;
-    const int64_t x = int64_t(source.x)*256 - matrix.reference_x_8;
-    const int64_t y = int64_t(source.y)*256 - matrix.reference_y_8;
+    const bool paged = paged_affine.map != nullptr && paged_affine.layer == layer;
+    const int64_t x = int64_t(source.x)*256 - matrix.reference_x_8 -
+        (paged ? int64_t(paged_affine.camera.x) * paged_affine.parallax_256.x : 0);
+    const int64_t y = int64_t(source.y)*256 - matrix.reference_y_8 -
+        (paged ? int64_t(paged_affine.camera.y) * paged_affine.parallax_256.y : 0);
     const int64_t screen_x = (x*matrix.pd-y*matrix.pb)/determinant;
     const int64_t screen_y = (y*matrix.pa-x*matrix.pc)/determinant;
     if (screen_x < -32768 || screen_x > 32767 || screen_y < -32768 || screen_y > 32767) return false;
@@ -788,6 +845,18 @@ bool apply_video_composition(const VideoComposition& composition) {
     if (!is_valid_display_mode(composition.display_mode)) {
         return false;
     }
+    const bool paged = composition.affine_enabled && composition.affine_tilemap &&
+        is_paged_affine_tilemap_asset(*composition.affine_tilemap);
+    if (paged) {
+        const auto& transform = composition.affine_transform;
+        if (!composition.affine_tiles || !is_valid_affine_tile_asset(*composition.affine_tiles) ||
+            !is_valid_affine_tilemap_asset(*composition.affine_tilemap) ||
+            !gbs_affine_page_fits(gbs_affine_page_bounds(transform.pa, transform.pb, transform.pc, transform.pd,
+                transform.reference_x_8, transform.reference_y_8))) return false;
+        for (size_t pixel = 0; pixel < bytes_per_affine_8bpp_tile; ++pixel)
+            if (composition.affine_tiles->data[pixel] != 0) return false;
+    }
+    clear_paged_affine();
     if (composition.affine_enabled) {
         const bool layer_supported = composition.affine_layer == BackgroundLayer::BG2 ||
             (composition.display_mode == DisplayMode::Mode2Affine && composition.affine_layer == BackgroundLayer::BG3);
@@ -802,14 +871,18 @@ bool apply_video_composition(const VideoComposition& composition) {
         if (composition.affine_tiles != nullptr && !load_affine_tiles(composition.affine_layer, *composition.affine_tiles)) {
             return false;
         }
-        if (composition.affine_tilemap != nullptr && !load_affine_tilemap(composition.affine_layer, *composition.affine_tilemap)) {
+        if (!paged && composition.affine_tilemap != nullptr && !load_affine_tilemap(composition.affine_layer, *composition.affine_tilemap)) {
             return false;
         }
     }
 
     event_affine_background_mask = composition.affine_enabled ? static_cast<uint8_t>(1u << (static_cast<int>(composition.affine_layer)-2)) : 0;
     set_display_mode(composition.display_mode);
-    if (composition.affine_enabled) {
+    if (paged) {
+        paged_affine = {composition.affine_tilemap, composition.affine_layer, {}, composition.paged_affine_parallax_256,
+            static_cast<uint8_t>(composition.affine_tiles->destination_tile), composition.affine_wrap, composition.affine_transform};
+        set_affine_bg_transform(composition.affine_layer, composition.affine_transform);
+    } else if (composition.affine_enabled) {
         set_affine_bg_wrap(composition.affine_layer, composition.affine_wrap);
         set_affine_bg_transform(composition.affine_layer, composition.affine_transform);
     }

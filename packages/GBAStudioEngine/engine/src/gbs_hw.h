@@ -152,6 +152,8 @@ void gbs_hw_load_affine_bg_tiles_for_layer(int layer, const uint8_t* data, uint3
 bool gbs_hw_set_affine_map_screen_base(uint16_t base);
 void gbs_hw_load_affine_bg_tilemap(int layer, const uint8_t* entries, uint32_t width, uint32_t height, uint32_t map_size);
 void gbs_hw_set_display_mode(uint16_t mode);
+struct GbsPagedAffineFrame;
+void gbs_hw_stage_paged_affine(const struct GbsPagedAffineFrame* frame);
 void gbs_hw_set_affine_bg_wrap(int layer, int enabled);
 void gbs_hw_set_affine_bg_transform(int layer, int16_t pa, int16_t pb, int16_t pc, int16_t pd, int32_t reference_x_8, int32_t reference_y_8);
 void gbs_hw_load_bitmap16(uint16_t mode, const uint16_t* pixels, uint16_t width, uint16_t height, uint16_t page);

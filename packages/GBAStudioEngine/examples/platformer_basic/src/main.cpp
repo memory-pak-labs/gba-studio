@@ -2334,6 +2334,7 @@ void render_platformer_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::draw_event_clock(event_state);
         gbs::tick_visual_effects(visual_effects);
         sync_runtime_telemetry(player, room, event_state);
+        gbs::set_paged_affine_camera(camera.position_pixels);
         gbs::render_event_background_scale(event_state);
         gbs::wait_vblank();
 }

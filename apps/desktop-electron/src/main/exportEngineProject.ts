@@ -1,3 +1,4 @@
+import { isLargeAffineSource, pagedAffineSceneIssue } from "../shared/affineScene.js";
 import { isSfxInstanceAudio, isSfxInstanceVerb, parseSfxInstanceCommand } from "../shared/sfxInstanceCommands.js";
 import { hasSceneRasterEffects, hasSceneScanlineControls, normalizeSceneRasterEffects, sceneRasterEffectIssues } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
@@ -2744,6 +2745,12 @@ function assertFixedUiAffineSource(room: Record<string, unknown>, asset: Record<
     throw new Error(`Cena ${roomName(room,0)}: fundo affine com interface fixa permite no máximo 512x512 pixels.`);
 }
 
+function assertPagedAffineSource(room: Record<string, unknown>, size: AffineSceneSourceSize | undefined, scaleX: number, scaleY: number, layer: string): void {
+  const sceneType = resolveSceneRuntimeExport(roomSceneType(room)).kind;
+  const issue = pagedAffineSceneIssue(sceneType, size, scaleX, scaleY, layer);
+  if (issue) throw new Error(`Cena ${roomName(room, 0)}. ${issue}`);
+}
+
 function buildRoomVideoComposition(data: GBAProjectData, room: Record<string, unknown>, tilesetPack: AssetcTilesetPackGeneration | null): ExportedAdvancedVideoComposition {
   const video = buildRoomVideoCompositionBase(data, room, tilesetPack);
   const composition = roomSceneComposition(room);
@@ -2788,6 +2795,8 @@ function buildRoomVideoCompositionBase(
       if (usesSinglePlaneBackground(roomSceneType(room)) && affineLayer.layer !== "BG2")
         throw new Error("Este perfil usa BG2 no Modo 1 para preservar a interface fixa.");
       const sourceAsset = roomAffineAssetRecord(data, affineLayer.assetId);
+      const sourceSize = affineSourceSize(sourceAsset);
+      assertPagedAffineSource(room, sourceSize, affineLayer.affine?.scaleX ?? 1, affineLayer.affine?.scaleY ?? 1, affineLayer.layer);
       assertFixedUiAffineSource(room, sourceAsset);
       const sourceName = sourceAsset ? stringField(sourceAsset, "name", affineLayer.assetId) : affineLayer.assetId;
       const packedAsset = tilesetPack?.assetsBySheet[sourceName] ?? tilesetPack?.assetsBySheet[affineLayer.assetId];
@@ -2808,7 +2817,9 @@ function buildRoomVideoCompositionBase(
           role: "decorative"
         },
         () => packedAsset.name,
-        affineSourceSize(sourceAsset)
+        sourceSize,
+        affineLayer.scroll,
+        affineLayer.parallax
       );
       return { display_mode: exported.display_mode, affine, bitmap: null };
     }
@@ -2839,6 +2850,8 @@ function buildRoomVideoCompositionBase(
     throw new Error(`A cena ${roomName(room, 0)} habilita Affine sem declarar assetId.`);
   }
   const sourceAsset = roomAffineAssetRecord(data, presentation.assetId);
+  const sourceSize = affineSourceSize(sourceAsset);
+  assertPagedAffineSource(room, sourceSize, presentation.scaleX, presentation.scaleY, presentation.layer);
   assertFixedUiAffineSource(room, sourceAsset);
   const sourceName = sourceAsset ? stringField(sourceAsset, "name", presentation.assetId) : presentation.assetId;
   const packedAsset = tilesetPack?.assetsBySheet[sourceName]
@@ -2850,7 +2863,7 @@ function buildRoomVideoCompositionBase(
   const affine = exportAffineScenePresentation(
     { ...presentation, assetId: sourceName },
     () => packedAsset.name,
-    affineSourceSize(sourceAsset)
+    sourceSize
   );
   if (!affine) return exportedDefaultRoomVideoComposition();
   return {
@@ -11350,6 +11363,13 @@ function buildEngineExportProjectContractUncached(
   if (videoAsset || projectUsesRoomAffine(data)) {
     features.push("render.video_composition");
   }
+  if (rooms.some(room => {
+    const composition = roomSceneComposition(room);
+    const affine = composition.enabled
+      ? composition.layers.find(layer => layer.enabled && layer.kind === "affine_bg")
+      : roomAffinePresentation(room);
+    return affine?.enabled && isLargeAffineSource(affineSourceSize(roomAffineAssetRecord(data, affine.assetId)));
+  })) features.push("render.paged_affine_bg");
   if (exportRoomsForKind(data, "menu").some(room => {
     const config = normalizeMenuSceneConfig(child(child(room, "runtime"), "config"));
     return config.actionSounds || config.screens?.some(screen => screen.actionSounds);

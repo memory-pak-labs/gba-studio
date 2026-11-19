@@ -27,10 +27,13 @@ backdrop_start=source.index('void gbs_hw_set_backdrop(')
 backdrop=source[backdrop_start:source.index('uint16_t gbs_hw_get_backdrop(',backdrop_start)]
 palette_start=source.index('void gbs_hw_load_bg_palette(')
 palette=source[palette_start:source.index('void gbs_hw_load_obj_palette(',palette_start)]
+stream_start=source.index('void gbs_hw_stage_paged_affine(')
+stream=source[stream_start:source.index('bool gbs_hw_set_affine_map_screen_base(',stream_start)]
 fixture = r'''
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include "gbs_paged_affine.h"
 uint16_t fake_vram[32768]{};
 uint8_t shadow_bg_map_size[4]{}, shadow_bg_depth[4]{}, bg_screenblocks[4]{};
 uint8_t shadow_bg_map_size_pending_mask=0,shadow_bg_depth_mask=0,shadow_bg_screen_base_pending_mask=0;
@@ -75,8 +78,44 @@ uint8_t scene_raster_overrides = 0;
 void release_scene_raster_overrides() { assert(scene_raster_overrides == 0); }
 void commit_shadow_affine_transforms() {}
 void commit_scene_raster_frame() {}
+GbsPagedAffineFrame paged_affine_staged{}, paged_affine_committed{};
+GbsAffinePageRect paged_affine_resident{};
+uint8_t paged_affine_ready=0, hblank_dma_active_mask=0; uint16_t fake_ime=1;
+#define REG_IME fake_ime
+int32_t last_x8=0, last_y8=0; unsigned transformed=0;
+void gbs_hw_set_affine_bg_wrap(int, int) {}
+void gbs_hw_set_affine_bg_transform(int,int16_t,int16_t,int16_t,int16_t,int32_t x,int32_t y) { last_x8=x; last_y8=y; ++transformed; }
+
 void gbs_emit_vblank_interrupt() {}
-''' + backdrop + palette + fallback + wait + r'''
+''' + stream + backdrop + palette + fallback + wait + r'''
+void test_paged_affine_publication() {
+ alignas(2) static uint8_t world[256*256];
+ for(int y=0;y<256;++y) for(int x=0;x<256;++x) world[y*256+x]=1+(x*37+y*41)%251;
+ auto vram=[](unsigned x,unsigned y) {
+  return (fake_vram[(y%128)*64+(x%128)/2] >> (8*(x&1)))&255;
+ };
+ auto publish=[&](int x,int y,int wrap) {
+  GbsPagedAffineFrame frame{world,256,2,static_cast<uint8_t>(wrap),0,218,-141,141,218,x*256,y*256,{}};
+  frame.visible=gbs_affine_page_bounds(frame.pa,frame.pb,frame.pc,frame.pd,frame.x8,frame.y8);
+  gbs_hw_stage_paged_affine(&frame);
+  const auto previous=transformed; commit_paged_affine_frame(); assert(transformed==previous);
+  paged_affine_ready=1; commit_paged_affine_frame();
+  assert(transformed==previous+1);
+  assert(last_x8==(x&1023)*256 && last_y8==(y&1023)*256);
+  for(int tile_y=frame.visible.top;tile_y<frame.visible.bottom;++tile_y) {
+   for(int tile_x=frame.visible.left;tile_x<frame.visible.right;++tile_x) {
+    const auto expected=wrap || (tile_x>=0 && tile_y>=0 && tile_x<256 && tile_y<256)
+      ? world[(tile_y&255)*256+(tile_x&255)] : 0;
+    assert(vram(tile_x,tile_y)==expected);
+   }
+  }
+ };
+ for(int x=900;x<=1200;x+=7) publish(x,1005,1);
+ publish(2050,-24,1);
+ publish(2050,-24,0);
+ publish(-8,1980,0);
+ gbs_hw_stage_paged_affine(nullptr); commit_paged_affine_frame(); assert(!paged_affine_staged.entries);
+}
 int main() {
  bg_screenblocks[0]=24;bg_screenblocks[1]=28;
  shadow_bg_tilemaps[0][1]=0xf123;shadow_bg_tilemap_pending_mask=3;
@@ -116,6 +155,7 @@ int main() {
  const uint16_t new_palette[]={0x3456};
  gbs_hw_set_render_handoff_fallback();gbs_hw_load_bg_palette(new_palette,0,1);gbs_hw_wait_vblank();
  assert(fake_palette[0]==0x3456); // a staged image palette supersedes the previous scene color
+ test_paged_affine_publication();
 
 
 }
@@ -123,6 +163,6 @@ int main() {
 fixture=fixture.replace('#include <cstring>','#include <cstring>\n#include <initializer_list>')
 with tempfile.TemporaryDirectory() as temp:
  cpp=Path(temp)/'test.cpp';cpp.write_text(fixture);exe=Path(temp)/'test'
- subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror',str(cpp),'-o',str(exe)],check=True)
+ subprocess.run(['c++','-std=c++17','-Wall','-Wextra','-Werror','-I'+str(root/'engine/src'),str(cpp),'-o',str(exe)],check=True)
  subprocess.run([str(exe)],check=True)
-print('Affine map and transparent UI publication remain isolated: PASS')
+print('Resident Affine maps, paged window publication and transparent UI: PASS')

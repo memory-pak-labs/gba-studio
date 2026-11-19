@@ -1,3 +1,4 @@
+import { isLargeAffineSource, PAGED_AFFINE_MINIMUM_SCALE, pagedAffineSceneIssue, type AffineSceneSourceSize } from "../shared/affineScene";
 import { SceneRasterEffectsEditor } from "./SceneRasterEffectsEditor";
 import { SceneBackgroundEffectsHelp } from "./SceneBackgroundEffectsHelp";
 import { uiText as ui, useStudioUiText } from "./studioUiText";
@@ -28,6 +29,7 @@ const HBLANK_SCANLINE_COUNT = 160;
 export interface SceneCompositionAssetOption {
   label: string;
   value: string;
+  size?: AffineSceneSourceSize;
 }
 
 export interface SceneCompositionInspectorProps {
@@ -287,6 +289,9 @@ export function SceneCompositionInspector({
       </div>
       {normalized.layers.map((layer) => {
         const layerAssets = optionsWithCurrent(assetOptions, layer.assetId);
+        const sourceSize = layerAssets.find(asset => asset.value === layer.assetId)?.size;
+        const paged = layer.kind === "affine_bg" && isLargeAffineSource(sourceSize);
+        const pagedIssue = pagedAffineSceneIssue(sceneType, paged ? sourceSize : undefined, layer.affine?.scaleX ?? 1, layer.affine?.scaleY ?? 1, layer.layer);
         return (
           <fieldset className={`scene-composition-layer-card${layer.enabled ? " is-enabled" : ""}`} key={layer.id}>
             <legend>{layer.id}</legend>
@@ -346,15 +351,19 @@ export function SceneCompositionInspector({
             <div className="scene-composition-number-grid">
               <InspectorNumber label={ui("Parallax X")} max={1024} min={-1024} onChange={(x256) => onChange(updateLayer(normalized, layer.id, { parallax: { ...layer.parallax, x256 } }))} unit="/256" value={layer.parallax.x256} />
               <InspectorNumber label={ui("Parallax Y")} max={1024} min={-1024} onChange={(y256) => onChange(updateLayer(normalized, layer.id, { parallax: { ...layer.parallax, y256 } }))} unit="/256" value={layer.parallax.y256} />
-              <InspectorNumber label={ui("Scroll X")} max={32767} min={-32768} onChange={(x) => onChange(updateLayer(normalized, layer.id, { scroll: { ...layer.scroll, x } }))} unit="px" value={layer.scroll.x} />
-              <InspectorNumber label={ui("Scroll Y")} max={32767} min={-32768} onChange={(y) => onChange(updateLayer(normalized, layer.id, { scroll: { ...layer.scroll, y } }))} unit="px" value={layer.scroll.y} />
+              <InspectorNumber label={ui(paged ? "Origem X do fundo" : "Scroll X")} max={32767} min={-32768} onChange={(x) => onChange(updateLayer(normalized, layer.id, { scroll: { ...layer.scroll, x } }))} unit="px" value={layer.scroll.x} />
+              <InspectorNumber label={ui(paged ? "Origem Y do fundo" : "Scroll Y")} max={32767} min={-32768} onChange={(y) => onChange(updateLayer(normalized, layer.id, { scroll: { ...layer.scroll, y } }))} unit="px" value={layer.scroll.y} />
             </div>
             {layer.kind === "affine_bg" && layer.affine ? (
               <div className="scene-composition-affine-controls">
+                {paged && sourceSize ? (
+                  <p>{ui("Fundo Affine paginado · {0} × {1} px", { 0: sourceSize.width, 1: sourceSize.height })}</p>
+                ) : null}
+                {pagedIssue ? <p role="alert">{ui(pagedIssue)}</p> : null}
                 <InspectorRange ariaLabel={ui("Rotação da camada {0}", { 0: layer.id })} label={ui("Rotação")} max={360} min={-360} onChange={(rotationDegrees) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, rotationDegrees } }))} unit="°" value={layer.affine.rotationDegrees} />
                 <p>{ui("A composição define o estado inicial. Use os eventos de escala do fundo para aplicar o efeito durante o jogo.")}</p>
-                <InspectorRange ariaLabel={ui("Escala X da camada {0}", { 0: layer.id })} label={ui("Escala X")} max={16} min={0.0625} onChange={(scaleX) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, scaleX } }))} step={0.0625} value={layer.affine.scaleX} />
-                <InspectorRange ariaLabel={ui("Escala Y da camada {0}", { 0: layer.id })} label={ui("Escala Y")} max={16} min={0.0625} onChange={(scaleY) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, scaleY } }))} step={0.0625} value={layer.affine.scaleY} />
+                <InspectorRange ariaLabel={ui("Escala X da camada {0}", { 0: layer.id })} label={ui("Escala X")} max={paged ? 4 : 16} min={paged ? PAGED_AFFINE_MINIMUM_SCALE : 0.0625} onChange={(scaleX) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, scaleX } }))} step={0.0625} value={layer.affine.scaleX} />
+                <InspectorRange ariaLabel={ui("Escala Y da camada {0}", { 0: layer.id })} label={ui("Escala Y")} max={paged ? 4 : 16} min={paged ? PAGED_AFFINE_MINIMUM_SCALE : 0.0625} onChange={(scaleY) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, scaleY } }))} step={0.0625} value={layer.affine.scaleY} />
                 <InspectorToggle checked={layer.affine.wrap} label={ui("Wrap affine")} onChange={(wrap) => onChange(updateLayer(normalized, layer.id, { affine: { ...layer.affine!, wrap } }))} />
               </div>
             ) : null}

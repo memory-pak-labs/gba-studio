@@ -701,6 +701,7 @@
       "affine_bg_transform",
       "affine_bg_keyframe_transform",
       "affine_bg_tilemap_load",
+      "render.paged_affine_bg",
       "bitmap_mode3_16bit",
       "bitmap_mode4_8bit",
       "bitmap_mode5_16bit",

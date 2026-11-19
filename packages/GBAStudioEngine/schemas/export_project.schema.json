@@ -4098,6 +4098,8 @@
         "pb": { "type": "integer", "minimum": -32768, "maximum": 32767 },
         "pc": { "type": "integer", "minimum": -32768, "maximum": 32767 },
         "pd": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+        "camera_x256": { "type": "integer", "minimum": -1024, "maximum": 1024 },
+        "camera_y256": { "type": "integer", "minimum": -1024, "maximum": 1024 },
         "reference_x_8": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 },
         "reference_y_8": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 }
       },

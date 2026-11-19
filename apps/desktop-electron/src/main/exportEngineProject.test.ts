@@ -61,6 +61,35 @@ describe("tacticalMarkerIndices", () => {
 });
 
 describe("prepareEngineProjectExport", () => {
+  it("exports a 4096px Affine world with its origin and camera factors", () => {
+    const composition = {
+      ...defaultSceneComposition(), enabled: true, mode: "affine",
+      layers: [{
+        id: "world", kind: "affine_bg", role: "decorative", layer: "BG2", enabled: true, assetId: "world.png",
+        scroll: { x: 1080, y: -16 }, parallax: { x256: 128, y256: -256 },
+        affine: { rotationDegrees: 0, scaleX: 1, scaleY: 1, pivotX: 120, pivotY: 80, wrap: false }
+      }]
+    };
+    const data = project({
+      assets: [{ id: "world", name: "world.png", kind: "Background", metadata: {
+        kind: "affine_bg", source: "Assets/world.png", width: 4096, height: 4096
+      } }],
+      scenas: [{ name: "start", width: 128, height: 32, runtime: { type: "topdown", config: { composition } } }]
+    });
+    const contract = buildEngineExportProjectContract(data);
+    expect(contract.topdown_project?.rooms[0]?.video?.affine).toMatchObject({
+      pa: 256, pd: 256, reference_x_8: 1080 * 256, reference_y_8: -16 * 256,
+      camera_x256: 128, camera_y256: -256, wrap: false
+    });
+    expect(contract.requires.features).toContain("render.paged_affine_bg");
+
+    composition.layers[0]!.affine.scaleX = 0.5;
+    expect(() => buildEngineExportProjectContract(structuredClone(data))).toThrow(/62,5%/);
+    composition.layers[0]!.affine.scaleX = 1;
+    composition.layers[0]!.layer = "BG3";
+    expect(() => buildEngineExportProjectContract(structuredClone(data))).toThrow(/BG2 no Modo 1/);
+  });
+
   it("exports an opt-in portrait tab independently of themes and requires its Engine capability", () => {
     const contract = buildEngineExportProjectContract(project({ scenas: [
       { name: "start", width: 30, height: 20, dialoguePresentation: "portrait_tab" },

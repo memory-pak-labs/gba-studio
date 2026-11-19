@@ -917,6 +917,7 @@ enum { GBS_RASTER_PALETTE = 4, GBS_RASTER_ALPHA = 8, GBS_RASTER_MASK = 16 };
 static uint8_t scene_raster_overrides;
 void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
 void commit_shadow_affine_transforms(void){}
+void commit_paged_affine_frame(void){}
 void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
 void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""

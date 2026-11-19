@@ -2,6 +2,7 @@ import type { SceneRasterEffects } from "./sceneRasterEffects.js";
 import { parseGbaVideoMode, type GbaVideoModeId } from "./gbaVideoModes.js";
 import {
   affineMatrixForScenePresentation,
+  isLargeAffineSource,
   normalizeAffineScenePresentation,
   type AffineScenePresentation,
   type AffineSceneSourceSize
@@ -40,6 +41,8 @@ export interface ExportedAdvancedVideoComposition {
     pd: number;
     reference_x_8: number;
     reference_y_8: number;
+    camera_x256?: number;
+    camera_y256?: number;
   }) | null;
   bitmap: ({
     asset: string;
@@ -53,11 +56,13 @@ export interface ExportedAdvancedVideoComposition {
 export function exportAffineScenePresentation(
   value: AffineScenePresentation,
   resolveAsset: (assetId: string) => string | null = (assetId) => assetId,
-  sourceSize?: AffineSceneSourceSize
+  sourceSize?: AffineSceneSourceSize,
+  scroll?: { x: number; y: number },
+  parallax = { x256: 256, y256: 256 }
 ): NonNullable<ExportedAdvancedVideoComposition["affine"]> | null {
   const presentation = normalizeAffineScenePresentation(value);
   if (!presentation.enabled) return null;
-  const matrix = affineMatrixForScenePresentation(presentation, sourceSize);
+  const matrix = affineMatrixForScenePresentation(presentation, sourceSize, scroll);
   return {
     asset: presentation.assetId ? resolveAsset(presentation.assetId) : null,
     layer: presentation.layer,
@@ -67,7 +72,11 @@ export function exportAffineScenePresentation(
     pc: matrix.pc,
     pd: matrix.pd,
     reference_x_8: matrix.referenceX8,
-    reference_y_8: matrix.referenceY8
+    reference_y_8: matrix.referenceY8,
+    ...(isLargeAffineSource(sourceSize) ? {
+      camera_x256: parallax.x256,
+      camera_y256: parallax.y256
+    } : {})
   };
 }
 

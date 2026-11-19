@@ -1366,7 +1366,7 @@ def _affine_tile_distance(left, right):
     return sum(pixel_left != pixel_right for pixel_left, pixel_right in zip(left, right))
 
 
-def _reduce_affine_tiles(tiles, tilemap_entries, max_tiles):
+def _reduce_affine_tiles(tiles, tilemap_entries, max_tiles, reserve_blank=False):
     """Mapeia tiles affine excedentes para um conjunto determinístico de tiles.
 
     O tilemap affine armazena índices de 8 bits, portanto o limite físico é 256
@@ -1383,7 +1383,7 @@ def _reduce_affine_tiles(tiles, tilemap_entries, max_tiles):
     for tile_index in tilemap_entries:
         frequencies[tile_index] += 1
 
-    selected = [max(range(len(tiles)), key=lambda index: (frequencies[index], -index))]
+    selected = [0 if reserve_blank else max(range(len(tiles)), key=lambda index: (frequencies[index], -index))]
     nearest_distance = [
         _affine_tile_distance(tile, tiles[selected[0]])
         for tile in tiles
@@ -1422,16 +1422,19 @@ def build_affine_tiles(width, height, indices, optimize_tile_budget=None):
 
     tilemap_width = width // 8
     tilemap_height = height // 8
-    if tilemap_width != tilemap_height or tilemap_width not in (16, 32, 64, 128):
-        raise SystemExit("--affine-tilemap precisa gerar mapa quadrado de 16x16, 32x32, 64x64 ou 128x128 tiles")
+    if tilemap_width != tilemap_height or tilemap_width not in (16, 32, 64, 128, 256, 512):
+        raise SystemExit("--affine-tilemap requer um PNG quadrado com 128, 256, 512, 1024, 2048 ou 4096 pixels por lado")
+    paged = tilemap_width > 128
 
     cache_key = (id(indices), optimize_tile_budget)
     cached = AFFINE_TILE_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    tiles = []
-    tile_lookup = {}
+    # Paged maps need a transparent entry for samples outside the authored
+    # world when logical wrapping is disabled.
+    tiles = [[0] * 64] if paged else []
+    tile_lookup = {tuple(tiles[0]): 0} if paged else {}
     tilemap_entries = []
 
     for tile_y in range(0, height, 8):
@@ -1444,7 +1447,7 @@ def build_affine_tiles(width, height, indices, optimize_tile_budget=None):
             tilemap_entries.append(tile_lookup[tile_key])
 
     if optimize_tile_budget is not None:
-        tiles, tilemap_entries = _reduce_affine_tiles(tiles, tilemap_entries, optimize_tile_budget)
+        tiles, tilemap_entries = _reduce_affine_tiles(tiles, tilemap_entries, optimize_tile_budget, reserve_blank=paged)
     elif len(tiles) > 256:
         raise SystemExit("affine background suporta no maximo 256 tiles unicos")
 
@@ -2836,10 +2839,15 @@ def emit_affine_header(
     ]
     for tile in tiles:
         lines.append("    { " + ", ".join(hex(v) for v in tile) + " },")
+    lines.extend(["};", ""])
+    if tilemap_width > 128:
+        lines.append(f"alignas(2) constexpr uint8_t {name}_tilemap_entries[{len(tilemap_values)}] = {{")
+        for start in range(0, len(tilemap_values), 32):
+            lines.append("    " + ", ".join(hex(v) for v in tilemap_values[start:start + 32]) + ",")
+        lines.append("};")
+    else:
+        lines.append(f"constexpr uint8_t {name}_tilemap_entries[{len(tilemap_values)}] = {{ {', '.join(hex(v) for v in tilemap_values)} }};")
     lines.extend([
-        "};",
-        "",
-        f"constexpr uint8_t {name}_tilemap_entries[{len(tilemap_values)}] = {{ {', '.join(hex(v) for v in tilemap_values)} }};",
         "",
         f"const gbs::AffineTileAsset {name}_tile_asset = {{ reinterpret_cast<const uint8_t*>({name}_tiles), {name}_tile_count, {destination_tile} }};",
         f"constexpr gbs::AffineTileMapAsset {name}_tilemap_asset = {{ {name}_tilemap_entries, {name}_tilemap_width, {name}_tilemap_height }};",
@@ -5846,7 +5854,8 @@ def pack_png_resources(asset, base_dir):
         return {
             "affine_bg_tiles": len(tiles),
             "bg_palette_colors": len(colors),
-            "tilemap_entries": len(tilemap_entries),
+            "tilemap_entries": min(len(tilemap_entries), 128 * 128),
+            **({"rom_source_bytes": len(tilemap_entries)} if tilemap_width > 128 else {}),
             "tilemap_width": tilemap_width,
             "tilemap_height": tilemap_height,
         }
@@ -15021,6 +15030,8 @@ def video_composition_literal(project, description, asset_report=None):
         int(affine.get("reference_y_8", 0)),
     ]
     affine_asset = affine.get("asset")
+    parallax = [require_int(affine.get(key, 0), f"{description}.video.affine.{key}", -1024, 1024)
+                for key in ("camera_x256", "camera_y256")]
     affine_tiles = "nullptr"
     affine_tilemap = "nullptr"
     affine_palette = "nullptr"
@@ -15055,8 +15066,9 @@ def video_composition_literal(project, description, asset_report=None):
         f"{affine_tiles}, {affine_tilemap}, {affine_palette}, "
         f"{bitmap16}, {bitmap8}, {bitmap_palette}, static_cast<uint8_t>({page}), "
         f"{'true' if bool(affine.get('wrap', True)) else 'false'}, "
-        f"{scene_raster_effects_literal(video.get('raster'), mode)} "
-        "}"
+        f"{scene_raster_effects_literal(video.get('raster'), mode)}"
+        + (f", gbs::Vec2i {{ {parallax[0]}, {parallax[1]} }} " if any(parallax) else " ")
+        + "}"
     )
 
 
@@ -21572,11 +21584,12 @@ def compiled_scene_video_layouts(project_data, asset_report):
             if asset.get("kind") != "affine_bg" or not placement:
                 notes.append("affine_asset_not_resolved")
                 continue
-            if width != height or width not in (16, 32, 64, 128):
+            if width != height or width not in (16, 32, 64, 128, 256, 512):
                 notes.append("affine_map_dimensions_not_resolved")
                 continue
             bg.append({"start": 32768 + placement["start"] * 64, "count": placement["count"] * 64})
-            maps[0] = max(1, (width * height + 2047) // 2048)
+            caps = min(width, 128)
+            maps[0] = max(1, (caps * caps + 2047) // 2048)
         elif runtime == "isometric" and not row.get("paged_surface"):
             authored = row.get("authored_background") if row.get("world_mode") == "static_composition" else None
             tactical = row.get("tactical_presentation") if row.get("grid", block.get("grid", {})).get("gameplay_mode") == "tactical" else None

@@ -276,6 +276,7 @@ struct VideoComposition {
     uint8_t bitmap_page;
     bool affine_wrap = true;
     SceneRasterEffects raster {};
+    Vec2i paged_affine_parallax_256 {};
 };
 
 constexpr VideoComposition default_video_composition() {
@@ -564,6 +565,7 @@ void set_affine_bg_wrap(BackgroundLayer layer, bool enabled);
 void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& transform);
 bool load_bitmap16(DisplayMode mode, const Bitmap16Asset& asset, uint8_t page = 0);
 bool load_bitmap8(DisplayMode mode, const Bitmap8Asset& asset, uint8_t page = 0);
+void set_paged_affine_camera(Vec2i position_pixels);
 bool render_event_background_scale(const EventState& state);
 // Project map decorations through the same image transform; icons keep their size.
 bool project_event_background_point(const EventState& state, BackgroundLayer layer, Vec2i source, Vec2i& screen);

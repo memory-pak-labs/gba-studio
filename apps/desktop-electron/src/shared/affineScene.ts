@@ -17,6 +17,31 @@ export interface AffineSceneSourceSize {
   height: number;
 }
 
+export const PAGED_AFFINE_MINIMUM_SCALE = 0.625;
+
+export function isLargeAffineSource(size: AffineSceneSourceSize | undefined): boolean {
+  return Boolean(size && (size.width > 1024 || size.height > 1024));
+}
+
+export function pagedAffineSceneIssue(
+  sceneType: string,
+  size: AffineSceneSourceSize | undefined,
+  scaleX: number,
+  scaleY: number,
+  layer: string
+): string | null {
+  if (!size || !isLargeAffineSource(size)) return null;
+  if (size.width !== size.height || ![2048, 4096].includes(size.width)) {
+    return "Use um PNG quadrado de 2048 × 2048 ou 4096 × 4096 px para o fundo Affine paginado.";
+  }
+  if (!["topdown", "platformer"].includes(sceneType)) return "O fundo Affine paginado está disponível em Aventura / Top-down e Plataforma.";
+  if (layer !== "BG2") return "O fundo Affine paginado usa a camada BG2 no Modo 1.";
+  if (Math.min(scaleX, scaleY) < PAGED_AFFINE_MINIMUM_SCALE) {
+    return "O fundo Affine paginado exige escala inicial de pelo menos 62,5% nos dois eixos.";
+  }
+  return null;
+}
+
 export const DEFAULT_AFFINE_SCENE_SOURCE_SIZE: AffineSceneSourceSize = Object.freeze({
   width: 128,
   height: 128
@@ -108,7 +133,8 @@ function sourceDimension(value: number | undefined, fallback: number): number {
 
 export function affineMatrixForScenePresentation(
   value: AffineScenePresentation,
-  sourceSize: AffineSceneSourceSize = DEFAULT_AFFINE_SCENE_SOURCE_SIZE
+  sourceSize: AffineSceneSourceSize = DEFAULT_AFFINE_SCENE_SOURCE_SIZE,
+  scroll = { x: 0, y: 0 }
 ): {
   pa: number;
   pb: number;
@@ -127,11 +153,11 @@ export function affineMatrixForScenePresentation(
   const pd = fixed8(cosine / affine.scaleY);
   const sourceWidth = sourceDimension(sourceSize.width, DEFAULT_AFFINE_SCENE_SOURCE_SIZE.width);
   const sourceHeight = sourceDimension(sourceSize.height, DEFAULT_AFFINE_SCENE_SOURCE_SIZE.height);
-  // GBA affine backgrounds map the screen origin from dx/dy and then apply
-  // P. To keep the source center on the authored viewport pivot, solve
-  // dx = p0 - P*q0 using the quantized 8.8 matrix written to hardware.
-  const sourcePivotX8 = Math.round((sourceWidth / 2) * 256);
-  const sourcePivotY8 = Math.round((sourceHeight / 2) * 256);
+  // Solve dx = p0 - P*q0 using the quantized hardware matrix. Resident assets
+  // center the source. Paged assets use the authored world origin at scale 1.
+  const paged = isLargeAffineSource(sourceSize);
+  const sourcePivotX8 = paged ? (affine.pivotX + scroll.x) * 256 : Math.round((sourceWidth / 2) * 256);
+  const sourcePivotY8 = paged ? (affine.pivotY + scroll.y) * 256 : Math.round((sourceHeight / 2) * 256);
   return {
     pa,
     pb,

@@ -3959,6 +3959,7 @@ void render_topdown_runtime(const gbs::RuntimeFrameContext& context) {
         gbs::debug_end_frame(debug_work_units);
         gbs::tick_visual_effects(visual_effects);
 
+        gbs::set_paged_affine_camera(render_camera);
         gbs::render_event_background_scale(event_state);
         gbs::wait_vblank();
 }

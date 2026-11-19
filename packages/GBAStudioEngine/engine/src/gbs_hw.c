@@ -1,4 +1,5 @@
 #include "gbs_hw.h"
+#include "gbs_paged_affine.h"
 #include "frame_video_stats.h"
 
 static volatile uint32_t frame_dma_bytes, frame_dma_transfers;
@@ -119,6 +120,11 @@ static uint16_t scene_raster_base_winin, scene_raster_base_winout;
 static uint8_t hblank_dispatch_required;
 void gbs_hw_set_hblank_dispatch_required(int required) { hblank_dispatch_required = required != 0; }
 extern void gbs_scene_raster_interrupt_state(int enabled);
+static GbsPagedAffineFrame paged_affine_staged;
+static GbsPagedAffineFrame paged_affine_committed;
+static GbsAffinePageRect paged_affine_resident;
+static volatile uint8_t paged_affine_ready;
+static void commit_paged_affine_frame(void);
 static void commit_scene_raster_frame(void);
 static void commit_shadow_affine_transforms(void);
 static void release_scene_raster_overrides(void);
@@ -311,6 +317,7 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
     }
     if ((pending & 1u) != 0) {
         if (scene_raster_overrides) release_scene_raster_overrides();
+        commit_paged_affine_frame();
         if (affine_hblank_frame_ready && !render_publication_blocked && affine_hblank_enabled) {
             affine_hblank_frame_ready = 0;
             commit_hblank_bg_scroll();
@@ -1167,6 +1174,7 @@ static void commit_scene_raster_frame(void) {
 }
 
 void gbs_hw_init(void) {
+    gbs_hw_stage_paged_affine(0);
     affine_upload_screenblock_base = affine_screenblock_base;
     shadow_display_mode = 0;
     shadow_backdrop_color = 0;
@@ -1251,6 +1259,7 @@ void gbs_hw_init(void) {
 void gbs_hw_wait_vblank(void) {
     frame_vblank_irq_ticks = 0;
     const int vblank_irq_enabled = (REG_IE & (1u << 0)) != 0 && (REG_DISPSTAT & (1u << 3)) != 0;
+    if (paged_affine_staged.entries && !render_publication_blocked) paged_affine_ready = 1;
     if (vblank_irq_enabled) {
         // The audio IRQ can outlast VBlank. Publish the completed affine
         // table at the start of that IRQ, before mixing delays this thread.
@@ -1261,6 +1270,7 @@ void gbs_hw_wait_vblank(void) {
         }
         while (REG_VCOUNT < 160) {
         }
+        commit_paged_affine_frame();
     }
     if (!vblank_irq_enabled) {
         if (scene_raster_overrides) release_scene_raster_overrides();
@@ -2028,6 +2038,92 @@ void gbs_hw_set_bg_tilemap_entry(int layer, uint32_t x, uint32_t y, uint32_t wid
     if (stage_ui_map) {
         shadow_bg_tilemap_pending_mask = (uint8_t)(shadow_bg_tilemap_pending_mask | (1u << UI_BACKGROUND_LAYER));
     }
+}
+
+void gbs_hw_stage_paged_affine(const GbsPagedAffineFrame* frame) {
+    const uint16_t previous = REG_IME;
+    REG_IME = 0;
+    if (frame) {
+        paged_affine_staged = *frame;
+    } else {
+        paged_affine_ready = 0;
+        paged_affine_staged.entries = 0;
+        paged_affine_committed.entries = 0;
+    }
+    REG_IME = previous;
+}
+
+static void copy_paged_affine_row(const GbsPagedAffineFrame* frame, int y, int left, int right) {
+    const int side = frame->map_tiles;
+    const uint16_t blank_pair = frame->blank | ((uint16_t)frame->blank << 8);
+    const uint8_t* source_row = frame->wrap || (y >= 0 && y < side)
+        ? frame->entries + gbs_affine_wrap_tile(y, side) * side : 0;
+    volatile uint16_t* destination_row = MEM_VRAM +
+        gbs_affine_wrap_tile(y, GBS_AFFINE_PAGE_TILES) * (GBS_AFFINE_PAGE_TILES / 2);
+    while (left < right) {
+        const int x = (int)gbs_affine_wrap_tile(left, GBS_AFFINE_PAGE_TILES);
+        int length = gbs_affine_min(right - left, GBS_AFFINE_PAGE_TILES - x);
+        const int source_x = (int)gbs_affine_wrap_tile(left, side);
+        const uint8_t* source = 0;
+        if (source_row && (frame->wrap || (left >= 0 && left < side))) {
+            length = gbs_affine_min(length, side - source_x);
+            source = source_row + source_x;
+        } else if (left < 0) {
+            length = gbs_affine_min(length, -left);
+        }
+        volatile uint16_t* destination = destination_row + x / 2;
+        if (source && length >= 16 && ((uintptr_t)source & 1u) == 0) {
+            gbs_hw_dma_copy(3, source, destination, (uint32_t)length / 2u, 0);
+        } else if (source) {
+            for (int i = 0; i < length; i += 2) destination[i / 2] = source[i] | ((uint16_t)source[i + 1] << 8);
+        } else {
+            for (int i = 0; i < length / 2; ++i) destination[i] = blank_pair;
+        }
+        left += length;
+    }
+}
+
+static void commit_paged_affine_frame(void) {
+    if (!paged_affine_ready || render_publication_blocked || (hblank_dma_active_mask & (1u << 3))) return;
+    paged_affine_ready = 0;
+    const GbsPagedAffineFrame* frame = &paged_affine_staged;
+    const int layer = frame->layer;
+    const int same_map = paged_affine_committed.entries == frame->entries &&
+        paged_affine_committed.layer == layer && paged_affine_committed.map_tiles == frame->map_tiles &&
+        paged_affine_committed.wrap == frame->wrap && paged_affine_committed.blank == frame->blank;
+    if (!same_map || !gbs_affine_page_contains(paged_affine_resident, frame->visible)) {
+        const GbsAffinePageRect next = gbs_affine_page_with_margin(frame->visible);
+        const int common_left = gbs_affine_max(next.left, paged_affine_resident.left);
+        const int common_right = gbs_affine_min(next.right, paged_affine_resident.right);
+        for (int y = next.top; y < next.bottom; ++y) {
+            if (same_map && common_left < common_right && y >= paged_affine_resident.top && y < paged_affine_resident.bottom) {
+                copy_paged_affine_row(frame, y, next.left, common_left);
+                copy_paged_affine_row(frame, y, common_right, next.right);
+            } else {
+                copy_paged_affine_row(frame, y, next.left, next.right);
+            }
+        }
+        paged_affine_resident = next;
+    }
+    if (!same_map) {
+        // Match the existing 128x128 affine layout at screenblocks 0–7.
+        const uint8_t bit = (uint8_t)(1u << layer);
+        shadow_bg_tilemap_pending_mask &= (uint8_t)~bit;
+        shadow_bg_map_size[layer] = 3u;
+        shadow_bg_map_size_pending_mask |= bit;
+        shadow_bg_depth[layer] = 1u;
+        shadow_bg_depth_mask |= bit;
+        bg_screenblocks[layer] = affine_screenblock_base;
+        shadow_bg_screen_base_pending_mask |= bit;
+        commit_shadow_bg_controls();
+        // The hardware wraps the resident map. The source map can either
+        // wrap at its world limits or sample the reserved blank tile outside.
+        gbs_hw_set_affine_bg_wrap(layer, 1);
+    }
+    const uint32_t reference_mask = (GBS_AFFINE_PAGE_TILES * 8u * 256u) - 1u;
+    gbs_hw_set_affine_bg_transform(layer, frame->pa, frame->pb, frame->pc, frame->pd,
+        (int32_t)((uint32_t)frame->x8 & reference_mask), (int32_t)((uint32_t)frame->y8 & reference_mask));
+    paged_affine_committed = *frame;
 }
 
 bool gbs_hw_set_affine_map_screen_base(uint16_t base) {
