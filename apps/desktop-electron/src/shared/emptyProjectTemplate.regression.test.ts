@@ -10,7 +10,47 @@ import { SCENE_TYPE_OPTIONS } from "./sceneTypes.js";
 const records = (data: GBAProjectData, key: string) => data[key] as Record<string, any>[];
 const reopen = (data: GBAProjectData) => parseGBAProjectFile(serializeGBAProjectFile({ data, summary: summarizeGBAProject(data) })).data;
 
-describe("empty public project template", () => {
+describe("project without starter assets", () => {
+  it("saves and reopens with just the project settings and editor state", () => {
+    const data = reopen(buildProjectFromTemplate("empty", { name: "  Do zero  " }));
+    expect(data.name).toBe("Do zero");
+    for (const key of ["rooms", "scenas", "actors", "assets", "assetGroups", "animations", "animationStates", "triggers", "events", "dialogues", "audioItems"]) {
+      expect(data[key], key).toEqual([]);
+    }
+    expect(data.scena).toBeUndefined();
+    expect(data.room).toBeUndefined();
+    expect(data.editorState).not.toHaveProperty("activeScenaID");
+    expect(data.editorState).not.toHaveProperty("startScenaID");
+    expect(data.settings).toMatchObject({
+      general: { gameTitle: "Do zero", startScene: "", startPlayer: "" },
+      build: { romFileName: "do_zero.gba" },
+      sceneTypes: { enabled: Object.fromEntries(SCENE_TYPE_OPTIONS.map(({ id }) => [id, true])) },
+      topdown: { playerSprite: "" },
+      pointAndClick: { cursorImage: "", font: "" },
+      uiDialogs: { boxImage: "", font: "", selectorImage: "" }
+    });
+    expect(data.settings).not.toHaveProperty("hudPresets");
+    expect(validateGBAProjectMigrationContract(data)).toEqual([]);
+    expect(deriveProjectHealthReport(data)).toMatchObject({ counts: { error: 0, warning: 0 }, exportReady: false });
+  });
+
+  it.each(["exterior", "isometricAdventure", "isometricTactical"] as const)(
+    "creates a first %s scene without importing sample content",
+    (presetID) => {
+      const empty = reopen(buildProjectFromTemplate("empty", { name: "Do zero" }));
+      const data = reopen(createRoomInProject(empty, {
+        id: "first", name: "Minha cena", sceneType: "topdown", presetID, width: 30, height: 20
+      }));
+      expect(deriveRoomsWorkspacePresentation(data).rooms).toHaveLength(1);
+      expect(data.scena).toMatchObject({ id: "first", name: "Minha cena" });
+      expect(data.settings).toMatchObject({ general: { startScene: "Minha cena", startPlayer: "" } });
+      expect(data.assets).toEqual([]);
+      expect(data.actors).toEqual([]);
+    }
+  );
+});
+
+describe("basic template with starter assets", () => {
   it("saves and reopens without authored content or stale scene selections", () => {
     const data = reopen(buildProjectFromTemplate("blank", { name: "  Meu jogo  " }));
     expect(data.name).toBe("Meu jogo");

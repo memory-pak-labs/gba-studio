@@ -53,8 +53,12 @@ describe("projectTemplates", () => {
     hud.components[0].x = 120;
     expect(deriveHudPresetsWorkspacePresentation(buildProjectFromTemplate("blank", {name:"Outro"})).activePreset.components[0].x).toBe(8);
   });
-  it("offers the example and an empty project in the public catalog", () => {
-    expect(projectTemplateDefinitions.map((template) => template.id)).toEqual(["exemplo-gba", "blank"]);
+  it("offers the example, the basic template and a project without starter content", () => {
+    expect(projectTemplateDefinitions.map(({ id, title }) => [id, title])).toEqual([
+      ["exemplo-gba", "O Último Farol"],
+      ["blank", "Template básico"],
+      ["empty", "Projeto em branco"]
+    ]);
   });
 
   it("creates and reopens a blank project without example content or dangling asset references", () => {

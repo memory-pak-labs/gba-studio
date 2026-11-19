@@ -1222,7 +1222,7 @@ function App(): React.ReactElement {
     setFocusedAssetRequest(null);
     setFocusedEventRequest(null);
     setSelectedWorkspace("Editor");
-    notifySuccess(ui("Template {0} criado em {1}.", { 0: templateID, 1: createdSession.path }));
+    publishFeedback(saveProjectFeedback(saveResult));
   }
 
   async function renameAsset(assetID: string, currentName: string): Promise<void> {

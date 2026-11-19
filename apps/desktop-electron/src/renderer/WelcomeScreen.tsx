@@ -1,5 +1,6 @@
 import { uiText as ui, useStudioUiText } from "./studioUiText";
 import React, { useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import type { RecentProjectEntry } from "../shared/ipc";
 import { EXEMPLO_GBA_SCENE_COUNT, projectTemplateDefinitions, type ProjectTemplateID } from "../shared/projectTemplates";
 import { welcomeIconURL } from "./brandingAssets";
@@ -16,9 +17,13 @@ interface WelcomeScreenProps {
 
 const welcomeProjectTemplates = projectTemplateDefinitions;
 
-const templatePreviewURLs: Partial<Record<ProjectTemplateID, string>> = {
+const templatePreviewURLs: Record<Exclude<ProjectTemplateID, "empty">, string> = {
   "exemplo-gba": new URL(
     "../../default-assets/templates/exemplo-gba/Assets/backgrounds/title-day-centered-240x160-4bpp.png",
+    import.meta.url
+  ).href,
+  blank: new URL(
+    "../../default-assets/templates/blank/Assets/backgrounds/neutral-background-topdown.png",
     import.meta.url
   ).href
 };
@@ -157,23 +162,26 @@ export function WelcomeScreen({
           <h2>{t("welcome.templates")}</h2>
           {welcomeProjectTemplates.map((template) => {
             const title = t(`template.${template.id}.title` as StudioTranslationKey);
-            const previewURL = templatePreviewURLs[template.id];
             return (
               <button
                 key={template.id}
-                className={previewURL ? "welcome-template-card has-preview" : "welcome-template-card"}
+                className="welcome-template-card"
                 disabled={creatingProject}
                 type="button"
                 onClick={() => createFromTemplate(template.id)}
               >
-                {previewURL ? (
-                  <img
-                    alt={t(`template.${template.id}.previewAlt` as StudioTranslationKey)}
-                    className="welcome-template-preview"
-                    src={previewURL}
-                  />
+                {template.id === "empty" ? (
+                  <span aria-hidden="true" className="welcome-template-preview welcome-template-preview-empty">
+                    <Plus size={24} />
+                  </span>
                 ) : (
-                  <span className="welcome-template-icon" aria-hidden="true">{template.icon}</span>
+                  <img
+                    alt={template.id === "exemplo-gba" ? t("template.exemplo-gba.previewAlt") : ""}
+                    className="welcome-template-preview"
+                    src={templatePreviewURLs[template.id]}
+                    width={240}
+                    height={160}
+                  />
                 )}
                 <strong>{title}</strong>
                 <small>{t(`template.${template.id}.detail` as StudioTranslationKey, { count: EXEMPLO_GBA_SCENE_COUNT })}</small>
