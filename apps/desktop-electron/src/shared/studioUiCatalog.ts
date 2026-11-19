@@ -13,6 +13,7 @@ export const studioUiMessages: Record<string, readonly [string, string, string]>
   "Transparência por linha": ["Transparência por linha", "Scanline transparency", "Transparencia por línea"],
   "Mistura duas camadas sobrepostas. 0 mostra a inferior e 16 mantém a superior opaca.": ["Mistura duas camadas sobrepostas. 0 mostra a inferior e 16 mantém a superior opaca.", "Blends two overlapping layers. 0 shows the lower layer and 16 keeps the upper layer opaque.", "Mezcla dos capas superpuestas. 0 muestra la inferior y 16 mantiene la superior opaca."],
   "Camada superior": ["Camada superior", "Upper layer", "Capa superior"],
+  "Cor de fundo": ["Cor de fundo", "Backdrop", "Color de fondo"],
   "Camada inferior": ["Camada inferior", "Lower layer", "Capa inferior"],
   "Opacidade inicial": ["Opacidade inicial", "Start opacity", "Opacidad inicial"],
   "Opacidade final": ["Opacidade final", "End opacity", "Opacidad final"],
