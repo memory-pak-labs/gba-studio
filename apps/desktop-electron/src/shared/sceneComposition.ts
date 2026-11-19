@@ -479,7 +479,13 @@ export function sceneCompositionIssues(value: unknown, profile = "shmup"): Scene
     if (layer.kind === "bitmap" && layer.layer !== "BITMAP") issues.push(issue("INVALID_BITMAP_LAYER", `A camada bitmap ${layer.id} deve usar o plano BITMAP.`, layer.id, "layer"));
   }
   const effects = composition.effects;
-  for (const message of sceneRasterEffectIssues(isRecord(value.effects) ? value.effects.raster : undefined, composition.mode, effects.hblank.enabled)) issues.push(issue("INVALID_EFFECT", message, undefined, "effects.raster"));
+  for (const message of sceneRasterEffectIssues(isRecord(value.effects) ? value.effects.raster : undefined, composition.mode, effects.hblank.enabled, videoMode)) issues.push(issue("INVALID_EFFECT", message, undefined, "effects.raster"));
+  if (effects.raster?.alpha?.enabled && effects.blend.enabled) {
+    issues.push(issue("INVALID_EFFECT", "A transparência por linha e o blending fixo usam o mesmo controle do GBA.", undefined, "effects.raster.alpha"));
+  }
+  if (effects.raster?.mask?.enabled && (effects.window0.enabled || effects.window1.enabled)) {
+    issues.push(issue("INVALID_WINDOW", "A máscara por linha precisa das janelas do GBA livres.", undefined, "effects.raster.mask"));
+  }
   if (effects.blend.enabled && (effects.blend.mode === "none" || effects.blend.firstTargets.length === 0)) {
     issues.push(issue("INVALID_EFFECT", "Blending habilitado precisa de modo e alvos de primeira camada.", undefined, "effects.blend"));
   }

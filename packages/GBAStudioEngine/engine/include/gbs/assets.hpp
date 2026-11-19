@@ -251,12 +251,16 @@ constexpr bool is_valid_affine_tile_asset(const AffineTileAsset& asset) {
            static_cast<uint32_t>(asset.destination_tile) + asset.tile_count <= 256;
 }
 
+constexpr bool is_paged_affine_tilemap_asset(const AffineTileMapAsset& asset) {
+    return asset.width == asset.height && (asset.width == 256 || asset.width == 512);
+}
+
 constexpr bool is_valid_affine_tilemap_asset(const AffineTileMapAsset& asset) {
     return asset.entries != nullptr &&
            asset.width > 0 &&
            asset.height > 0 &&
            asset.width == asset.height &&
-           (asset.width == 16 || asset.width == 32 || asset.width == 64 || asset.width == 128);
+           (asset.width == 16 || asset.width == 32 || asset.width == 64 || asset.width == 128 || is_paged_affine_tilemap_asset(asset));
 }
 
 constexpr bool is_valid_gba_obj_dimensions(int width, int height) {
@@ -427,7 +431,8 @@ constexpr RenderAssetCost estimate_tilemap_asset_cost(const TileMapAsset& asset)
 }
 
 constexpr RenderAssetCost estimate_affine_tilemap_asset_cost(const AffineTileMapAsset& asset) {
-    const uint32_t entries = static_cast<uint32_t>(asset.width) * asset.height;
+    const uint16_t resident_side = is_paged_affine_tilemap_asset(asset) ? 128 : asset.width;
+    const uint32_t entries = static_cast<uint32_t>(resident_side) * resident_side;
     return !is_valid_affine_tilemap_asset(asset)
         ? invalid_render_asset_cost()
         : RenderAssetCost {
@@ -443,7 +448,7 @@ constexpr RenderAssetCost estimate_affine_tilemap_asset_cost(const AffineTileMap
             static_cast<uint16_t>(entries),
             0,
             0,
-            affine_screenblock_count_for_dimensions(asset.width, asset.height)
+            affine_screenblock_count_for_dimensions(resident_side, resident_side)
         };
 }
 

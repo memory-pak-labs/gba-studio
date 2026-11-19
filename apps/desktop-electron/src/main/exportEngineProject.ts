@@ -1,4 +1,6 @@
-import { hasSceneRasterEffects, normalizeSceneRasterEffects } from "../shared/sceneRasterEffects.js";
+import { isLargeAffineSource, pagedAffineSceneIssue } from "../shared/affineScene.js";
+import { isSfxInstanceAudio, isSfxInstanceVerb, parseSfxInstanceCommand } from "../shared/sfxInstanceCommands.js";
+import { hasSceneRasterEffects, hasSceneScanlineControls, normalizeSceneRasterEffects, sceneRasterEffectIssues } from "../shared/sceneRasterEffects.js";
 import { projectAudioMixingRate, requireAudioMixingRate } from "../shared/audioMixing.js";
 import { projectCartridgeRumbleProfile, type CartridgeRumbleProfile } from "../shared/cartridgeRumble.js";
 import { isPcmAudio } from "../shared/audioPcm.js";
@@ -254,6 +256,7 @@ export interface EngineExportProjectEventCommand {
   x?: number;
   y?: number;
   index?: number;
+  instance?: number;
   key?: string;
   value?: string | number | boolean;
   amount?: number;
@@ -2742,14 +2745,31 @@ function assertFixedUiAffineSource(room: Record<string, unknown>, asset: Record<
     throw new Error(`Cena ${roomName(room,0)}: fundo affine com interface fixa permite no máximo 512x512 pixels.`);
 }
 
+function assertPagedAffineSource(room: Record<string, unknown>, size: AffineSceneSourceSize | undefined, scaleX: number, scaleY: number, layer: string): void {
+  const sceneType = resolveSceneRuntimeExport(roomSceneType(room)).kind;
+  const issue = pagedAffineSceneIssue(sceneType, size, scaleX, scaleY, layer);
+  if (issue) throw new Error(`Cena ${roomName(room, 0)}. ${issue}`);
+}
+
 function buildRoomVideoComposition(data: GBAProjectData, room: Record<string, unknown>, tilesetPack: AssetcTilesetPackGeneration | null): ExportedAdvancedVideoComposition {
   const video = buildRoomVideoCompositionBase(data, room, tilesetPack);
   const composition = roomSceneComposition(room);
   if (!composition.enabled || !hasSceneRasterEffects(composition.effects.raster)) return video;
   const raster = normalizeSceneRasterEffects(composition.effects.raster);
-  if (raster.ripple.enabled && ((video.display_mode !== 0 && !(video.display_mode === 1 && raster.ripple.layer === "BG1")) || (roomSceneType(room) === "racing" && raster.ripple.layer !== "BG1" && racingSceneConfigFromRuntime(room.runtime,data.settings)?.presentation === "pseudo3d")))
+  const perspective = roomSceneType(room) === "racing" &&
+    racingSceneConfigFromRuntime(room.runtime, data.settings)?.presentation === "pseudo3d";
+  if (raster.ripple.enabled && ((video.display_mode !== 0 && !(video.display_mode === 1 && raster.ripple.layer === "BG1")) ||
+    (perspective && raster.ripple.layer !== "BG1"))) {
     throw new Error(`Cena ${roomName(room,0)}: a ondulação exige uma camada regular livre; o plano affine/perspectiva já controla BG2.`);
-  return { ...video, raster };
+  }
+  if (hasSceneScanlineControls(raster) && perspective) {
+    const issues = sceneRasterEffectIssues(raster, composition.mode, composition.effects.hblank.enabled, 1);
+    if (issues.length) throw new Error(`Composição inválida na cena ${roomName(room,0)}: ${issues.join(" ")}`);
+  }
+  const { palette, alpha, mask, ...baseRaster } = raster;
+  return { ...video, raster: {
+    ...baseRaster, ...(palette?.enabled ? { palette } : {}), ...(alpha?.enabled ? { alpha } : {}), ...(mask?.enabled ? { mask } : {})
+  } };
 }
 
 function buildRoomVideoCompositionBase(
@@ -2775,6 +2795,8 @@ function buildRoomVideoCompositionBase(
       if (usesSinglePlaneBackground(roomSceneType(room)) && affineLayer.layer !== "BG2")
         throw new Error("Este perfil usa BG2 no Modo 1 para preservar a interface fixa.");
       const sourceAsset = roomAffineAssetRecord(data, affineLayer.assetId);
+      const sourceSize = affineSourceSize(sourceAsset);
+      assertPagedAffineSource(room, sourceSize, affineLayer.affine?.scaleX ?? 1, affineLayer.affine?.scaleY ?? 1, affineLayer.layer);
       assertFixedUiAffineSource(room, sourceAsset);
       const sourceName = sourceAsset ? stringField(sourceAsset, "name", affineLayer.assetId) : affineLayer.assetId;
       const packedAsset = tilesetPack?.assetsBySheet[sourceName] ?? tilesetPack?.assetsBySheet[affineLayer.assetId];
@@ -2795,7 +2817,9 @@ function buildRoomVideoCompositionBase(
           role: "decorative"
         },
         () => packedAsset.name,
-        affineSourceSize(sourceAsset)
+        sourceSize,
+        affineLayer.scroll,
+        affineLayer.parallax
       );
       return { display_mode: exported.display_mode, affine, bitmap: null };
     }
@@ -2826,6 +2850,8 @@ function buildRoomVideoCompositionBase(
     throw new Error(`A cena ${roomName(room, 0)} habilita Affine sem declarar assetId.`);
   }
   const sourceAsset = roomAffineAssetRecord(data, presentation.assetId);
+  const sourceSize = affineSourceSize(sourceAsset);
+  assertPagedAffineSource(room, sourceSize, presentation.scaleX, presentation.scaleY, presentation.layer);
   assertFixedUiAffineSource(room, sourceAsset);
   const sourceName = sourceAsset ? stringField(sourceAsset, "name", presentation.assetId) : presentation.assetId;
   const packedAsset = tilesetPack?.assetsBySheet[sourceName]
@@ -2837,7 +2863,7 @@ function buildRoomVideoCompositionBase(
   const affine = exportAffineScenePresentation(
     { ...presentation, assetId: sourceName },
     () => packedAsset.name,
-    affineSourceSize(sourceAsset)
+    sourceSize
   );
   if (!affine) return exportedDefaultRoomVideoComposition();
   return {
@@ -4576,6 +4602,26 @@ function compileEventStep(
 
   const integrationIssue = eventCommandIntegrationIssue(sceneChangeCommand(parts), resolveSceneRuntimeExport(roomSceneType(rooms[0] ?? {})).kind);
   if (integrationIssue) throw new Error(integrationIssue);
+
+  if (isSfxInstanceVerb(verb)) {
+    const control = parseSfxInstanceCommand(verb, parts.slice(1));
+    if (control.verb === "play_sfx_instance") {
+      const audioIndex = audioIndexByName(audioItems, control.audio);
+      const audio = audioItems[audioIndex];
+      const resolved = resolveAudioPlayback(audioItems, audioPack, control.audio, false);
+      if (!audioPack || !audio || !isSfxInstanceAudio(data, audio) || resolved?.op !== "play_pcm_sfx") {
+        throw new Error(`Instância de som requer um efeito PCM ou WAV compilado: ${control.audio}`);
+      }
+      const pcmName = audioPack.document.pcm[resolved.index]?.name;
+      const volume = audioPack.document.sfx.find(sfx => sfx.name === pcmName)?.pcm_volume ?? 15;
+      return [{ op: verb, index: resolved.index, instance: control.instance, volume }];
+    }
+    return [{
+      op: verb,
+      instance: control.instance,
+      ...("percent" in control ? { percent: control.percent } : {})
+    }];
+  }
 
   if (isScaleEvent(verb)) {
     const scale = parseScaleEvent(parts);
@@ -11180,6 +11226,7 @@ function buildEngineExportProjectContractUncached(
   });
   features.push(...cameraZoneFeatures);
   if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneRasterEffects(c.effects.raster); })) features.push("render_runtime.scene_raster_effects");
+  if (rooms.some(room => { const c = roomSceneComposition(room); return c.enabled && hasSceneScanlineControls(c.effects.raster); })) features.push("render_runtime.scene_scanline_controls");
   if (projectAudioMixingRate(data) !== 31536 || projectArray(data, "events").some(event => JSON.stringify(event).includes("set_audio_mixing_rate"))) features.push("audio.configurable_mixing_rate");
   if (projectCartridgeRumbleProfile(data) !== "none") features.push("rumble.rumble_project_configuration", "rumble.rumble_chisflash_v12_opt_in");
   if (hasQueuedMultiplayerCommands(data)) features.push("link.link_queued_events", "link.link_queued_messages", "link.link_nonblocking_irq", "link.link_automatic_recovery");
@@ -11316,6 +11363,13 @@ function buildEngineExportProjectContractUncached(
   if (videoAsset || projectUsesRoomAffine(data)) {
     features.push("render.video_composition");
   }
+  if (rooms.some(room => {
+    const composition = roomSceneComposition(room);
+    const affine = composition.enabled
+      ? composition.layers.find(layer => layer.enabled && layer.kind === "affine_bg")
+      : roomAffinePresentation(room);
+    return affine?.enabled && isLargeAffineSource(affineSourceSize(roomAffineAssetRecord(data, affine.assetId)));
+  })) features.push("render.paged_affine_bg");
   if (exportRoomsForKind(data, "menu").some(room => {
     const config = normalizeMenuSceneConfig(child(child(room, "runtime"), "config"));
     return config.actionSounds || config.screens?.some(screen => screen.actionSounds);
@@ -11343,6 +11397,9 @@ function buildEngineExportProjectContractUncached(
   if (advancedTools.compiled.hasResources) {
     features.push("advanced_tools_data");
   }
+  if (expandEventProcedures(projectArray(data, "events")).events.some(event => eventSteps(event).some(step =>
+    isSfxInstanceVerb(commandParts(stringField(step, "command", ""))[0] ?? "")
+  ))) features.push("audio.pcm_sfx_instances");
   const exportCoverage = auditExportEventCommandCoverage(data);
   const spriteVramWarnings = auditProjectSpriteVramWarnings(data);
   const spriteVramExportNotices = auditProjectSpriteVramExportNotices(data);

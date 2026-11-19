@@ -90,6 +90,13 @@ Para backgrounds affine BG2/BG3 em 8bpp, gere um mapa quadrado de 16x16, 32x32, 
 tools/assetc/assetc.py affine_room.png -o affine_room.hpp -n affine_room --destination-tile 0 --affine-tilemap
 ```
 
+Fundos Affine de 2048 × 2048 ou 4096 × 4096 px usam uma janela paginada na
+VRAM. No GBA Studio, use a camada Affine BG2 da composição em Aventura /
+Top-down ou Plataforma. A origem define o enquadramento inicial e o parallax controla
+quanto a camada acompanha a câmera. Use 8 bpp e até 255 tiles únicos além do
+tile transparente reservado. A escala inicial precisa ser de pelo menos
+62,5% nos dois eixos para que a janela comporte o zoom dos eventos.
+
 Para collision flags top-down por tile, use uma cor/indice solido no PNG:
 
 ```sh

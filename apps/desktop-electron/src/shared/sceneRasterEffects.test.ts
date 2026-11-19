@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSceneRasterEffects, rasterScanline, sceneRasterEffectIssues } from "./sceneRasterEffects.js";
+import { blendScanlineColors, normalizeSceneRasterEffects, rasterScanline, sceneScanlineControls, sceneRasterEffectIssues } from "./sceneRasterEffects.js";
 import { defaultSceneComposition, exportSceneComposition, normalizeSceneComposition } from "./sceneComposition.js";
 
 describe("simple scene raster effects", () => {
@@ -25,5 +25,30 @@ describe("simple scene raster effects", () => {
     expect(sceneRasterEffectIssues({ ripple: { enabled: true, layer: "BG2", amplitude: 80 } }, "tilemap", false).length).toBeGreaterThan(0);
     expect(sceneRasterEffectIssues({ ripple: { enabled: true } }, "tilemap", true).join(" ")).toMatch(/HBlank/);
     expect(sceneRasterEffectIssues({ ripple: { enabled: true, layer: "BG2" } }, "affine", false).length).toBeGreaterThan(0);
+  });
+  it("interpolates control endpoints and keeps the full layer outside the mask band", () => {
+    const effects = normalizeSceneRasterEffects({
+      palette: { enabled: true, index: 19, from: "#ff0000", to: "#0000ff", top: 10, bottom: 13 },
+      alpha: { enabled: true, from: 16, to: 0, top: 10, bottom: 13 },
+      mask: { enabled: true, leftTop: 10, rightTop: 230, leftBottom: 50, rightBottom: 190, top: 10, bottom: 13 }
+    });
+    expect(sceneScanlineControls(effects, 9)).toEqual({ paletteColor: 31, alpha: 16, left: 0, right: 240 });
+    const middle = sceneScanlineControls(effects, 11);
+    expect(middle).toEqual({ paletteColor: 15 | (15 << 10), alpha: 8, left: 30, right: 210 });
+    expect(blendScanlineColors(middle.paletteColor!, 31 << 5, middle.alpha!)).toBe(7 | (15 << 5) | (7 << 10));
+    expect(sceneScanlineControls(effects, 13)).toEqual({ paletteColor: 31744, alpha: 0, left: 0, right: 240 });
+  });
+
+  it("rejects invalid palette indices, repeated blend targets and crossed mask edges", () => {
+    const issues = sceneRasterEffectIssues({
+      palette: { enabled: true, index: 0 },
+      alpha: { enabled: true, first: "BG2", second: "BG2" },
+      mask: { enabled: true, leftTop: 190, rightTop: 25 }
+    }, "tilemap", false);
+    expect(issues).toHaveLength(3);
+    expect(sceneRasterEffectIssues({ mask: { enabled: true, layer: "BG3" } }, "affine", false)).toHaveLength(1);
+    expect(sceneRasterEffectIssues({ alpha: { enabled: true } }, "bitmap4", false)).toHaveLength(1);
+    expect(sceneRasterEffectIssues({ mask: { enabled: true, layer: "BG3" } }, "affine", false, 2)).toHaveLength(0);
+    expect(sceneRasterEffectIssues({ mask: { enabled: true, layer: "BG1" } }, "affine", false, 2)).toHaveLength(1);
   });
 });

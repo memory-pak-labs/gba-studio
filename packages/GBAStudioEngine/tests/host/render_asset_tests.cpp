@@ -2,6 +2,7 @@
 #include "gbs/assets.hpp"
 #include "gbs/compression.hpp"
 #include "gbs/render.hpp"
+#include "../../engine/src/gbs_paged_affine.h"
 
 namespace {
 
@@ -52,6 +53,25 @@ void test_tilemap_asset_validation() {
     assert(!gbs::is_valid_affine_tilemap_asset(gbs::AffineTileMapAsset { nullptr, 16, 16 }));
     assert(!gbs::is_valid_affine_tilemap_asset(gbs::AffineTileMapAsset { affine_entries, 16, 32 }));
     assert(!gbs::is_valid_affine_tilemap_asset(gbs::AffineTileMapAsset { affine_entries, 8, 8 }));
+}
+
+void test_paged_affine_map_and_viewport() {
+    const uint8_t entries[] = { 0 };
+    const gbs::AffineTileMapAsset world { entries, 512, 512 };
+    assert(gbs::is_valid_affine_tilemap_asset(world));
+    assert(gbs::estimate_affine_tilemap_asset_cost(world).tilemap_bytes == 16384);
+    assert(gbs::estimate_affine_tilemap_asset_cost(world).screenblocks == 8);
+    assert(!gbs::is_valid_affine_tilemap_asset({ entries, 1024, 1024 }));
+
+    const GbsAffinePageRect screen = gbs_affine_page_bounds(181, -181, 181, 181, -128, 1024 * 256);
+    assert(screen.left == -15 && screen.right == 22);
+    assert(screen.top == 128 && screen.bottom == 164);
+    const auto page = gbs_affine_page_with_margin(screen);
+    assert(gbs_affine_page_contains(page, screen));
+    assert(page.left % 2 == 0 && page.right % 2 == 0);
+    assert(gbs_affine_wrap_tile(-1, 512) == 511);
+    assert(gbs_affine_wrap_tile(128, 128) == 0);
+    assert(!gbs_affine_page_fits(gbs_affine_page_bounds(2048, 0, 0, 2048, 0, 0)));
 }
 
 void test_metasprite_validation() {
@@ -503,6 +523,7 @@ int main() {
     test_palette_asset_validation();
     test_tile_asset_validation();
     test_tilemap_asset_validation();
+    test_paged_affine_map_and_viewport();
     test_metasprite_validation();
     test_sprite_animation_validation();
     test_render_asset_cost_estimates();

@@ -43,6 +43,7 @@ class HardwareSourceContractTests(unittest.TestCase):
     def test_gradient_preserves_its_scanline_color_when_the_scene_sets_backdrop(self):
         code = """#include <stdint.h>
 #include <assert.h>
+enum { GBS_RASTER_BACKDROP = 2 };
 uint16_t shadow_backdrop_color, palette[1];
 #define MEM_PALETTE palette
 struct {uint8_t enabled;} scene_raster_tables[2];int scene_raster_active;
@@ -237,6 +238,53 @@ int main(void) {
         reveal = "gbs::consume_scene_transition_visual_effect_event(event_state);"
         self.assertIn(reveal, initializer)
         self.assertLess(initializer.index("start_screen("), initializer.index(reveal))
+
+    def test_static_affine_transform_publishes_as_one_vblank_update(self):
+        stage = function_body(self.source, "gbs_hw_set_affine_bg_transform")
+        publish = function_body(self.source, "commit_shadow_affine_transforms")
+        irq = function_body(self.source, "gbs_hw_irq_dispatch_slow")
+        self.assertLess(irq.index("commit_shadow_affine_transforms();"), irq.index("commit_pcm_stream_block();"))
+        code = """#include <stdint.h>
+#include <assert.h>
+typedef struct { int16_t pa, pb, pc, pd; int32_t x, y; } GbsHwAffineTransform;
+GbsHwAffineTransform shadow_affine_transforms[2];
+uint8_t shadow_affine_pending_mask, render_publication_blocked, affine_hblank_enabled, affine_hblank_layer;
+uint16_t REG_VCOUNT, REG_IME = 1;
+uint16_t matrices[2][4];
+uint32_t references[2][2];
+volatile uint16_t* affine_bg_matrix_registers(int layer){return matrices[layer-2];}
+volatile uint32_t* affine_bg_reference_registers(int layer){return references[layer-2];}
+uint16_t gbs_hw_audio_lock_state(void){uint16_t previous=REG_IME;REG_IME=0;return previous;}
+void gbs_hw_audio_unlock_state(uint16_t previous){REG_IME=previous;}
+void stage(int layer,int16_t pa,int16_t pb,int16_t pc,int16_t pd,int32_t reference_x_8,int32_t reference_y_8)
+""" + stage + """
+void publish(void)
+""" + publish + """
+int main(void){
+    stage(1,1,1,1,1,1,1);
+    assert(shadow_affine_pending_mask==0);
+    stage(2,256,0,0,256,100,200);
+    stage(2,195,-63,63,195,14408,9608);
+    stage(3,128,0,0,128,-20,30);
+    assert(REG_IME==1 && shadow_affine_pending_mask==3);
+    REG_VCOUNT=41;publish();
+    assert(matrices[0][0]==0 && references[1][1]==0 && shadow_affine_pending_mask==3);
+    REG_VCOUNT=160;render_publication_blocked=1;publish();
+    assert(matrices[0][0]==0 && shadow_affine_pending_mask==3);
+    render_publication_blocked=0;affine_hblank_enabled=1;affine_hblank_layer=2;publish();
+    assert(matrices[0][0]==0 && shadow_affine_pending_mask==1);
+    assert(matrices[1][0]==128 && references[1][0]==(uint32_t)-20 && references[1][1]==30);
+    affine_hblank_enabled=0;publish();
+    assert(shadow_affine_pending_mask==0 && matrices[0][0]==195 && matrices[0][1]==(uint16_t)-63);
+    assert(matrices[0][2]==63 && matrices[0][3]==195 && references[0][0]==14408 && references[0][1]==9608);
+}
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "affine.c"
+            binary = Path(directory) / "affine"
+            source.write_text(code)
+            subprocess.run(["cc", str(source), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
 
     def test_window_registers_pack_start_in_high_byte_and_end_in_low_byte(self) -> None:
         for window in (0, 1):
@@ -829,9 +877,13 @@ int main() {
     def test_disabling_one_window_preserves_the_other_window_outside_mask(self):
         parameters = "uint16_t left,uint16_t right,uint16_t top,uint16_t bottom,uint16_t inside_mask,uint16_t outside_mask,int enabled"
         code = "#include <stdint.h>\n#include <assert.h>\nuint16_t REG_WIN0H,REG_WIN0V,REG_WIN1H,REG_WIN1V,REG_WININ,REG_WINOUT,REG_DISPCNT;\n"
+        code += "enum { GBS_RASTER_MASK = 16 }; uint8_t scene_raster_overrides; uint16_t scene_raster_base_winin, scene_raster_base_winout;\n"
+        code += "void release_scene_raster_mask(void)" + function_body(self.source, "release_scene_raster_mask") + "\n"
         for window in (0, 1):
             code += "void window" + str(window) + "(" + parameters + "){" + function_body(self.source, "gbs_hw_set_window" + str(window)) + "}\n"
-        code += "int main(void){window0(0,120,0,160,63,0,1);window1(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==0);window1(0,120,0,160,31,4,1);window0(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==4);}"
+        code += "int main(void){window0(0,120,0,160,63,0,1);window1(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==0);window1(0,120,0,160,31,4,1);window0(0,240,0,160,63,63,0);assert((REG_WINOUT&63)==4);"
+        code += "scene_raster_base_winin=0x3F00;scene_raster_base_winout=0x3510;scene_raster_overrides=GBS_RASTER_MASK;"
+        code += "window1(2,15,0,160,31,7,1);assert(scene_raster_overrides==0 && (REG_DISPCNT&0x6000)==0x4000 && REG_WINOUT==0x3507);}"
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory)/"windows.c"; source.write_text(code)
             binary = Path(directory)/"windows"
@@ -861,8 +913,22 @@ void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
 static void commit_hblank_bg_scroll(void){assert(REG_VCOUNT == 160);++affine_commits;}
 void gbs_hw_mix_audio_with_hblank(void){}
+enum { GBS_RASTER_PALETTE = 4, GBS_RASTER_ALPHA = 8, GBS_RASTER_MASK = 16 };
+static uint8_t scene_raster_overrides, scanline_frame_ready;
+static int oam_commits, bg_commits, map_commits;
+void commit_shadow_bg_controls(void){++bg_commits;}
+void commit_shadow_oam(void){assert(REG_VCOUNT==160);++oam_commits;}
+void commit_shadow_bg_tilemaps(void){assert(REG_VCOUNT==160);++map_commits;}
+void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
+void commit_shadow_affine_transforms(void){}
+void commit_paged_affine_frame(void){}
 void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
-void commit_pcm_stream_block(void){} void gbs_audio_vblank_update(void){if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}} void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+void commit_pcm_stream_block(void){}
+void gbs_audio_vblank_update(void){
+ if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}
+ if(scene_raster_tables[scene_raster_active].enabled){assert(oam_commits==1&&bg_commits==1&&map_commits==1);REG_VCOUNT=56;}
+}
+void gbs_dispatch_hardware_interrupts(uint16_t flags){}
 static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""
 void dispatch(void) {"""+irq+"""}
 int main(void){
@@ -874,6 +940,9 @@ int main(void){
  render_publication_blocked=0;audio_must_follow_commit=1;dispatch();
  assert(affine_commits==1 && affine_hblank_frame_ready==0 && REG_VCOUNT==24);
  audio_must_follow_commit=0;dispatch();assert(affine_commits==1);
+ REG_VCOUNT=160; scene_raster_tables[0].enabled=GBS_RASTER_MASK; scanline_frame_ready=1;
+ dispatch();assert(!scanline_frame_ready && oam_commits==1 && REG_VCOUNT==56);
+ REG_VCOUNT=160;dispatch();assert(oam_commits==1); // no publication before the producer signals completion
 }
 """
         with tempfile.TemporaryDirectory() as directory:

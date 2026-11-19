@@ -124,8 +124,8 @@ describe("native command integration", () => {
 
   it("classifies every catalog entry without mistaking pending handlers for native support", () => {
     const matrix = buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(216); // Includes the five queued Link commands already in the catalogue.
-    for (const verb of ["multiplayer_queue_open", "multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status", "multiplayer_queue_close"]) {
+    expect(matrix).toHaveLength(220);
+    for (const verb of ["multiplayer_queue_open", "multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status", "multiplayer_queue_close", "play_sfx_instance", "stop_sfx_instance", "set_sfx_instance_speed", "set_sfx_instance_pan"]) {
       expect(matrix.find(entry => entry.verb === verb)?.status, verb).toBe("native");
     }
     expect(matrix.filter(entry => entry.status === "unknown")).toEqual([]);

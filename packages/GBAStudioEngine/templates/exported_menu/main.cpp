@@ -1870,6 +1870,7 @@ int initialize_menu_runtime() {
     gbs::init_hud(hud);
     gbs::init_event_state(event_state);
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+    gbs::bind_pcm_sfx_instance_assets(project.pcm_assets, project.pcm_asset_count);
     gbs::init_event_runner(menu_event_runner);
     gbs::init_resource_manager(resource_manager);
     gbs::set_backdrop_color(gbs::rgb15(1, 1, 5));

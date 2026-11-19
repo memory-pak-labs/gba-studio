@@ -2655,6 +2655,7 @@ int initialize_isometric_runtime() {
         }
     }
     gbs::bind_event_scripts(event_state, project.scripts, project.script_count);
+    gbs::bind_pcm_sfx_instance_assets(project.pcm_assets, project.pcm_asset_count);
     gbs::init_visual_effects(visual_effects);
     current_room = project.initial_room;
     entry_x = 0;

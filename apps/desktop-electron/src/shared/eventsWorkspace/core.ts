@@ -1,3 +1,4 @@
+import { isSfxInstanceAudio } from "../sfxInstanceCommands.js";
 import { mapAuthoredEventCommands } from "../authoredEventCommands.js";
 import { parseLinkCableCommand, QUEUED_MULTIPLAYER_VERBS } from "../linkCableRuntime.js";
 import { retargetNativeEventCommand } from "../eventCommandRegistry.js";
@@ -266,6 +267,7 @@ export type EventsWorkspaceCommandParameterKind =
   | "dialogue"
   | "event"
   | "music"
+  | "pcmSfx"
   | "room"
   | "routeTable"
   | "sfx"
@@ -733,6 +735,7 @@ interface EventCommandResourceOptions {
   dialogue: string[];
   event: string[];
   music: string[];
+  pcmSfx: string[];
   room: string[];
   routeTable: string[];
   sfx: string[];
@@ -751,6 +754,7 @@ const commandParameterLabels: Record<EventsWorkspaceCommandParameterKind, string
   dialogue: "Dialogo",
   event: "Evento",
   music: "Musica",
+  pcmSfx: "Efeito PCM",
   room: "Cena",
   routeTable: "Tabela de rotas",
   sfx: "SFX",
@@ -793,6 +797,7 @@ function commandParameterKind(placeholder: string | null): EventsWorkspaceComman
     placeholder === "dialogue" ||
     placeholder === "event" ||
     placeholder === "music" ||
+    placeholder === "pcmSfx" ||
     placeholder === "room" ||
     placeholder === "routeTable" ||
     placeholder === "sfx" ||
@@ -2220,6 +2225,11 @@ function missingResourceReferences(command: string, data: GBAProjectData, eventN
     }
   }
 
+  if (verb === "play_sfx_instance" && parts[1]) {
+    const audio = projectArray(data, "audioItems").find((item) => item.name === parts[1] || item.exportID === parts[1]);
+    if (!audio || !isSfxInstanceAudio(data, audio)) missing.push(`Efeito PCM ou WAV não encontrado: ${parts[1]}.`);
+  }
+
   if (verb === "change_scene" && parts[1]) {
     const roomNames = new Set(projectRooms(data).map((item) => stringField(item.name, "")));
     if (!roomNames.has(parts[1])) {
@@ -2291,6 +2301,7 @@ interface EventCommandTemplateContext {
   dialogue: string;
   event: string;
   music: string;
+  pcmSfx: string;
   room: string;
   routeTable: string;
   sfx: string;
@@ -2340,6 +2351,7 @@ function commandResourceOptions(data: GBAProjectData, sourceEvents: Record<strin
     currentRoom: uniqueStrings(rooms),
     dialogue: uniqueStrings(dialogues.map((dialogue) => dialogue.key)),
     event: uniqueStrings(events),
+    pcmSfx: uniqueStrings(projectArray(data, "audioItems").filter(audio => isSfxInstanceAudio(data, audio)).map(audio => stringField(audio.name, ""))),
     music: uniqueStrings(music.length ? music : audioItems.map((audio) => audio.name)),
     room: uniqueStrings(rooms),
     routeTable: uniqueStrings(routeTables),
@@ -2367,6 +2379,7 @@ function commandTemplateContext(options: EventCommandResourceOptions): EventComm
     currentRoom: firstOption(options.currentRoom, "room_name"),
     dialogue: firstOption(options.dialogue, ""),
     event: firstOption(options.event, "intro_001"),
+    pcmSfx: firstOption(options.pcmSfx, ""),
     music: firstOption(options.music, "theme.mod"),
     room: options.room[1] ?? firstOption(options.room, "room_name"),
     routeTable: firstOption(options.routeTable, "scene-routes"),
@@ -2385,7 +2398,7 @@ function resolveCommandTemplate(template: string, context: EventCommandTemplateC
   return template.replace(/\{([a-zA-Z_]+)\}/g, (_match, key: keyof EventCommandTemplateContext) => {
     const value = context[key] ?? defaults[key] ?? _match;
     const verb = template.split(/\s+/)[0] ?? "";
-    return (verb === "change_scene" && key === "room") || key === "actor"
+    return (verb === "change_scene" && key === "room") || key === "actor" || key === "pcmSfx"
       ? sceneChangeCommand([verb, value]).slice(verb.length + 1)
       : value;
   });

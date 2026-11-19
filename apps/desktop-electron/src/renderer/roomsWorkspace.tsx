@@ -1,3 +1,4 @@
+import { PagedAffinePreview } from "./PagedAffinePreview";
 import { roomEntityFieldValidation } from "../shared/roomEntityFieldValidation";
 import { useWorkspaceState, useWorkspaceRef, useWorkspaceChangeEffect } from "./workspaceSessionState";
 import {RacingTrackOverlay} from "./RacingTrackOverlay";
@@ -214,6 +215,7 @@ import { buildScenePreflightReport } from "../shared/scenePreflight";
 import { normalizeBattleRpgSceneConfig, normalizeDungeonCrawlerSceneConfig, normalizeIsometricSceneConfig, normalizeRacingSceneConfig, normalizeSceneRuntime, normalizeShmupSceneConfig, resolveSceneRuntime, sceneTypeProfile, type DungeonCrawlerSceneConfig, type IsometricSceneConfig, type RacingSceneConfig, type SceneFeatureRuntimeConfig } from "../shared/sceneTypeProfiles";
 import {
   affineMatrixForScenePresentation,
+  isLargeAffineSource,
   normalizeAffineScenePresentation,
   type AffineScenePresentation,
   type AffineSceneSourceSize
@@ -984,7 +986,7 @@ function affineAssetOptions(projectData: GBAProjectData | null | undefined): Arr
   });
 }
 
-function sceneCompositionAssetOptions(projectData: GBAProjectData | null | undefined): Array<{ label: string; value: string }> {
+function sceneCompositionAssetOptions(projectData: GBAProjectData | null | undefined): Array<{ label: string; value: string; size?: AffineSceneSourceSize }> {
   const assets = Array.isArray(projectData?.assets) ? projectData.assets : [];
   const excludedKinds = new Set(["audio", "music", "sfx", "pcm", "tracker", "font"]);
   return assets.flatMap((candidate) => {
@@ -998,7 +1000,7 @@ function sceneCompositionAssetOptions(projectData: GBAProjectData | null | undef
       : typeof asset.kind === "string" ? asset.kind : "";
     const name = typeof asset.name === "string" ? asset.name.trim() : "";
     return name && !excludedKinds.has(kind.toLowerCase())
-      ? [{ label: name, value: name }]
+      ? [{ label: name, value: name, size: assetPixelDimensions(asset) }]
       : [];
   });
 }
@@ -1009,9 +1011,13 @@ function affineAssetSourceSize(
 ): AffineSceneSourceSize | undefined {
   const assets = Array.isArray(projectData?.assets) ? projectData.assets : [];
   const asset = assets.find((candidate) => (
-    candidate && typeof candidate === "object" && !Array.isArray(candidate) && candidate.name === assetName
+    candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate.name === assetName || candidate.id === assetName)
   ));
   if (!asset || typeof asset !== "object" || Array.isArray(asset)) return undefined;
+  return assetPixelDimensions(asset);
+}
+
+function assetPixelDimensions(asset: Record<string, unknown>): AffineSceneSourceSize | undefined {
   const metadata = asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
     ? asset.metadata as Record<string, unknown>
     : {};
@@ -1496,21 +1502,21 @@ function AffineScenePreviewOverlay({
   presentation,
   projectData,
   projectPath,
+  scroll,
   room
-}: AffineScenePreviewOverlayProps): React.ReactElement | null {
+}: AffineScenePreviewOverlayProps & { scroll?: { x: number; y: number } }): React.ReactElement | null {
   const ui = useStudioUiText();
   const normalized = normalizeAffineScenePresentation(presentation);
   if (!normalized.enabled) return null;
-  const matrix = affineMatrixForScenePresentation(
-    normalized,
-    affineAssetSourceSize(projectData, normalized.assetId)
-  );
+  const size = affineAssetSourceSize(projectData, normalized.assetId);
+  const paged = isLargeAffineSource(size);
+  const matrix = affineMatrixForScenePresentation(normalized, size, scroll);
   const affineURL = normalized.assetId
     ? resolveProjectAssetURL(projectData, projectPath, normalized.assetId)
     : null;
   const previewStyle: CSSProperties = {
     height: `${cardSize.canvasDisplayHeight}px`,
-    transform: `rotate(${normalized.rotationDegrees}deg) scale(${normalized.scaleX}, ${normalized.scaleY})`,
+    transform: paged ? undefined : `rotate(${normalized.rotationDegrees}deg) scale(${normalized.scaleX}, ${normalized.scaleY})`,
     transformOrigin: `${(normalized.pivotX / 240) * 100}% ${(normalized.pivotY / 160) * 100}%`,
     width: `${cardSize.width}px`
   };
@@ -1530,7 +1536,9 @@ function AffineScenePreviewOverlay({
       role="img"
       style={previewStyle}
     >
-      {affineURL ? <img alt="" draggable={false} src={affineURL} /> : null}
+      {affineURL && paged && size ? (
+        <PagedAffinePreview url={affineURL} size={size} presentation={normalized} scroll={scroll} label={ui("Prévia do fundo Affine paginado")} />
+      ) : affineURL ? <img alt="" draggable={false} src={affineURL} /> : null}
       <span className="room-affine-preview-label">
         {normalized.assetId ? ui("Affine · {0}", { 0: normalized.layer }) : ui("Affine ativado · selecione um asset")}
       </span>
@@ -1560,6 +1568,7 @@ function SceneCompositionPreviewOverlay({
         presentation={sceneCompositionToAffinePresentation(composition)}
         projectData={projectData}
         projectPath={projectPath}
+        scroll={composition.layers.find(layer => layer.enabled && layer.kind === "affine_bg")?.scroll}
         room={room}
       />
     );

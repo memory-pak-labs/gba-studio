@@ -1,11 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { normalizeSceneRasterEffects, rasterScanline, type SceneRasterEffects } from "../shared/sceneRasterEffects";
+import { blendScanlineColors, defaultScanlineControls, normalizeSceneRasterEffects, rasterScanline, sceneScanlineControls, scanlineLayers, SCANLINE_SECOND_TARGETS, type SceneRasterEffects, type SceneScanlineControls } from "../shared/sceneRasterEffects";
 import { InspectorNumber, InspectorRange, InspectorSelect, InspectorToggle } from "./InspectorControls";
 import { useStudioUiText } from "./studioUiText";
 
-export function SceneRasterEffectsEditor({ value, enabled, onChange }: { value?: SceneRasterEffects; enabled: boolean; onChange(value: SceneRasterEffects): void }) {
+function ScanlineBandFields({ label, top, bottom, onChange }: {
+  label: string; top: number; bottom: number; onChange(patch: { top: number } | { bottom: number }): void;
+}) {
+  const ui = useStudioUiText();
+  return <div className="scene-composition-number-grid">
+    <InspectorNumber label={ui("{0} · linha inicial", { 0: label })} min={0} max={158} value={top} onChange={top => onChange({ top })} />
+    <InspectorNumber label={ui("{0} · linha final", { 0: label })} min={2} max={160} value={bottom} onChange={bottom => onChange({ bottom })} />
+  </div>;
+}
+
+export function SceneRasterEffectsEditor({ value, enabled, videoMode, onChange }: { value?: SceneRasterEffects; enabled: boolean; videoMode: number; onChange(value: SceneRasterEffects): void }) {
   const ui = useStudioUiText();
   const effects = normalizeSceneRasterEffects(value), { ripple, gradient } = effects;
+  const { palette, alpha, mask } = { ...defaultScanlineControls, ...effects };
+  const layers = scanlineLayers(videoMode);
+  const layerOptions = layers.map(layer => ({ label: layer, value: layer }));
+  const secondOptions = SCANLINE_SECOND_TARGETS.filter(layer => layer === "BACKDROP" || layers.includes(layer))
+    .map(layer => ({ label: layer === "BACKDROP" ? ui("Cor de fundo") : layer, value: layer }));
+  const changeControl = <K extends keyof SceneScanlineControls>(key: K, patch: Partial<SceneScanlineControls[K]>) => {
+    onChange({ ...effects, [key]: { ...(effects[key] ?? defaultScanlineControls[key]), ...patch } });
+  };
   const [playing, setPlaying] = useState(true), [frame, setFrame] = useState(0);
   const [visible, setVisible] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -29,14 +47,19 @@ export function SceneRasterEffectsEditor({ value, enabled, onChange }: { value?:
   useEffect(() => {
     const context = canvas.current?.getContext("2d"); if (!context) return;
     const image = context.createImageData(240, 160);
-    // Transparent sky and a tiled water pattern demonstrate the two effects.
-    // This is deliberately labeled as a sample, not a rendering of the scene.
+    // A backdrop and a single indexed plane make the mask and alpha visible even in an empty scene.
+    const hasControls = enabled && (palette.enabled || alpha.enabled || mask.enabled);
     for (let y=0;y<160;++y) {
       const scan = rasterScanline(effects, y, frame);
+      const { paletteColor, alpha: opacity, left, right } = sceneScanlineControls(effects, y);
       for (let x=0;x<240;++x) {
         const shifted = (x+(enabled?scan.offset:0)+240)%240;
         let color = enabled && gradient.enabled ? scan.color : 0x5167;
-        if (y>=80) color = ((Math.floor(shifted/8)+Math.floor(y/8))%2 ? 0x4566 : 0x3923);
+        if (y >= (hasControls ? 40 : 80) && (!enabled || (x >= left && x < right))) {
+          const alternate = (Math.floor(shifted / 8) + Math.floor(y / 8)) % 2;
+          const foreground = alternate ? (enabled ? paletteColor ?? 0x4566 : 0x4566) : 0x3923;
+          color = enabled && opacity !== undefined ? blendScanlineColors(foreground, color, opacity) : foreground;
+        }
         const index=(y*240+x)*4;
         for (let c=0;c<3;++c) image.data[index+c]=Math.round(((color>>(c*5))&31)*255/31);
         image.data[index+3]=255;
@@ -45,12 +68,12 @@ export function SceneRasterEffectsEditor({ value, enabled, onChange }: { value?:
     context.putImageData(image,0,0);
   }, [JSON.stringify(effects), enabled, frame]);
   return <fieldset className="scene-composition-effect-card scene-raster-editor">
-    <legend>{ui("Ondulação e gradiente")}</legend>
+    <legend>{ui("Efeitos por linha")}</legend>
     {!enabled ? <p className="inspector-field-description">{ui("Ative a composição avançada para aplicar os efeitos na cena.")}</p> : null}
     <div className="scene-raster-preview">
-      <canvas ref={canvas} width={240} height={160} aria-label={ui("Prévia demonstrativa de ondulação e gradiente")} />
-      <div><strong>{ui("Prévia demonstrativa · 240 × 160")}</strong><p className="inspector-field-description">{ui("O padrão de água e céu demonstra os parâmetros. Use Testar cena para conferir a arte e as camadas do seu projeto na ROM.")}</p>
-        <button type="button" className="inspector-action" onClick={()=>setPlaying(!playing)}>{ui(playing?"Pausar prévia":"Reproduzir prévia")}</button>
+      <canvas ref={canvas} width={240} height={160} aria-label={ui("Prévia demonstrativa dos efeitos por linha")} />
+      <div><strong>{ui("Prévia demonstrativa · 240 × 160")}</strong><p className="inspector-field-description">{ui("A amostra usa uma camada sobre a cor de fundo. Use Testar cena para conferir as camadas e a paleta do projeto na ROM.")}</p>
+        {enabled && ripple.enabled && ripple.speed > 0 ? <button type="button" className="inspector-action" onClick={() => setPlaying(!playing)}>{ui(playing ? "Pausar prévia" : "Reproduzir prévia")}</button> : null}
       </div>
     </div>
     <InspectorToggle checked={ripple.enabled} label={ui("Ondulação")} onChange={enabled=>changeRipple({enabled})} />
@@ -70,6 +93,39 @@ export function SceneRasterEffectsEditor({ value, enabled, onChange }: { value?:
         <InspectorNumber label={ui("Gradiente · linha inicial")} min={0} max={158} value={gradient.top} onChange={top=>changeGradient({top})}/>
         <InspectorNumber label={ui("Gradiente · linha final")} min={2} max={160} value={gradient.bottom} onChange={bottom=>changeGradient({bottom})}/>
       </div>
+    </> : null}
+    <InspectorToggle checked={palette.enabled} label={ui("Paleta por linha")} onChange={enabled => changeControl("palette", { enabled })} />
+    {palette.enabled ? <>
+      <p className="inspector-field-description">{ui("Altera uma entrada da paleta de fundos. As cores inicial e final continuam antes e depois da faixa.")}</p>
+      <div className="scene-composition-number-grid">
+        <InspectorNumber label={ui("Índice da cor BG")} min={1} max={223} value={palette.index} onChange={index => changeControl("palette", { index })} />
+        <label className="inspector-field"><span>{ui("Cor inicial")}</span><input aria-label={ui("Cor inicial da paleta")} type="color" value={palette.from} onChange={event => changeControl("palette", { from: event.currentTarget.value })} /></label>
+        <label className="inspector-field"><span>{ui("Cor final")}</span><input aria-label={ui("Cor final da paleta")} type="color" value={palette.to} onChange={event => changeControl("palette", { to: event.currentTarget.value })} /></label>
+      </div>
+      <ScanlineBandFields label={ui("Paleta")} {...palette} onChange={patch => changeControl("palette", patch)} />
+    </> : null}
+    <InspectorToggle checked={alpha.enabled} label={ui("Transparência por linha")} onChange={enabled => changeControl("alpha", { enabled })} />
+    {alpha.enabled ? <>
+      <p className="inspector-field-description">{ui("Mistura duas camadas sobrepostas. 0 mostra a inferior e 16 mantém a superior opaca.")}</p>
+      <div className="scene-composition-number-grid">
+        <InspectorSelect label={ui("Camada superior")} options={layerOptions} value={alpha.first} onChange={first => changeControl("alpha", { first: first as typeof alpha.first })} />
+        <InspectorSelect label={ui("Camada inferior")} options={secondOptions} value={alpha.second} onChange={second => changeControl("alpha", { second: second as typeof alpha.second })} />
+        <InspectorNumber label={ui("Opacidade inicial")} min={0} max={16} value={alpha.from} onChange={from => changeControl("alpha", { from })} />
+        <InspectorNumber label={ui("Opacidade final")} min={0} max={16} value={alpha.to} onChange={to => changeControl("alpha", { to })} />
+      </div>
+      <ScanlineBandFields label={ui("Transparência")} {...alpha} onChange={patch => changeControl("alpha", patch)} />
+    </> : null}
+    <InspectorToggle checked={mask.enabled} label={ui("Máscara por linha")} onChange={enabled => changeControl("mask", { enabled })} />
+    {mask.enabled ? <>
+      <p className="inspector-field-description">{ui("Recorta a camada entre duas bordas horizontais dentro da faixa. Fora da faixa, a camada aparece inteira.")}</p>
+      <InspectorSelect label={ui("Camada da máscara")} options={layerOptions} value={mask.layer} onChange={layer => changeControl("mask", { layer: layer as typeof mask.layer })} />
+      <div className="scene-composition-number-grid">
+        <InspectorNumber label={ui("Esquerda na linha inicial")} min={0} max={239} value={mask.leftTop} onChange={leftTop => changeControl("mask", { leftTop })} />
+        <InspectorNumber label={ui("Direita na linha inicial")} min={1} max={240} value={mask.rightTop} onChange={rightTop => changeControl("mask", { rightTop })} />
+        <InspectorNumber label={ui("Esquerda na linha final")} min={0} max={239} value={mask.leftBottom} onChange={leftBottom => changeControl("mask", { leftBottom })} />
+        <InspectorNumber label={ui("Direita na linha final")} min={1} max={240} value={mask.rightBottom} onChange={rightBottom => changeControl("mask", { rightBottom })} />
+      </div>
+      <ScanlineBandFields label={ui("Máscara")} {...mask} onChange={patch => changeControl("mask", patch)} />
     </> : null}
   </fieldset>;
 }

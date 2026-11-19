@@ -233,8 +233,33 @@ struct SceneGradient {
     uint16_t from = 0x5167, to = 0x7f76;
     uint8_t top = 0, bottom = 80;
 };
-struct SceneRasterEffects { SceneRipple ripple {}; SceneGradient gradient {}; };
-constexpr bool has_scene_raster_effects(const SceneRasterEffects& effects) { return effects.ripple.enabled || effects.gradient.enabled; }
+struct SceneScanlinePalette {
+    bool enabled = false;
+    uint8_t index = 17;
+    uint16_t from = 0, to = 0;
+    uint8_t top = 0, bottom = 160;
+};
+struct SceneScanlineAlpha {
+    bool enabled = false;
+    uint8_t first = 4, second = 32;
+    uint8_t from = 16, to = 6, top = 0, bottom = 160;
+};
+struct SceneScanlineMask {
+    bool enabled = false;
+    uint8_t layer = 4;
+    uint8_t leftTop = 96, rightTop = 144, leftBottom = 20, rightBottom = 220;
+    uint8_t top = 0, bottom = 160;
+};
+struct SceneRasterEffects {
+    SceneRipple ripple {};
+    SceneGradient gradient {};
+    SceneScanlinePalette palette {};
+    SceneScanlineAlpha alpha {};
+    SceneScanlineMask mask {};
+};
+constexpr bool has_scene_raster_effects(const SceneRasterEffects& effects) {
+    return effects.ripple.enabled || effects.gradient.enabled || effects.palette.enabled || effects.alpha.enabled || effects.mask.enabled;
+}
 bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mode);
 
 struct VideoComposition {
@@ -251,6 +276,7 @@ struct VideoComposition {
     uint8_t bitmap_page;
     bool affine_wrap = true;
     SceneRasterEffects raster {};
+    Vec2i paged_affine_parallax_256 {};
 };
 
 constexpr VideoComposition default_video_composition() {
@@ -539,6 +565,7 @@ void set_affine_bg_wrap(BackgroundLayer layer, bool enabled);
 void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& transform);
 bool load_bitmap16(DisplayMode mode, const Bitmap16Asset& asset, uint8_t page = 0);
 bool load_bitmap8(DisplayMode mode, const Bitmap8Asset& asset, uint8_t page = 0);
+void set_paged_affine_camera(Vec2i position_pixels);
 bool render_event_background_scale(const EventState& state);
 // Project map decorations through the same image transform; icons keep their size.
 bool project_event_background_point(const EventState& state, BackgroundLayer layer, Vec2i source, Vec2i& screen);

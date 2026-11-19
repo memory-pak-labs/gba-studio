@@ -16,7 +16,7 @@ describe("SceneCompositionInspector", () => {
       return <SceneCompositionInspector assetOptions={[]} onChange={next => { changed(next); setValue(next); }} sceneType="topdown" value={value} />;
     }
     render(<Harness/>);
-    expect(screen.getByLabelText("Prévia demonstrativa de ondulação e gradiente")).toHaveAttribute("width", "240");
+    expect(screen.getByLabelText("Prévia demonstrativa dos efeitos por linha")).toHaveAttribute("width", "240");
     fireEvent.click(screen.getByRole("checkbox", { name: /^Ondulação$/ }));
     fireEvent.change(screen.getByRole("combobox", { name: "Camada da ondulação" }), { target: { value: "BG3" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /^Gradiente de fundo$/ }));

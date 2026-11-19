@@ -1618,7 +1618,10 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
       const inactiveActionEffect = runtime === "battleRpg"
         && room?.runtime?.config?.presentation?.effectsActorId === actor?.id
         && !nativeSinglePartSpriteObject(header,symbol,frameRuntimeState?.nativeVideo);
-      const visibleInInitialFrame = typeof actor?.visibleVariable !== "string" && !inactiveActionEffect;
+      // The first frame belongs to wave 0 even when an actor from a later wave
+      // already has authored coordinates inside the viewport.
+      const waitingForShmupWave = runtime === "shmup" && Number(actor?.waveIndex ?? 0) > 0;
+      const visibleInInitialFrame = typeof actor?.visibleVariable !== "string" && !inactiveActionEffect && !waitingForShmupWave;
       const authoredTarget = authoredActorFramebufferTarget(
         room,
         runtime,
@@ -1717,7 +1720,8 @@ async function auditExportedAuthoredActors(exportPath, exported, project, room, 
           audited: framebufferRequired,
           ok: !framebufferRequired || framebufferPixels.ok,
           required: framebufferRequired,
-          reason: inactiveActionEffect ? "efeito-de-acao-inativo-no-frame-inicial" : !visibleInInitialFrame
+          reason: waitingForShmupWave ? "ator-de-onda-posterior-ao-frame-inicial"
+            : inactiveActionEffect ? "efeito-de-acao-inativo-no-frame-inicial" : !visibleInInitialFrame
             ? "ator-condicional-ausente-no-frame-inicial"
             : !intersectsInitialFramebuffer
               ? "ator-fora-do-framebuffer-inicial"

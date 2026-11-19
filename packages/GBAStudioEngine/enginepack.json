@@ -681,6 +681,7 @@
     ],
     "render_runtime": [
       "scene_raster_effects",
+      "scene_scanline_controls",
       "background_parallax",
       "visual_effect_controller",
       "visual_effect_target_layers",
@@ -700,6 +701,7 @@
       "affine_bg_transform",
       "affine_bg_keyframe_transform",
       "affine_bg_tilemap_load",
+      "render.paged_affine_bg",
       "bitmap_mode3_16bit",
       "bitmap_mode4_8bit",
       "bitmap_mode5_16bit",
@@ -1324,6 +1326,7 @@
       "runtime_bus_fade",
       "runtime_bus_mute_all_profiles",
       "pcm_sfx_event_options",
+      "pcm_sfx_instances",
       "pcm_music_mix",
       "pcm_block_streaming",
       "pcm_stream_status",

@@ -1038,6 +1038,23 @@ describe("Audio workspace presentation", () => {
     ]);
   });
 
+  it("tracks instance playback in the sound library and preserves its slot on rename", () => {
+    const project = {
+      events: [{ name: "boot", steps: [
+        { command: 'play_sfx_instance "First sound.wav" 4' },
+        { command: "stop_sfx_instance 4" }
+      ] }],
+      audioItems: [{ id: "clip", name: "First sound.wav", kind: "SFX", format: "WAV", exportID: "first_sound" }]
+    };
+    expect(deriveAudioWorkspacePresentation(project).items[0].usageCount).toBe(1);
+    expect(renameAudioItemInProject(project, "clip", "New sound.wav").events).toEqual([
+      { name: "boot", steps: [
+        { command: 'play_sfx_instance "New sound.wav" 4' },
+        { command: "stop_sfx_instance 4" }
+      ] }
+    ]);
+  });
+
   it("tracks and renames the native fight action cues in both scene collections", () => {
     const scene = {name:"arena", runtime:{type:"luta", config:{actionSounds:{hit:"impact",miss:"whiff"}}}};
     const project = {

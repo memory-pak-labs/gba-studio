@@ -1,9 +1,11 @@
+import { sfxInstanceVerbs } from "./sfxInstanceCommands.js";
 import { lutaEventVerbs } from "./lutaEventCommands.js";
 import { QUEUED_MULTIPLAYER_VERBS } from "./linkCableRuntime.js";
 
 export type NativeEventCommandExportHandling = "runtime" | "structural" | "editor-only";
 
 const nativeEventCommandExportHandlingByVerb = new Map<string, NativeEventCommandExportHandling>([
+  ...sfxInstanceVerbs.map(verb => [verb, "runtime"] as const),
   ...lutaEventVerbs.map(verb => [verb, "runtime"] as const),
   ...QUEUED_MULTIPLAYER_VERBS.map(verb => [verb, "runtime"] as const),
   ...([

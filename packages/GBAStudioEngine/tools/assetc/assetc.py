@@ -1366,7 +1366,7 @@ def _affine_tile_distance(left, right):
     return sum(pixel_left != pixel_right for pixel_left, pixel_right in zip(left, right))
 
 
-def _reduce_affine_tiles(tiles, tilemap_entries, max_tiles):
+def _reduce_affine_tiles(tiles, tilemap_entries, max_tiles, reserve_blank=False):
     """Mapeia tiles affine excedentes para um conjunto determinístico de tiles.
 
     O tilemap affine armazena índices de 8 bits, portanto o limite físico é 256
@@ -1383,7 +1383,7 @@ def _reduce_affine_tiles(tiles, tilemap_entries, max_tiles):
     for tile_index in tilemap_entries:
         frequencies[tile_index] += 1
 
-    selected = [max(range(len(tiles)), key=lambda index: (frequencies[index], -index))]
+    selected = [0 if reserve_blank else max(range(len(tiles)), key=lambda index: (frequencies[index], -index))]
     nearest_distance = [
         _affine_tile_distance(tile, tiles[selected[0]])
         for tile in tiles
@@ -1422,16 +1422,19 @@ def build_affine_tiles(width, height, indices, optimize_tile_budget=None):
 
     tilemap_width = width // 8
     tilemap_height = height // 8
-    if tilemap_width != tilemap_height or tilemap_width not in (16, 32, 64, 128):
-        raise SystemExit("--affine-tilemap precisa gerar mapa quadrado de 16x16, 32x32, 64x64 ou 128x128 tiles")
+    if tilemap_width != tilemap_height or tilemap_width not in (16, 32, 64, 128, 256, 512):
+        raise SystemExit("--affine-tilemap requer um PNG quadrado com 128, 256, 512, 1024, 2048 ou 4096 pixels por lado")
+    paged = tilemap_width > 128
 
     cache_key = (id(indices), optimize_tile_budget)
     cached = AFFINE_TILE_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    tiles = []
-    tile_lookup = {}
+    # Paged maps need a transparent entry for samples outside the authored
+    # world when logical wrapping is disabled.
+    tiles = [[0] * 64] if paged else []
+    tile_lookup = {tuple(tiles[0]): 0} if paged else {}
     tilemap_entries = []
 
     for tile_y in range(0, height, 8):
@@ -1444,7 +1447,7 @@ def build_affine_tiles(width, height, indices, optimize_tile_budget=None):
             tilemap_entries.append(tile_lookup[tile_key])
 
     if optimize_tile_budget is not None:
-        tiles, tilemap_entries = _reduce_affine_tiles(tiles, tilemap_entries, optimize_tile_budget)
+        tiles, tilemap_entries = _reduce_affine_tiles(tiles, tilemap_entries, optimize_tile_budget, reserve_blank=paged)
     elif len(tiles) > 256:
         raise SystemExit("affine background suporta no maximo 256 tiles unicos")
 
@@ -2836,10 +2839,15 @@ def emit_affine_header(
     ]
     for tile in tiles:
         lines.append("    { " + ", ".join(hex(v) for v in tile) + " },")
+    lines.extend(["};", ""])
+    if tilemap_width > 128:
+        lines.append(f"alignas(2) constexpr uint8_t {name}_tilemap_entries[{len(tilemap_values)}] = {{")
+        for start in range(0, len(tilemap_values), 32):
+            lines.append("    " + ", ".join(hex(v) for v in tilemap_values[start:start + 32]) + ",")
+        lines.append("};")
+    else:
+        lines.append(f"constexpr uint8_t {name}_tilemap_entries[{len(tilemap_values)}] = {{ {', '.join(hex(v) for v in tilemap_values)} }};")
     lines.extend([
-        "};",
-        "",
-        f"constexpr uint8_t {name}_tilemap_entries[{len(tilemap_values)}] = {{ {', '.join(hex(v) for v in tilemap_values)} }};",
         "",
         f"const gbs::AffineTileAsset {name}_tile_asset = {{ reinterpret_cast<const uint8_t*>({name}_tiles), {name}_tile_count, {destination_tile} }};",
         f"constexpr gbs::AffineTileMapAsset {name}_tilemap_asset = {{ {name}_tilemap_entries, {name}_tilemap_width, {name}_tilemap_height }};",
@@ -5846,7 +5854,8 @@ def pack_png_resources(asset, base_dir):
         return {
             "affine_bg_tiles": len(tiles),
             "bg_palette_colors": len(colors),
-            "tilemap_entries": len(tilemap_entries),
+            "tilemap_entries": min(len(tilemap_entries), 128 * 128),
+            **({"rom_source_bytes": len(tilemap_entries)} if tilemap_width > 128 else {}),
             "tilemap_width": tilemap_width,
             "tilemap_height": tilemap_height,
         }
@@ -9963,6 +9972,10 @@ def event_op_from_json(value):
         "play_sfx": "PlaySfx",
         "sfx": "PlaySfx",
         "play_pcm_sfx": "PlayPcmSfx",
+        "play_sfx_instance": "PlayPcmSfxInstance",
+        "stop_sfx_instance": "StopPcmSfxInstance",
+        "set_sfx_instance_speed": "SetPcmSfxInstanceSpeed",
+        "set_sfx_instance_pan": "SetPcmSfxInstancePan",
         "pcm_sfx": "PlayPcmSfx",
         "clear_variable": "ClearVariable",
         "clear_var": "ClearVariable",
@@ -11154,6 +11167,23 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             event_int(command, ["other_actor", "other_actor_index", "other"], 0),
             event_value_offset(event_direction_index(command, ["relation", "direction", "value"]), event_int(command, ["offset"], 0)),
         )
+    if op in ("PlayPcmSfxInstance", "StopPcmSfxInstance", "SetPcmSfxInstanceSpeed", "SetPcmSfxInstancePan"):
+        instance = event_int(command, "instance")
+        if not 1 <= instance <= 4:
+            raise SystemExit(f"{op}: instance must be 1–4")
+        if op == "PlayPcmSfxInstance":
+            index = event_int(command, "index", -1)
+            volume = event_int(command, "volume", 15)
+            if not 0 <= index <= 32767 or not 0 <= volume <= 15:
+                raise SystemExit(f"{op}: invalid PCM index or volume")
+            return (op, instance, index, volume)
+        if op == "StopPcmSfxInstance":
+            return (op, instance, 0, 0)
+        percent = event_int(command, "percent", -32768)
+        minimum, maximum = (25, 400) if op == "SetPcmSfxInstanceSpeed" else (-100, 100)
+        if not minimum <= percent <= maximum:
+            raise SystemExit(f"{op}: percent must be {minimum}–{maximum}")
+        return (op, instance, percent, 0)
     if op == "PlayPcmSfx":
         return (
             op,
@@ -14909,7 +14939,7 @@ def scene_raster_effects_literal(value, mode):
         return value
     def color(value):
         if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-            raise SystemExit("video.raster.gradient precisa de cores #rrggbb")
+            raise SystemExit("video.raster precisa de cores #rrggbb")
         rgb = int(value[1:], 16)
         return ((rgb >> 19) & 31) | (((rgb >> 11) & 31) << 5) | (((rgb >> 3) & 31) << 10)
     r, g = ripple.get("enabled") is True, gradient.get("enabled") is True
@@ -14926,9 +14956,53 @@ def scene_raster_effects_literal(value, mode):
     if g and end - start < 2:
         raise SystemExit("Gradiente requer ao menos duas linhas")
     first, last = color(gradient.get("from", "#3858a0")), color(gradient.get("to", "#b0d8f8"))
+    palette, alpha, mask = (value.get(kind, {}) for kind in ("palette", "alpha", "mask"))
+    def band(control):
+        if not isinstance(control, dict):
+            raise SystemExit("video.raster: cada efeito por linha precisa ser objeto")
+        enabled = control.get("enabled") is True
+        top = number(control, "top", 0, 0, 158)
+        bottom = number(control, "bottom", 160, 2, 160)
+        if enabled and (mode not in (0, 1, 2) or bottom - top < 2):
+            raise SystemExit("Efeito por linha requer duas linhas ou mais e modo tiled ou affine")
+        return enabled, top, bottom
+    def targets(control, key, default, backdrop=False):
+        targets = {"BG1": 2, "BG2": 4, "BG3": 8}
+        if backdrop:
+            targets["BACKDROP"] = 32
+        layer = control.get(key, default)
+        if not isinstance(layer, str) or layer not in targets or (mode == 1 and layer == "BG3") or (mode == 2 and layer == "BG1"):
+            raise SystemExit(f"Camada inválida em video.raster.{key}")
+        return targets[layer]
+    p, p_top, p_bottom = band(palette)
+    a, a_top, a_bottom = band(alpha)
+    m, m_top, m_bottom = band(mask)
+    palette_literal = "gbs::SceneScanlinePalette {}"
+    alpha_literal = "gbs::SceneScanlineAlpha {}"
+    mask_literal = "gbs::SceneScanlineMask {}"
+    if p:
+        index = number(palette, "index", 17, 1, 223)
+        p_from, p_to = color(palette.get("from", "#ffac48")), color(palette.get("to", "#4868d8"))
+        palette_literal = f"gbs::SceneScanlinePalette {{ true, {index}, {p_from}, {p_to}, {p_top}, {p_bottom} }}"
+    if a:
+        a_first, a_second = targets(alpha, "first", "BG2"), targets(alpha, "second", "BACKDROP", backdrop=True)
+        if a_first == a_second:
+            raise SystemExit("Transparência por linha requer camadas diferentes")
+        a_from, a_to = number(alpha, "from", 16, 0, 16), number(alpha, "to", 6, 0, 16)
+        alpha_literal = f"gbs::SceneScanlineAlpha {{ true, {a_first}, {a_second}, {a_from}, {a_to}, {a_top}, {a_bottom} }}"
+    if m:
+        m_layer = targets(mask, "layer", "BG2")
+        left_top, right_top = number(mask, "leftTop", 96, 0, 239), number(mask, "rightTop", 144, 1, 240)
+        left_bottom, right_bottom = number(mask, "leftBottom", 20, 0, 239), number(mask, "rightBottom", 220, 1, 240)
+        if left_top >= right_top or left_bottom >= right_bottom:
+            raise SystemExit("As bordas da máscara por linha estão invertidas")
+        mask_literal = (f"gbs::SceneScanlineMask {{ true, {m_layer}, {left_top}, {right_top}, "
+                        f"{left_bottom}, {right_bottom}, {m_top}, {m_bottom} }}")
     return ("gbs::SceneRasterEffects { "
             f"gbs::SceneRipple {{ {'true' if r else 'false'}, gbs::BackgroundLayer::{layer}, {amplitude}, {wavelength}, {speed}, {top}, {bottom} }}, "
-            f"gbs::SceneGradient {{ {'true' if g else 'false'}, {first}, {last}, {start}, {end} }} }}")
+            f"gbs::SceneGradient {{ {'true' if g else 'false'}, {first}, {last}, {start}, {end} }}, "
+            f"{palette_literal}, {alpha_literal}, {mask_literal} }}")
+
 
 
 def video_composition_literal(project, description, asset_report=None):
@@ -14956,6 +15030,8 @@ def video_composition_literal(project, description, asset_report=None):
         int(affine.get("reference_y_8", 0)),
     ]
     affine_asset = affine.get("asset")
+    parallax = [require_int(affine.get(key, 0), f"{description}.video.affine.{key}", -1024, 1024)
+                for key in ("camera_x256", "camera_y256")]
     affine_tiles = "nullptr"
     affine_tilemap = "nullptr"
     affine_palette = "nullptr"
@@ -14990,8 +15066,9 @@ def video_composition_literal(project, description, asset_report=None):
         f"{affine_tiles}, {affine_tilemap}, {affine_palette}, "
         f"{bitmap16}, {bitmap8}, {bitmap_palette}, static_cast<uint8_t>({page}), "
         f"{'true' if bool(affine.get('wrap', True)) else 'false'}, "
-        f"{scene_raster_effects_literal(video.get('raster'), mode)} "
-        "}"
+        f"{scene_raster_effects_literal(video.get('raster'), mode)}"
+        + (f", gbs::Vec2i {{ {parallax[0]}, {parallax[1]} }} " if any(parallax) else " ")
+        + "}"
     )
 
 
@@ -21507,11 +21584,12 @@ def compiled_scene_video_layouts(project_data, asset_report):
             if asset.get("kind") != "affine_bg" or not placement:
                 notes.append("affine_asset_not_resolved")
                 continue
-            if width != height or width not in (16, 32, 64, 128):
+            if width != height or width not in (16, 32, 64, 128, 256, 512):
                 notes.append("affine_map_dimensions_not_resolved")
                 continue
             bg.append({"start": 32768 + placement["start"] * 64, "count": placement["count"] * 64})
-            maps[0] = max(1, (width * height + 2047) // 2048)
+            caps = min(width, 128)
+            maps[0] = max(1, (caps * caps + 2047) // 2048)
         elif runtime == "isometric" and not row.get("paged_surface"):
             authored = row.get("authored_background") if row.get("world_mode") == "static_composition" else None
             tactical = row.get("tactical_presentation") if row.get("grid", block.get("grid", {})).get("gameplay_mode") == "tactical" else None

@@ -186,7 +186,11 @@ enum class EventOp : uint8_t {
     MultiplayerQueueSend = 170,
     MultiplayerQueueReceive = 171,
     MultiplayerQueueStatus = 172,
-    MultiplayerQueueClose = 173
+    MultiplayerQueueClose = 173,
+    PlayPcmSfxInstance = 174,
+    StopPcmSfxInstance = 175,
+    SetPcmSfxInstanceSpeed = 176,
+    SetPcmSfxInstancePan = 177
 };
 
 enum class VisualEffectKind : uint8_t {

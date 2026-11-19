@@ -1643,7 +1643,7 @@ gbsdoctor-test:
 
 .PHONY: iwram-buffer-placement-test
 iwram-buffer-placement-test: check-toolchain
-	GBA_TEST_CXX="$(ARM_CXX)" GBA_TEST_OBJDUMP="$(ARM_OBJDUMP)" python3 tests/host/iwram_buffer_placement_tests.py
+	GBA_TEST_CC="$(ARM_CC)" GBA_TEST_CXX="$(ARM_CXX)" GBA_TEST_OBJDUMP="$(ARM_OBJDUMP)" python3 tests/host/iwram_buffer_placement_tests.py
 
 package: test topdown_basic.gba platformer_basic.gba isometric_basic.gba iwram-buffer-placement-test
 	rm -rf $(DIST_DIR)

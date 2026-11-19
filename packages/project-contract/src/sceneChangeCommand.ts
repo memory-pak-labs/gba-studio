@@ -23,7 +23,7 @@ export function actorCommandReferences(command: string, actorNames: readonly str
 
 function hasQuotedFirstReference(verb: string): boolean {
   return verb === "change_scene" || verb === "luta_start_match" || verb === "if_scene"
-    || verb === "play_music" || verb === "play_sfx" || verb === "run_audio_routine" || verb === "set_text_sfx"
+    || verb === "play_music" || verb === "play_sfx" || verb === "play_sfx_instance" || verb === "run_audio_routine" || verb === "set_text_sfx"
     || actorReferenceCommands.has(verb) || queuedVariableReferenceCommands.has(verb);
 }
 
@@ -90,6 +90,7 @@ export function sceneChangeCommandParts(command: string, actorNames: readonly st
 
 /** Scene, actor and actor-resource names use JSON string escaping when required. */
 export function sceneChangeCommand(parts: string[]): string {
+  if (parts[0] === "play_sfx_instance" && parts[1] === "") return [parts[0], '""', ...parts.slice(2)].join(" ");
   if (!hasQuotedFirstReference(parts[0] ?? "") || !parts[1]) return parts.join(" ").trim();
   const quote = (value: string) => /[\s"\\]/.test(value) ? JSON.stringify(value) : value;
   const first = quote(parts[1]);

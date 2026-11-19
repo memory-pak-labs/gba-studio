@@ -4,6 +4,7 @@
 #include "gbs/event.hpp"
 #include "gbs/interrupt.hpp"
 #include "gbs_hw.h"
+#include "gbs_paged_affine.h"
 #include "gbs_room_tilemap.h"
 #include "gbs/tile_edits.hpp"
 
@@ -11,6 +12,7 @@
 extern "C" __attribute__((weak)) GbsSceneRasterTable* gbs_hw_begin_scene_raster_update() { static GbsSceneRasterTable table {}; return &table; }
 extern "C" __attribute__((weak)) void gbs_hw_submit_scene_raster_update() {}
 extern "C" __attribute__((weak)) void gbs_hw_reset_scene_raster() {}
+extern "C" __attribute__((weak)) void gbs_hw_stage_paged_affine(const GbsPagedAffineFrame*) {}
 // Pure render host fixtures omit the DMA transport. Full queue tests link the
 // strong implementation, which replaces this no-queue host stub.
 namespace gbs {
@@ -57,6 +59,39 @@ int background_scroll_x[4] {};
 DisplayMode background_display_mode = DisplayMode::Mode0Text;
 uint8_t event_affine_background_mask = 0;
 AffineBgTransform event_affine_background_base[2] {};
+struct PagedAffineBackground {
+    const AffineTileMapAsset* map;
+    BackgroundLayer layer;
+    Vec2i camera;
+    Vec2i parallax_256;
+    uint8_t blank;
+    bool wrap;
+    AffineBgTransform last_transform;
+};
+PagedAffineBackground paged_affine GBS_RENDER_EWRAM {};
+
+bool stage_paged_affine(const AffineBgTransform& authored) {
+    auto transform = authored;
+    transform.reference_x_8 += paged_affine.camera.x * paged_affine.parallax_256.x;
+    transform.reference_y_8 += paged_affine.camera.y * paged_affine.parallax_256.y;
+    const auto bounds = gbs_affine_page_bounds(transform.pa, transform.pb, transform.pc, transform.pd,
+        transform.reference_x_8, transform.reference_y_8);
+    if (!gbs_affine_page_fits(bounds)) return false;
+    const GbsPagedAffineFrame frame {
+        paged_affine.map->entries, paged_affine.map->width, static_cast<uint8_t>(paged_affine.layer),
+        static_cast<uint8_t>(paged_affine.wrap), paged_affine.blank, transform.pa, transform.pb,
+        transform.pc, transform.pd, transform.reference_x_8, transform.reference_y_8, bounds
+    };
+    paged_affine.last_transform = authored;
+    gbs_hw_stage_paged_affine(&frame);
+    return true;
+}
+
+void clear_paged_affine() {
+    if (paged_affine.map == nullptr) return;
+    paged_affine = {};
+    gbs_hw_stage_paged_affine(nullptr);
+}
 AffineSpriteTransform explicit_sprite_matrices[32] GBS_RENDER_EWRAM {};
 AffineSpriteTransform scaled_sprite_matrices[16] GBS_RENDER_EWRAM {};
 uint8_t scaled_sprite_matrix_slots[16] GBS_RENDER_EWRAM {};
@@ -433,6 +468,7 @@ bool load_affine_tilemap(BackgroundLayer layer, const AffineTileMapAsset& asset)
         return false;
     }
 
+    if (paged_affine.layer == layer) clear_paged_affine();
     gbs_hw_load_affine_bg_tilemap(static_cast<int>(layer), asset.entries, asset.width, asset.height, static_cast<uint32_t>(size));
     return true;
 }
@@ -584,6 +620,7 @@ void set_display_mode(DisplayMode mode) {
     if (!is_valid_display_mode(mode)) {
         return;
     }
+    if (mode != DisplayMode::Mode1TextAffine && mode != DisplayMode::Mode2Affine) clear_paged_affine();
     background_display_mode = mode;
     gbs_hw_set_display_mode(static_cast<uint16_t>(mode));
 }
@@ -592,11 +629,20 @@ void set_affine_bg_wrap(BackgroundLayer layer, bool enabled) {
     if (!is_valid_affine_background_layer(layer)) {
         return;
     }
+    if (paged_affine.map != nullptr && paged_affine.layer == layer) {
+        paged_affine.wrap = enabled;
+        stage_paged_affine(paged_affine.last_transform);
+        return;
+    }
     gbs_hw_set_affine_bg_wrap(static_cast<int>(layer), enabled ? 1 : 0);
 }
 
 void set_affine_bg_transform(BackgroundLayer layer, const AffineBgTransform& transform) {
     if (!is_valid_affine_background_layer(layer)) {
+        return;
+    }
+    if (paged_affine.map != nullptr && paged_affine.layer == layer) {
+        if (stage_paged_affine(transform)) event_affine_background_base[static_cast<int>(layer) - 2] = transform;
         return;
     }
     event_affine_background_base[static_cast<int>(layer)-2] = transform;
@@ -644,11 +690,19 @@ bool event_background_transform(const EventState& state, int index, AffineBgTran
 }
 }
 
+void set_paged_affine_camera(Vec2i position_pixels) {
+    paged_affine.camera = position_pixels;
+}
+
 bool render_event_background_scale(const EventState& state) {
     bool applied = false;
     for (int index = 0; index < 2; ++index) {
         AffineBgTransform transform {};
         if (!event_background_transform(state,index,transform)) continue;
+        if (paged_affine.map != nullptr && static_cast<int>(paged_affine.layer) == index + 2) {
+            applied = stage_paged_affine(transform) || applied;
+            continue;
+        }
         gbs_hw_set_affine_bg_transform(index+2,transform.pa,transform.pb,transform.pc,transform.pd,
             transform.reference_x_8,transform.reference_y_8);
         applied = true;
@@ -661,8 +715,11 @@ bool project_event_background_point(const EventState& state, BackgroundLayer lay
     if (!event_background_transform(state,static_cast<int>(layer)-2,matrix)) return false;
     const int64_t determinant = int64_t(matrix.pa)*matrix.pd - int64_t(matrix.pb)*matrix.pc;
     if (!determinant) return false;
-    const int64_t x = int64_t(source.x)*256 - matrix.reference_x_8;
-    const int64_t y = int64_t(source.y)*256 - matrix.reference_y_8;
+    const bool paged = paged_affine.map != nullptr && paged_affine.layer == layer;
+    const int64_t x = int64_t(source.x)*256 - matrix.reference_x_8 -
+        (paged ? int64_t(paged_affine.camera.x) * paged_affine.parallax_256.x : 0);
+    const int64_t y = int64_t(source.y)*256 - matrix.reference_y_8 -
+        (paged ? int64_t(paged_affine.camera.y) * paged_affine.parallax_256.y : 0);
     const int64_t screen_x = (x*matrix.pd-y*matrix.pb)/determinant;
     const int64_t screen_y = (y*matrix.pa-x*matrix.pc)/determinant;
     if (screen_x < -32768 || screen_x > 32767 || screen_y < -32768 || screen_y > 32767) return false;
@@ -702,20 +759,61 @@ bool scale_perspective_background(HBlankAffineRasterLine* lines, size_t count, u
     return true;
 }
 
+static unsigned interpolate_scanline(unsigned from, unsigned to, unsigned top, unsigned bottom, unsigned y) {
+    const unsigned span = bottom - top - 1;
+    const unsigned distance = y <= top ? 0 : y >= bottom - 1 ? span : y - top;
+    return (from * (span - distance) + to * distance) / span;
+}
+
+static uint16_t interpolate_scanline_color(uint16_t from, uint16_t to, unsigned top, unsigned bottom, unsigned y) {
+    uint16_t color = 0;
+    for (unsigned shift = 0; shift <= 10; shift += 5) {
+        color |= static_cast<uint16_t>(interpolate_scanline((from >> shift) & 31, (to >> shift) & 31, top, bottom, y) << shift);
+    }
+    return color;
+}
+
+static bool valid_scanline_band(unsigned top, unsigned bottom) {
+    return bottom <= 160 && bottom >= top + 2;
+}
+
+static bool valid_scanline_layer(uint8_t mask, DisplayMode mode) {
+    return mask == 4 || (mask == 2 && mode != DisplayMode::Mode2Affine) ||
+        (mask == 8 && mode != DisplayMode::Mode1TextAffine);
+}
+
 bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mode) {
     const auto& r = effects.ripple; const auto& g = effects.gradient;
+    const auto& p = effects.palette; const auto& a = effects.alpha; const auto& m = effects.mask;
     if (r.enabled && (r.amplitude > 16 || r.wavelength < 8 || r.wavelength > 160 || r.speed > 8 ||
         r.top >= r.bottom || r.bottom > 160 || r.layer == BackgroundLayer::BG0 || !is_valid_background_layer(r.layer) ||
         (mode != DisplayMode::Mode0Text && !(mode == DisplayMode::Mode1TextAffine && r.layer == BackgroundLayer::BG1)))) return false;
     if (g.enabled && (static_cast<int>(mode) > 2 || g.from > 32767 || g.to > 32767 || g.bottom > 160 || g.bottom < g.top + 2)) return false;
+    if ((p.enabled || a.enabled || m.enabled) && static_cast<int>(mode) > 2) return false;
+    if (p.enabled && (!valid_scanline_band(p.top, p.bottom) || p.index == 0 || p.index > 223 || p.from > 32767 || p.to > 32767)) return false;
+    if (a.enabled && (!valid_scanline_band(a.top, a.bottom) || a.from > 16 || a.to > 16 ||
+        !valid_scanline_layer(a.first, mode) || (a.second != 32 && !valid_scanline_layer(a.second, mode)) || a.first == a.second)) return false;
+    if (m.enabled && (!valid_scanline_band(m.top, m.bottom) || !valid_scanline_layer(m.layer, mode) ||
+        m.leftTop >= m.rightTop || m.rightTop > 240 || m.leftBottom >= m.rightBottom || m.rightBottom > 240)) return false;
+    const auto& old_p = cached_scene_raster.palette;
+    const auto& old_a = cached_scene_raster.alpha;
+    const auto& old_m = cached_scene_raster.mask;
     const auto& old_r = cached_scene_raster.ripple;
     const auto& old_g = cached_scene_raster.gradient;
     if (scene_raster_cached && mode == cached_scene_raster_mode &&
         r.enabled == old_r.enabled && r.layer == old_r.layer && r.amplitude == old_r.amplitude &&
         r.wavelength == old_r.wavelength && r.speed == old_r.speed && r.top == old_r.top && r.bottom == old_r.bottom &&
-        g.enabled == old_g.enabled && g.from == old_g.from && g.to == old_g.to && g.top == old_g.top && g.bottom == old_g.bottom) return true;
+        g.enabled == old_g.enabled && g.from == old_g.from && g.to == old_g.to && g.top == old_g.top && g.bottom == old_g.bottom &&
+        p.enabled == old_p.enabled && p.index == old_p.index && p.from == old_p.from && p.to == old_p.to && p.top == old_p.top && p.bottom == old_p.bottom &&
+        a.enabled == old_a.enabled && a.first == old_a.first && a.second == old_a.second && a.from == old_a.from && a.to == old_a.to && a.top == old_a.top && a.bottom == old_a.bottom &&
+        m.enabled == old_m.enabled && m.layer == old_m.layer && m.leftTop == old_m.leftTop && m.rightTop == old_m.rightTop &&
+        m.leftBottom == old_m.leftBottom && m.rightBottom == old_m.rightBottom && m.top == old_m.top && m.bottom == old_m.bottom) return true;
     GbsSceneRasterTable* table = gbs_hw_begin_scene_raster_update();
-    table->enabled = (r.enabled ? 1 : 0) | (g.enabled ? 2 : 0);
+    table->enabled = (r.enabled ? GBS_RASTER_RIPPLE : 0) | (g.enabled ? GBS_RASTER_BACKDROP : 0) |
+        (p.enabled ? GBS_RASTER_PALETTE : 0) | (a.enabled ? GBS_RASTER_ALPHA : 0) | (m.enabled ? GBS_RASTER_MASK : 0);
+    table->palette_index = p.index;
+    table->blend_control = static_cast<uint16_t>(a.first | (1u << 6) | (a.second << 8));
+    table->mask_layer = m.layer;
     table->layer = static_cast<uint8_t>(r.enabled ? r.layer : BackgroundLayer::BG2); table->speed = r.speed; table->top = r.top; table->bottom = r.bottom;
     if (r.enabled) {
         for (unsigned phase = 0; phase < 256; ++phase) {
@@ -724,13 +822,18 @@ bool set_scene_raster_effects(const SceneRasterEffects& effects, DisplayMode mod
         }
         for (unsigned y = r.top; y < r.bottom; ++y) table->line_phase[y] = static_cast<uint8_t>((y-r.top)*256/r.wavelength);
     }
-    if (g.enabled) {
-        const unsigned span = g.bottom - g.top - 1;
-        for (unsigned y = 0; y < 160; ++y) {
-            const unsigned distance = y <= g.top ? 0 : y >= g.bottom - 1u ? span : y-g.top;
-            uint16_t color = 0;
-            for (unsigned shift = 0; shift <= 10; shift += 5) color |= static_cast<uint16_t>((((g.from >> shift)&31)*(span-distance)+((g.to >> shift)&31)*distance)/span << shift);
-            table->colors[y] = color;
+    for (unsigned y = 0; y < 160; ++y) {
+        if (g.enabled) table->colors[y] = interpolate_scanline_color(g.from, g.to, g.top, g.bottom, y);
+        if (p.enabled) table->palette[y] = interpolate_scanline_color(p.from, p.to, p.top, p.bottom, y);
+        if (a.enabled) {
+            const unsigned eva = interpolate_scanline(a.from, a.to, a.top, a.bottom, y);
+            table->alpha[y] = static_cast<uint16_t>(eva | ((16 - eva) << 8));
+        }
+        if (m.enabled) {
+            const bool inside_band = y >= m.top && y < m.bottom;
+            const unsigned left = inside_band ? interpolate_scanline(m.leftTop, m.leftBottom, m.top, m.bottom, y) : 0;
+            const unsigned right = inside_band ? interpolate_scanline(m.rightTop, m.rightBottom, m.top, m.bottom, y) : 240;
+            table->window[y] = static_cast<uint16_t>((left << 8) | right);
         }
     }
     gbs_hw_submit_scene_raster_update();
@@ -742,6 +845,18 @@ bool apply_video_composition(const VideoComposition& composition) {
     if (!is_valid_display_mode(composition.display_mode)) {
         return false;
     }
+    const bool paged = composition.affine_enabled && composition.affine_tilemap &&
+        is_paged_affine_tilemap_asset(*composition.affine_tilemap);
+    if (paged) {
+        const auto& transform = composition.affine_transform;
+        if (!composition.affine_tiles || !is_valid_affine_tile_asset(*composition.affine_tiles) ||
+            !is_valid_affine_tilemap_asset(*composition.affine_tilemap) ||
+            !gbs_affine_page_fits(gbs_affine_page_bounds(transform.pa, transform.pb, transform.pc, transform.pd,
+                transform.reference_x_8, transform.reference_y_8))) return false;
+        for (size_t pixel = 0; pixel < bytes_per_affine_8bpp_tile; ++pixel)
+            if (composition.affine_tiles->data[pixel] != 0) return false;
+    }
+    clear_paged_affine();
     if (composition.affine_enabled) {
         const bool layer_supported = composition.affine_layer == BackgroundLayer::BG2 ||
             (composition.display_mode == DisplayMode::Mode2Affine && composition.affine_layer == BackgroundLayer::BG3);
@@ -756,14 +871,18 @@ bool apply_video_composition(const VideoComposition& composition) {
         if (composition.affine_tiles != nullptr && !load_affine_tiles(composition.affine_layer, *composition.affine_tiles)) {
             return false;
         }
-        if (composition.affine_tilemap != nullptr && !load_affine_tilemap(composition.affine_layer, *composition.affine_tilemap)) {
+        if (!paged && composition.affine_tilemap != nullptr && !load_affine_tilemap(composition.affine_layer, *composition.affine_tilemap)) {
             return false;
         }
     }
 
     event_affine_background_mask = composition.affine_enabled ? static_cast<uint8_t>(1u << (static_cast<int>(composition.affine_layer)-2)) : 0;
     set_display_mode(composition.display_mode);
-    if (composition.affine_enabled) {
+    if (paged) {
+        paged_affine = {composition.affine_tilemap, composition.affine_layer, {}, composition.paged_affine_parallax_256,
+            static_cast<uint8_t>(composition.affine_tiles->destination_tile), composition.affine_wrap, composition.affine_transform};
+        set_affine_bg_transform(composition.affine_layer, composition.affine_transform);
+    } else if (composition.affine_enabled) {
         set_affine_bg_wrap(composition.affine_layer, composition.affine_wrap);
         set_affine_bg_transform(composition.affine_layer, composition.affine_transform);
     }
