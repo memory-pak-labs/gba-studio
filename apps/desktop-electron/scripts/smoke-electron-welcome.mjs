@@ -323,6 +323,8 @@ async function main() {
         assertContains(welcomeText, `Projeto completo com ${canonicalSceneNames.length} cenas`);
         assertContains(welcomeText, "Criar projeto");
         assertContains(welcomeText, "Abrir projeto");
+        assertContains(welcomeText, "Template básico");
+        assertContains(welcomeText, "Comece do zero, sem cenas ou assets de partida.");
         const preview = await cdp.send("Runtime.evaluate", {
           expression: "({ complete: document.querySelector('.welcome-template-preview')?.complete, width: document.querySelector('.welcome-template-preview')?.naturalWidth })",
           returnByValue: true

@@ -12,7 +12,7 @@ import exemploGBAProjectRaw from "../../default-assets/templates/exemplo-gba/exe
 
 export const EXEMPLO_GBA_SCENE_COUNT = (JSON.parse(exemploGBAProjectRaw) as { scenas: unknown[] }).scenas.length;
 
-export type ProjectTemplateID = "exemplo-gba" | "blank";
+export type ProjectTemplateID = "exemplo-gba" | "blank" | "empty";
 
 export interface ProjectTemplateDefinition {
   id: ProjectTemplateID;
@@ -30,8 +30,14 @@ export const projectTemplateDefinitions: ProjectTemplateDefinition[] = [
   },
   {
     id: "blank",
+    title: "Template básico",
+    detail: "Com sprites, fundos, HUDs e recursos de diálogo prontos para usar.",
+    icon: "▦"
+  },
+  {
+    id: "empty",
     title: "Projeto em branco",
-    detail: "Sem cenas de demonstração, com todos os tipos de cena e recursos de criação disponíveis.",
+    detail: "Comece do zero, sem cenas ou assets de partida.",
     icon: "+"
   }
 ];
@@ -77,15 +83,15 @@ export function buildProjectFromTemplate(
   templateID: ProjectTemplateID,
   options: { name: string }
 ): GBAProjectData {
-  if (templateID === "blank") {
-    const project = createBlankProjectData({ name: options.name, includeStarterContent: false });
-    project.rooms = [];
-    project.scenas = [];
-    project.actors = [];
-    delete project.scena;
-    delete project.room;
-    const editorState = project.editorState as Record<string, unknown>;
-    for (const key of ["activeScenaID", "activeScenaName", "startScenaID"]) delete editorState[key];
+  if (templateID === "blank" || templateID === "empty") {
+    const project = createBlankProjectData({ name: options.name, includeStarterContent: false, includeInitialScene: false });
+    const settings = project.settings as Record<string, Record<string, unknown>>;
+    settings.sceneTypes.enabled = Object.fromEntries(SCENE_TYPE_OPTIONS.map(({ id }) => [id, true]));
+    // Use neutral scene creation, which only assigns default sprites already in the project.
+    settings.sceneTypes.playerDefaultsProfile = BLANK_PLAYER_DEFAULTS_PROFILE;
+    settings.backgrounds.defaultMapSize = "";
+    if (templateID === "empty") return project;
+
     const content = blankPlayerContent();
     const dungeonNpcs = blankDungeonNpcContent();
     const hud = blankHudContent();
@@ -106,10 +112,6 @@ export function buildProjectFromTemplate(
       { id: "asset-group-neutral-dialogue", name: "Diálogo padrão", assetIDs: dialogueAssets.map(asset => asset.id), children: [] },
       { id: "asset-group-neutral-backgrounds", name: "Backgrounds padrão", assetIDs: backgrounds.assets.map(asset => asset.id), children: [] }
     ];
-    const settings = project.settings as Record<string, Record<string, unknown>>;
-    settings.general.startScene = "";
-    settings.general.startPlayer = "";
-    settings.sceneTypes.enabled = Object.fromEntries(SCENE_TYPE_OPTIONS.map(({ id }) => [id, true]));
     settings.topdown.playerSprite = content.defaultPlayerSprites.topdown;
     settings.topdown.mirrorLeftFromRight = false;
     settings.pointAndClick.cursorImage = content.defaultPlayerSprites.pointAndClick;
@@ -119,10 +121,8 @@ export function buildProjectFromTemplate(
       ...(settings.sceneTypes.defaultPlayerSprites as Record<string, string>),
       ...content.defaultPlayerSprites
     };
-    settings.sceneTypes.playerDefaultsProfile = BLANK_PLAYER_DEFAULTS_PROFILE;
     settings.sceneTypes.backgroundDefaultsProfile = BLANK_BACKGROUND_DEFAULTS_PROFILE;
     settings.sceneTypes.defaultBackgrounds = backgrounds.defaultBackgrounds;
-    settings.backgrounds.defaultMapSize = "";
     (project.settings as Record<string, unknown>).hudPresets = [hud.preset,...sceneHuds.presets];
     (project.settings as Record<string, unknown>).hudPresetId = hud.preset.id;
     settings.uiDialogs = {
