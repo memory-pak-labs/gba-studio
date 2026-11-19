@@ -9,8 +9,8 @@ topdown = (ROOT / 'examples/topdown_basic/src/main.cpp').read_text()
 render = topdown[topdown.index('void render_topdown_runtime('):]
 assert render.index('gbs::hide_all_sprites();') < render.index('gbs::draw_hud(hud);'), 'World clearing erases the HUD images'
 def function(name):
-    start = re.search(r'^(?:static )?(?:void|int|uint16_t) ' + name + r'\(', source, re.M).start()
-    end = source.index('{', start) + 1
+    definition = re.search(r'^(?:static )?(?:void|int|uint16_t) ' + name + r'\([^;{}]*\)\s*\{', source, re.M)
+    start, end = definition.span()
     depth = 1
     while depth:
         depth += (source[end] == '{') - (source[end] == '}')
