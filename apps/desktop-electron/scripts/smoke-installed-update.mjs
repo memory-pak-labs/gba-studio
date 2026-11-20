@@ -94,7 +94,20 @@ const evaluate = async (expression) => {
   return result.result?.value;
 };
 const waitFor = (expression, label, ms) => poll(() => evaluate(expression), label, ms);
-const click = (label, selector = 'document') => evaluate(`(() => { const button = [...${selector}.querySelectorAll('button')].find((item) => item.textContent.trim() === ${JSON.stringify(label)}); if (!button) throw new Error('Button missing: ' + ${JSON.stringify(label)}); button.click(); })()`);
+async function click(label, selector = 'document') {
+  await poll(() => evaluate(`
+    (() => {
+      const root = ${selector};
+      const button = [...(root?.querySelectorAll('button') ?? [])].find(
+        item => item.textContent.trim() === ${JSON.stringify(label)}
+          && !item.disabled && item.getClientRects().length > 0
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()
+  `), 'enabled button ' + label);
+}
 async function screenshot(name) {
   const result = await cdp.send('Page.captureScreenshot', { format: 'png' });
   await writeFile(path.join(evidence, name), Buffer.from(result.data, 'base64'));
@@ -106,7 +119,7 @@ try {
   const initial = await evaluate('window.gbaStudio.getAppUpdateState()');
   assert(initial.status !== 'disabled' && initial.currentVersion === fixture.version, 'Installed updater is enabled at the source version');
   const available = await evaluate('window.gbaStudio.checkAppUpdates()');
-  if (published) assert(available.status === 'available' && available.version === fixture.targetVersion, `GitHub provider found RC6: ${JSON.stringify(available)}`);
+  if (published) assert(available.status === 'available' && available.version === fixture.targetVersion, `GitHub provider found target version: ${JSON.stringify(available)}`);
   await waitFor("document.body.innerText.includes('Uma nova versão está disponível')", 'available update');
   assert(!requestedInstaller(), 'Checking does not download without confirmation');
   await click('Baixar atualização');
@@ -175,7 +188,7 @@ try {
     checks.push(await verifyPublishedMacBundle(bundle));
     const actualHashes = await Promise.all(macBundleFiles
       .map(file => hash(path.join(contents, file), 'sha256', 'hex')));
-    assert(JSON.stringify(actualHashes) === JSON.stringify(fixture.targetBundleHashes), 'Installed app matches the signed and notarized RC6 bundle');
+    assert(JSON.stringify(actualHashes) === JSON.stringify(fixture.targetBundleHashes), 'Installed app matches the signed and notarized target bundle');
     process.kill(restartedPid);
     await poll(() => {
       try { process.kill(restartedPid, 0); return false; }
@@ -228,10 +241,21 @@ try {
   await writeFile(path.join(evidence, 'result.json'), `${JSON.stringify({ ok: true, platform: fixture.platform, architecture: process.arch, sourceVersion: fixture.version, targetVersion: fixture.targetVersion, localFeed: true, sourcePackage: fixture.sourceFile, targetPackage: fixture.targetFile, checks, requests }, null, 2)}\n`);
 } catch (error) {
   let diagnostics = '';
+  if (cdp) {
+    try {
+      diagnostics = JSON.stringify(await evaluate(`({
+        notices: [...document.querySelectorAll('.app-update-notice')].map(item => item.innerText),
+        buttons: [...document.querySelectorAll('.app-update-notice button')].map(item => ({
+          label: item.textContent.trim(), disabled: item.disabled, visible: item.getClientRects().length > 0
+        }))
+      })`));
+      await screenshot('update-failure.png');
+    } catch { /* The app may already have closed. */ }
+  }
   if (fixture.platform === 'linux') {
     try {
       const { stdout } = await execFileAsync('ps', ['-eo', 'pid,ppid,stat,args']);
-      diagnostics = stdout.split('\n').filter((line) => line.includes(root) || line.includes('appimage_extracted')).join('\n');
+      diagnostics += '\n' + stdout.split('\n').filter((line) => line.includes(root) || line.includes('appimage_extracted')).join('\n');
       const installedImage = path.join(path.dirname(fixture.sourceExecutable), targetName);
       diagnostics += `\nTarget image SHA-256: ${await hash(installedImage, 'sha256', 'hex')} (expected ${targetHash})`;
     } catch (diagnosticError) { diagnostics += `\nDiagnostic error: ${diagnosticError}`; }
