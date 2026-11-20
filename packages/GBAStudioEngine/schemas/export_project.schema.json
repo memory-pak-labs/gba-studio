@@ -926,6 +926,7 @@
           "open_menu",
           "open_shop",
           "actor_effects",
+          "actor_scanline_wave",
           "cancel_actor_movement",
           "luta_start_match",
                 "luta_end_match",

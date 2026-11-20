@@ -10029,6 +10029,7 @@ def event_op_from_json(value):
         "set_actor_scale": "SetActorScale",
         "set_background_scale": "SetBackgroundScale",
         "actor_effects": "ActorEffects",
+        "actor_scanline_wave": "ActorScanlineWave",
         "visibility": "Visibility",
         "open_menu": "OpenMenu",
         "open_shop": "OpenShop",
@@ -10939,6 +10940,13 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
         if area > 32767:
             area -= 65536
         return (op, actor, area, frames, intensity | (128 if effect == "reveal" else 0) | (256 if shape == "circle" else 0))
+    if op == "ActorScanlineWave":
+        actor = event_int(command, "actor", -2)
+        frames = event_int(command, "frames", 0)
+        intensity = event_int(command, "intensity", -1)
+        if not (-1 <= actor < 96 and 1 <= frames <= 32767 and 0 <= intensity <= 100):
+            raise SystemExit(f"{op}: invalid actor, duration or intensity")
+        return (op, actor, frames, intensity)
     if op == "ActorEffects":
         return (op, event_int(command, ["actor"], -1), event_int(command, ["index"], 0), event_int(command, ["frames"], 30), event_int(command, ["intensity"], 50))
     if op == "CancelActorMovement":
@@ -11176,6 +11184,11 @@ def event_command_from_json(command, description, animation_lookup=None, actor_a
             volume = event_int(command, "volume", 15)
             if not 0 <= index <= 32767 or not 0 <= volume <= 15:
                 raise SystemExit(f"{op}: invalid PCM index or volume")
+            if "priority" in command:
+                priority = event_int(command, "priority", -1)
+                if not 0 <= priority <= 255:
+                    raise SystemExit(f"{op}: priority must be 0–255")
+                return (op, instance, index, volume, priority + 1)
             return (op, instance, index, volume)
         if op == "StopPcmSfxInstance":
             return (op, instance, 0, 0)

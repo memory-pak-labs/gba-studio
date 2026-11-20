@@ -1828,12 +1828,17 @@ extern "C" void gbs_audio_vblank_update(void) {
     gbs::audio_vblank_update();
 }
 
-extern "C" void gbs_event_pcm_sfx_instance(gbs::EventOp op, int instance, int operand, int volume) {
+extern "C" void gbs_event_pcm_sfx_instance(gbs::EventOp op, int instance, int operand, int volume, int priority_code) {
     switch (op) {
     case gbs::EventOp::PlayPcmSfxInstance:
         if (pcm_sfx_instance_assets != nullptr && operand >= 0 &&
-            static_cast<size_t>(operand) < pcm_sfx_instance_asset_count && volume >= 0 && volume <= 15) {
-            gbs::play_pcm_sfx_instance(pcm_sfx_instance_assets[operand], instance, { static_cast<uint8_t>(volume) });
+            static_cast<size_t>(operand) < pcm_sfx_instance_asset_count && volume >= 0 && volume <= 15 &&
+            priority_code >= 0 && priority_code <= 256) {
+            gbs::PcmSfxOptions options;
+            options.volume = static_cast<uint8_t>(volume);
+            // Zero preserves the default for older exported scripts; 1 encodes priority 0.
+            if (priority_code != 0) options.priority = static_cast<uint8_t>(priority_code - 1);
+            gbs::play_pcm_sfx_instance(pcm_sfx_instance_assets[operand], instance, options);
         }
         break;
     case gbs::EventOp::StopPcmSfxInstance:

@@ -2418,7 +2418,7 @@ describe("prepareEngineProjectExport", () => {
       audioItems: [{ name: "Alarm tone.wav", kind: "SFX", format: "WAV", exportID: "alarm", volume: 60 }],
       events: [{ name: "instance_mix", category: "Audio", steps: [
         { command: 'play_sfx_instance "Alarm tone.wav" 1' },
-        { command: "play_sfx_instance alarm 2" },
+        { command: "play_sfx_instance alarm 2 200" },
         { command: "set_sfx_instance_speed 1 200" },
         { command: "set_sfx_instance_pan 2 -100" },
         { command: "stop_sfx_instance 1" }
@@ -2427,7 +2427,7 @@ describe("prepareEngineProjectExport", () => {
 
     expect(contract.topdown_project?.scripts.find(script => script.name === "instance_mix")?.script).toEqual([
       { op: "play_sfx_instance", instance: 1, index: 0, volume: 9 },
-      { op: "play_sfx_instance", instance: 2, index: 0, volume: 9 },
+      { op: "play_sfx_instance", instance: 2, index: 0, volume: 9, priority: 200 },
       { op: "set_sfx_instance_speed", instance: 1, percent: 200 },
       { op: "set_sfx_instance_pan", instance: 2, percent: -100 },
       { op: "stop_sfx_instance", instance: 1 }
@@ -2439,6 +2439,8 @@ describe("prepareEngineProjectExport", () => {
     ["stop_sfx_instance 0", /1–4/],
     ["set_sfx_instance_speed 1 401", /25–400/],
     ["set_sfx_instance_pan 1 -101", /100/],
+    ["play_sfx_instance noise 1 256", /0–255/],
+    ["play_sfx_instance noise 1 -1", /0–255/],
     ["play_sfx_instance noise 1", /PCM/]
   ])("rejects invalid instance authoring %s", (command, error) => {
     expect(() => buildEngineExportProjectContract(project({

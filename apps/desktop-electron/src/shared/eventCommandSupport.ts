@@ -25,6 +25,7 @@ const scoped: Record<string, string[]> = {
   set_player_speed_profile:["topdown"],
   start_segment:["topdown"], stop_segment:["topdown"], set_adventure_state:["topdown"], push_actor:["topdown"],
   open_menu: ["topdown"], open_shop: ["topdown"], open_equip_menu: ["topdown"], open_code_lock: ["topdown"],
+  actor_scanline_wave: ["topdown", "platformer"],
   actor_effects: ["topdown"], set_actor_animation_state: ["topdown"], cancel_actor_movement: ["topdown"],
   projectile_load_slot: ["topdown"], launch_projectile_slot: ["topdown"],
   start_game_clock: ["topdown", "platformer", "isometric"], advance_time: ["topdown", "platformer", "isometric"],
@@ -107,6 +108,10 @@ export function eventCommandIntegrationIssue(command: string, runtime?: string):
   if (verb === "open_code_lock" && (parts.length !== 4 || !parts[1] || !integer(parts[2],4) || Number(parts[2])<1 || !integer(parts[3],9999) || Number(parts[3])>=10**Number(parts[2]))) return "Cadeado requer variável, 1–4 dígitos e código compatível.";
   if (verb === "open_equip_menu" && (parts.length !== 3 || !integer(parts[1],8) || Number(parts[1])<1 || !["true","false"].includes(parts[2] ?? ""))) return "Equipamento requer 1–8 slots e pausa true ou false.";
   if (verb === "open_shop" && (parts.length !== 2 || !parts[1])) return "Loja requer um ator.";
+  if (verb === "actor_scanline_wave" && (parts.length !== 4 || !parts[1] || /^\{/.test(parts[1]) ||
+    !integer(parts[2], 32767) || Number(parts[2]) < 1 || !integer(parts[3], 100))) {
+    return "Selecione um ator, duração de 1–32767 quadros e intensidade de 0–100.";
+  }
   if (verb === "actor_effects" && (parts.length !== 5 || !parts[1] || !["flash", "shake"].includes(parts[2] ?? "") || !integer(parts[3], 32767) || Number(parts[3]) < 1 || !integer(parts[4], 100))) return "Efeito requer ator, flash ou shake, duração positiva e intensidade 0–100.";
   if (verb === "cancel_actor_movement" && (parts.length !== 2 || !parts[1])) return "Cancelar movimento requer um ator.";
   if (verb === "set_actor_animation_state" && (parts.length !== 3 || !parts[1] || !parts[2])) return "Estado de animação requer ator e estado cadastrado.";

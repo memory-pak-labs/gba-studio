@@ -11,7 +11,7 @@ export const sfxInstanceVerbs = [
 type SfxInstanceVerb = typeof sfxInstanceVerbs[number];
 
 type SfxInstanceCommand =
-  | { verb: "play_sfx_instance"; instance: number; audio: string }
+  | { verb: "play_sfx_instance"; instance: number; audio: string; priority?: number }
   | { verb: "stop_sfx_instance"; instance: number }
   | { verb: "set_sfx_instance_speed" | "set_sfx_instance_pan"; instance: number; percent: number };
 
@@ -33,8 +33,14 @@ export function parseSfxInstanceCommand(verb: SfxInstanceVerb, operands: string[
   const play = verb === "play_sfx_instance";
   if (play && !operands[0]) throw new Error("Selecione um efeito PCM ou WAV para tocar na instância.");
   const instance = integerInRange(operands[play ? 1 : 0], 1, 4, "A instância deve ser um número inteiro de 1–4.");
-  if (operands.length > (verb === "stop_sfx_instance" ? 1 : 2)) throw new Error("O comando de instância de som tem argumentos extras.");
-  if (play) return { verb, instance, audio: operands[0]! };
+  if (operands.length > (play ? 3 : verb === "stop_sfx_instance" ? 1 : 2)) {
+    throw new Error("O comando de instância de som tem argumentos extras.");
+  }
+  if (play) {
+    const priority = operands[2] === undefined ? undefined
+      : integerInRange(operands[2], 0, 255, "A prioridade do efeito deve ser um número inteiro de 0–255.");
+    return { verb, instance, audio: operands[0]!, ...(priority === undefined ? {} : { priority }) };
+  }
   if (verb === "stop_sfx_instance") return { verb, instance };
   const percent = verb === "set_sfx_instance_speed"
     ? integerInRange(operands[1], 25, 400, "A velocidade deve ser um número inteiro de 25–400%.")

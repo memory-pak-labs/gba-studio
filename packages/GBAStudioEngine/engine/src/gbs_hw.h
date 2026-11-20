@@ -75,6 +75,7 @@ void gbs_hw_hide_world_sprites(void);
 void gbs_hw_hide_sprites(int first, int count);
 void gbs_hw_set_dialogue_oam_front(int enabled);
 void gbs_hw_set_sprite(int index, int x, int y, uint16_t tile_index, uint16_t palette, int hflip, int vflip, int visible, uint16_t priority, uint16_t mode, int mosaic, uint16_t shape, uint16_t size);
+void gbs_hw_stage_actor_scanline_wave(int first, int count, int amplitude, uint32_t phase);
 void gbs_hw_set_sprite_color_depth(int index, int eight_bpp);
 void gbs_hw_set_sprite_affine(int index, int enabled, int double_size, uint16_t matrix_index);
 void gbs_hw_set_sprite_affine_matrix(uint16_t matrix_index, int16_t pa, int16_t pb, int16_t pc, int16_t pd);

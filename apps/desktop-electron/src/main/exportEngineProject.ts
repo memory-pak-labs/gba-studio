@@ -4614,7 +4614,10 @@ function compileEventStep(
       }
       const pcmName = audioPack.document.pcm[resolved.index]?.name;
       const volume = audioPack.document.sfx.find(sfx => sfx.name === pcmName)?.pcm_volume ?? 15;
-      return [{ op: verb, index: resolved.index, instance: control.instance, volume }];
+      return [{
+        op: verb, index: resolved.index, instance: control.instance, volume,
+        ...(control.priority === undefined ? {} : { priority: control.priority })
+      }];
     }
     return [{
       op: verb,
@@ -5033,6 +5036,8 @@ function compileEventStep(
         actor: npcActorIndex(data, rooms, operand),
         value: booleanPart(parts[2], true) ? 1 : 0
       }];
+    case "actor_scanline_wave":
+      return [{ op: verb, actor: eventActorIndex(data, rooms, operand), frames: Number(parts[2]), intensity: Number(parts[3]) }];
     case "actor_effects":
       return [{ op: "actor_effects", actor: eventActorIndex(data, rooms, operand), index: parts[2] === "shake" ? 1 : 0, frames: Number(parts[3]), intensity: Number(parts[4]) }];
     case "cancel_actor_movement":
@@ -11384,6 +11389,10 @@ function buildEngineExportProjectContractUncached(
     features.push("sprite_animation_scale");
   }
   if (projectArray(data, "events").some(event => eventSteps(event).some(step => isScaleEvent(commandParts(stringField(step, "command", ""))[0] ?? "")))) features.push("events.visual_scale");
+  if (projectArray(data, "events").some(event => eventSteps(event).some(step =>
+    commandParts(stringField(step, "command", ""))[0] === "actor_scanline_wave"))) {
+    features.push("render_runtime.actor_scanline_wave");
+  }
   const extendedBackgroundRooms = projectRooms(data).filter(room => usesSinglePlaneBackground(roomSceneType(room)));
   if (extendedBackgroundRooms.some(room => roomAffinePresentation(room).enabled || roomSceneComposition(room).layers.some(layer => layer.enabled && layer.kind === "affine_bg")) ||
       extendedBackgroundRooms.length > 0 && projectArray(data,"events").some(event => eventSteps(event).some(step => /^(set|animate|reset)_background_scale\b/.test(stringField(step,"command","")))))

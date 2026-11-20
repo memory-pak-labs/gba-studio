@@ -49,7 +49,7 @@ export function previewCommandToExportOps(command: string): string[] {
     case "noop":
       return [];
     case "set_actor_animation_state": return ["set_actor_sprite"];
-    case "cancel_actor_movement": case "actor_effects": case "projectile_load_slot": case "launch_projectile_slot":
+    case "cancel_actor_movement": case "actor_effects": case "actor_scanline_wave": case "projectile_load_slot": case "launch_projectile_slot":
     case "draw_text": case "open_menu": case "open_shop": case "open_equip_menu": case "open_code_lock":
     case "start_segment": case "stop_segment": case "set_adventure_state": case "push_actor": return [verb];
     case "start_game_clock":

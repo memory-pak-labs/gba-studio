@@ -24,7 +24,7 @@ ISOMETRIC_SOURCE = ROOT / "engine" / "src" / "gbs_isometric.cpp"
 
 
 def function_body(source: str, name: str) -> str:
-    definition = re.search(r"\b(?:void|uint16_t|uint32_t)\s+" + re.escape(name) + r"\([^;{}]*\)\s*\{", source)
+    definition = re.search(r"\b(?:void|int|uint16_t|uint32_t)\s+" + re.escape(name) + r"\([^;{}]*\)\s*\{", source)
     if definition is None:
         raise AssertionError(f"definicao ausente para {name}")
     opening = definition.end() - 1
@@ -62,11 +62,13 @@ scene_raster_tables[0].enabled=0;set_backdrop(23);assert(shadow_backdrop_color==
 uint16_t REG_IME,REG_IE;
 struct {int enabled;} scene_raster_tables[2];
 int scene_raster_active,hblank_dispatch_required;
+struct { int count; } actor_wave_active;
+static int scanline_effect_active(void)""" + function_body(self.source, "scanline_effect_active") + """
 uint32_t lock(void)""" + function_body(self.source, "gbs_hw_audio_lock_observer_state") + """
 void unlock(uint32_t previous)""" + function_body(self.source, "gbs_hw_audio_unlock_observer_state") + """
-int main(void){for(int ime=0;ime<2;++ime)for(int enabled=0;enabled<2;++enabled)for(int callbacks=0;callbacks<2;++callbacks){
-REG_IME=ime;REG_IE=0x1007;scene_raster_tables[0].enabled=enabled;hblank_dispatch_required=callbacks;
-uint32_t previous=lock();if(enabled&&!callbacks){assert(REG_IE==2);assert(REG_IME==ime);}else{assert(REG_IE==0x1007);assert(REG_IME==0);}
+int main(void){for(int ime=0;ime<2;++ime)for(int enabled=0;enabled<2;++enabled)for(int wave=0;wave<2;++wave)for(int callbacks=0;callbacks<2;++callbacks){
+REG_IME=ime;REG_IE=0x1007;scene_raster_tables[0].enabled=enabled;actor_wave_active.count=wave;hblank_dispatch_required=callbacks;
+uint32_t previous=lock();if((enabled||wave)&&!callbacks){assert(REG_IE==2);assert(REG_IME==ime);}else{assert(REG_IE==0x1007);assert(REG_IME==0);}
 unlock(previous);assert(REG_IE==0x1007);assert(REG_IME==ime);}}
 """
         with tempfile.TemporaryDirectory(prefix="gbs-audio-observer-") as temp:
@@ -896,7 +898,9 @@ int main() {
         code = """#include <stdint.h>
 #include <assert.h>
 uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0,REG_VCOUNT=0,REG_DISPSTAT=0;
-struct { int enabled, speed, layer; } scene_raster_tables[2];
+typedef struct { int enabled, speed, layer; } GbsSceneRasterTable;
+GbsSceneRasterTable scene_raster_tables[2];
+struct { int count; } actor_wave_staged,actor_wave_active;
 uint16_t scene_raster_base_x,shadow_bg_scroll_x[4];
 uint8_t scene_raster_phase;
 int scene_raster_active,hblank_dispatch_required;int keypad_irq_pending,arms;
@@ -915,14 +919,17 @@ static void commit_hblank_bg_scroll(void){assert(REG_VCOUNT == 160);++affine_com
 void gbs_hw_mix_audio_with_hblank(void){}
 enum { GBS_RASTER_PALETTE = 4, GBS_RASTER_ALPHA = 8, GBS_RASTER_MASK = 16 };
 static uint8_t scene_raster_overrides, scanline_frame_ready;
-static int oam_commits, bg_commits, map_commits;
+static int oam_commits, bg_commits, map_commits, wave_commits;
+void commit_actor_wave_frame(void){assert(REG_VCOUNT==160);++wave_commits;}
+void apply_actor_wave_line(unsigned line){}
+static int scanline_effect_active(void)"""+function_body(self.source, "scanline_effect_active")+"""
 void commit_shadow_bg_controls(void){++bg_commits;}
 void commit_shadow_oam(void){assert(REG_VCOUNT==160);++oam_commits;}
 void commit_shadow_bg_tilemaps(void){assert(REG_VCOUNT==160);++map_commits;}
 void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
 void commit_shadow_affine_transforms(void){}
 void commit_paged_affine_frame(void){}
-void commit_scene_raster_frame(void){} void apply_scene_raster_line(unsigned line){}
+void commit_scene_raster_frame(void){} void apply_scene_raster_line(const GbsSceneRasterTable* table, unsigned line){}
 void commit_pcm_stream_block(void){}
 void gbs_audio_vblank_update(void){
  if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}
@@ -943,6 +950,8 @@ int main(void){
  REG_VCOUNT=160; scene_raster_tables[0].enabled=GBS_RASTER_MASK; scanline_frame_ready=1;
  dispatch();assert(!scanline_frame_ready && oam_commits==1 && REG_VCOUNT==56);
  REG_VCOUNT=160;dispatch();assert(oam_commits==1); // no publication before the producer signals completion
+ REG_VCOUNT=160;scene_raster_tables[0].enabled=0;actor_wave_staged.count=1;scanline_frame_ready=1;
+ dispatch();assert(oam_commits==2 && wave_commits==2);
 }
 """
         with tempfile.TemporaryDirectory() as directory:

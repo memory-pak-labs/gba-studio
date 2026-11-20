@@ -190,7 +190,8 @@ enum class EventOp : uint8_t {
     PlayPcmSfxInstance = 174,
     StopPcmSfxInstance = 175,
     SetPcmSfxInstanceSpeed = 176,
-    SetPcmSfxInstancePan = 177
+    SetPcmSfxInstancePan = 177,
+    ActorScanlineWave = 178
 };
 
 enum class VisualEffectKind : uint8_t {
@@ -758,6 +759,7 @@ void set_event_actor_animation_state(EventState& state, int actor_index, bool pl
 void tick_event_frame_counter(EventState& state);
 bool event_actor_effect_visible(const EventState& state, int actor_index);
 int event_actor_effect_offset_x(const EventState& state, int actor_index);
+int event_actor_wave_amplitude(const EventState& state, int actor_index);
 bool update_button_event_bindings(EventState& state);
 bool button_event_binding_overrides_default(const EventState& state, uint16_t buttons);
 bool update_timer_event_bindings(EventState& state);

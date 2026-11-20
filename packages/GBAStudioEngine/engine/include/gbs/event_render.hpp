@@ -3,6 +3,12 @@
 #include "gbs/render.hpp"
 
 namespace gbs {
+inline void stage_event_actor_wave(const EventState& state, int actor, int first, int count) {
+    if (const int amplitude = event_actor_wave_amplitude(state, actor); amplitude > 0) {
+        stage_actor_scanline_wave(first, count, amplitude, static_cast<uint32_t>(state.event_frame_counter));
+    }
+}
+
 // A short-lived copy preserves the source shared by other actors and animations.
 inline MetaSprite event_scaled_metasprite(const EventState& state, int actor_index, const MetaSprite& source) {
     MetaSprite result = source;

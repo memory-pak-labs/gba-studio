@@ -308,6 +308,14 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "commandTemplate": "actor_effects {actor} flash 30 50"
   },
   {
+    "id": "actor.scanline_wave",
+    "title": "Ondular sprite por linha",
+    "category": "Ator",
+    "section": "Propriedades",
+    "isFavorite": false,
+    "commandTemplate": "actor_scanline_wave {actor} 120 50"
+  },
+  {
     "id": "actor.enable_collision",
     "title": "Habilitar colisao de atores",
     "category": "Ator",
@@ -1089,7 +1097,7 @@ const historicalEventCommandDefinitions: EventCommandDefinition[] = [
     "category": "Música e efeitos sonoros",
     "section": null,
     "isFavorite": false,
-    "commandTemplate": "play_sfx_instance {pcmSfx} 1"
+    "commandTemplate": "play_sfx_instance {pcmSfx} 1 8"
   },
   {
     "id": "audio.stop_sfx_instance",

@@ -47,6 +47,19 @@ describe("native command integration", () => {
     expect(isNativeEventCommandSupportedInRom(verb)).toBe(true);
   });
 
+  it.each(["topdown", "platformer"])("exports a scoped actor scanline wave in %s", runtime => {
+    expect(script(["actor_scanline_wave player 120 75", "actor_scanline_wave player 1 0"], runtime)).toEqual([
+      { op: "actor_scanline_wave", actor: -1, frames: 120, intensity: 75 },
+      { op: "actor_scanline_wave", actor: -1, frames: 1, intensity: 0 }
+    ]);
+  });
+
+  it("rejects invalid or unsupported actor scanline waves during export", () => {
+    expect(prepareEngineProjectExport(project(["actor_scanline_wave player 0 75"])).error).toMatch(/Duração|duração/);
+    expect(prepareEngineProjectExport(project(["actor_scanline_wave player 60 101"])).error).toMatch(/intensidade/);
+    expect(prepareEngineProjectExport(project(["actor_scanline_wave player 60 50"], "cutscene")).error).toMatch(/cutscene/);
+  });
+
   it("reads the live engine field into the variable registry rather than assigning a literal", () => {
     expect(script(["store_engine_field player_x position.x"])).toEqual([
       { op: "store_engine_field", field: "player_x", variable: 0 }
@@ -124,8 +137,8 @@ describe("native command integration", () => {
 
   it("classifies every catalog entry without mistaking pending handlers for native support", () => {
     const matrix = buildEventCommandSupportMatrix();
-    expect(matrix).toHaveLength(220);
-    for (const verb of ["multiplayer_queue_open", "multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status", "multiplayer_queue_close", "play_sfx_instance", "stop_sfx_instance", "set_sfx_instance_speed", "set_sfx_instance_pan"]) {
+    expect(matrix).toHaveLength(221);
+    for (const verb of ["actor_scanline_wave", "multiplayer_queue_open", "multiplayer_queue_send", "multiplayer_queue_receive", "multiplayer_queue_status", "multiplayer_queue_close", "play_sfx_instance", "stop_sfx_instance", "set_sfx_instance_speed", "set_sfx_instance_pan"]) {
       expect(matrix.find(entry => entry.verb === verb)?.status, verb).toBe("native");
     }
     expect(matrix.filter(entry => entry.status === "unknown")).toEqual([]);

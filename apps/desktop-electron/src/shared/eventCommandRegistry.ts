@@ -15,6 +15,7 @@ const nativeEventCommandExportHandlingByVerb = new Map<string, NativeEventComman
     "set_actor_animation_state",
     "cancel_actor_movement",
     "actor_effects",
+    "actor_scanline_wave",
     "open_menu",
     "open_shop",
     "open_equip_menu",
