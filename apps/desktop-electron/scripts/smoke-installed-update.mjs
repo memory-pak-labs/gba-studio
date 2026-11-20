@@ -30,7 +30,7 @@ const hash = async (file, algorithm, encoding) => {
 const targetHash = await hash(fixture.targetInstaller, 'sha256', 'hex');
 const targetSha512 = await hash(fixture.targetInstaller, 'sha512', 'base64');
 const targetSize = (await stat(fixture.targetInstaller)).size;
-const targetName = path.basename(fixture.targetInstaller);
+const targetName = fixture.published ? fixture.targetFile.url : path.basename(fixture.targetInstaller);
 const feed = JSON.stringify({ version: fixture.targetVersion, files: [{ url: targetName, sha512: targetSha512, size: targetSize }], path: targetName, sha512: targetSha512, releaseDate: new Date().toISOString() });
 const requests = [];
 const published = fixture.published ? await startPublishedUpdaterFixture(root, fixture, requests) : null;
