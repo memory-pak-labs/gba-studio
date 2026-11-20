@@ -488,24 +488,28 @@ async function fillLastInputByAriaLabel(cdp, ariaLabel, value) {
 }
 
 async function selectAudioLibraryItem(cdp, itemName) {
-  const result = await evaluate(cdp, `
-    (() => {
-      const button = Array.from(document.querySelectorAll('.audio-groove-library-list button'))
-        .find((item) => item.getAttribute("aria-label") === ${JSON.stringify(`Selecionar áudio ${itemName}`)});
-      if (!button) {
-        return {
-          ok: false,
-          available: Array.from(document.querySelectorAll('.audio-groove-library-list button[aria-label]'))
-            .map((item) => item.getAttribute("aria-label"))
-        };
-      }
-      button.click();
-      return { ok: true };
-    })()
-  `);
-  if (!result?.ok) {
-    throw new Error(`Áudio ${JSON.stringify(itemName)} indisponível: ${JSON.stringify(result)}`);
-  }
+  const deadline = Date.now() + 15_000;
+  let result;
+  do {
+    result = await evaluate(cdp, `
+      (() => {
+        const button = Array.from(document.querySelectorAll('.audio-groove-library-list button'))
+          .find((item) => item.getAttribute("aria-label") === ${JSON.stringify(`Selecionar áudio ${itemName}`)});
+        if (!button) {
+          return {
+            ok: false,
+            available: Array.from(document.querySelectorAll('.audio-groove-library-list button[aria-label]'))
+              .map((item) => item.getAttribute("aria-label"))
+          };
+        }
+        button.click();
+        return { ok: true };
+      })()
+    `);
+    if (result?.ok) return;
+    await wait(100);
+  } while (Date.now() < deadline);
+  throw new Error(`Áudio ${JSON.stringify(itemName)} indisponível: ${JSON.stringify(result)}`);
 }
 
 function roomStageCardExpression(roomTitle) {
