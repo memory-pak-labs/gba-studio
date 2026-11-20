@@ -395,7 +395,11 @@ jobs:
           fi
           printf '%s' "$source_sha" | grep -Eq '^[0-9a-f]{40}$'
           git merge-base --is-ancestor "$source_sha" HEAD
-          test -z "$(git diff --name-only "$source_sha" HEAD -- . ':!.github/workflows/desktop-packages.yml' ':!apps/desktop-electron/scripts/prepare-published-updater-qa.mjs' ':!apps/desktop-electron/scripts/updater-qa-workflow.test.mjs' ':!.github/workflows/release-assets.yml' ':!apps/desktop-electron/scripts/release-assets-workflow.test.mjs' ':!scripts/release-qa/bootstrap_checksums.py' ':!scripts/release-qa/bootstrap_checksums_test.py')"
+          unexpected=$(git -C "$GITHUB_WORKSPACE" diff --name-only "$source_sha" HEAD -- . ':!.github/workflows/desktop-packages.yml' ':!apps/desktop-electron/scripts/prepare-published-updater-qa.mjs' ':!apps/desktop-electron/scripts/updater-qa-workflow.test.mjs' ':!.github/workflows/release-assets.yml' ':!apps/desktop-electron/scripts/release-assets-workflow.test.mjs' ':!scripts/release-qa/bootstrap_checksums.py' ':!scripts/release-qa/bootstrap_checksums_test.py')
+          if [ -n "$unexpected" ]; then
+            printf 'Unexpected changes since packaging:\n%s\n' "$unexpected"
+            exit 1
+          fi
           test "$(git show "$source_sha:apps/desktop-electron/package.json" | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).version')" = "$GBA_UPDATER_QA_TARGET_VERSION"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: inputs.updater_qa_candidate_run_id != ''
