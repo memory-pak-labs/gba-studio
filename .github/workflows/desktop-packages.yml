@@ -296,9 +296,48 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  stage-macos-updater:
+    name: Verify macOS draft archives
+    if: inputs.updater_qa_published && inputs.updater_qa_candidate_draft != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      # Draft assets are visible only with repository write access.
+      contents: write
+    steps:
+      - name: Download and verify the notarized draft archives
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_DRAFT: ${{ inputs.updater_qa_candidate_draft }}
+          TARGET_VERSION: ${{ inputs.updater_qa_target }}
+          CANDIDATE_RUN: ${{ inputs.updater_qa_candidate_run_id }}
+        run: |
+          test -z "$CANDIDATE_RUN"
+          test "$CANDIDATE_DRAFT" = "v$TARGET_VERSION"
+          [[ "$TARGET_VERSION" =~ ^[0-9]+[.][0-9]+[.][0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          dest="$RUNNER_TEMP/staged-macos-updater"
+          mkdir "$dest"
+          gh release view "$CANDIDATE_DRAFT" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,targetCommitish,assets > "$dest/staged-release.json"
+          jq -e --arg tag "$CANDIDATE_DRAFT" '.isDraft and .tagName == $tag' "$dest/staged-release.json"
+          for arch in arm64 x64; do
+            file="GBA-Studio-$TARGET_VERSION-macOS-$arch.zip"
+            gh release download "$CANDIDATE_DRAFT" --repo "$GITHUB_REPOSITORY" --pattern "$file" --dir "$dest"
+            digest=$(jq -r --arg name "$file" '.assets[] | select(.name == $name and .state == "uploaded") | .digest' "$dest/staged-release.json")
+            test "$digest" = "sha256:$(sha256sum "$dest/$file" | awk '{print $1}')"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Staged-macOS-updater
+          path: ${{ runner.temp }}/staged-macos-updater/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
   published-updater-qa:
     name: Published updater QA (${{ matrix.platform }})
-    if: inputs.updater_qa_published
+    needs: stage-macos-updater
+    if: always() && !cancelled() && inputs.updater_qa_published && (inputs.updater_qa_candidate_draft == '' || needs.stage-macos-updater.result == 'success')
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     strategy:
@@ -333,6 +372,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev libfuse2t64
       - run: npm ci
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.updater_qa_candidate_draft != ''
+        with:
+          name: Staged-macOS-updater
+          path: ${{ github.workspace }}/.staged-updater-artifacts
       - name: Verify staged package provenance
         if: inputs.updater_qa_candidate_run_id != '' || inputs.updater_qa_candidate_draft != ''
         shell: bash
@@ -344,8 +388,7 @@ jobs:
           if [ -n "$CANDIDATE_DRAFT" ]; then
             test -z "$CANDIDATE_RUN"
             test "$CANDIDATE_DRAFT" = "v$GBA_UPDATER_QA_TARGET_VERSION"
-            gh release view "$CANDIDATE_DRAFT" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,targetCommitish,assets > "$RUNNER_TEMP/staged-release.json"
-            source_sha=$(jq -r 'select(.isDraft) | .targetCommitish' "$RUNNER_TEMP/staged-release.json")
+            source_sha=$(jq -r --arg tag "$CANDIDATE_DRAFT" 'select(.isDraft and .tagName == $tag) | .targetCommitish' "$GITHUB_WORKSPACE/.staged-updater-artifacts/staged-release.json")
           else
             case "$CANDIDATE_RUN" in ''|*[!0-9]*) exit 1;; esac
             source_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" --jq 'select(.conclusion == "success" and .path == ".github/workflows/desktop-packages.yml") | .head_sha')
@@ -361,21 +404,6 @@ jobs:
           path: ${{ github.workspace }}/.staged-updater-artifacts
           run-id: ${{ inputs.updater_qa_candidate_run_id }}
           github-token: ${{ github.token }}
-      - name: Download and verify the notarized draft archives
-        if: inputs.updater_qa_candidate_draft != ''
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CANDIDATE_DRAFT: ${{ inputs.updater_qa_candidate_draft }}
-        run: |
-          dest="$GITHUB_WORKSPACE/.staged-updater-artifacts"
-          mkdir "$dest"
-          for arch in arm64 x64; do
-            file="GBA-Studio-$GBA_UPDATER_QA_TARGET_VERSION-macOS-$arch.zip"
-            gh release download "$CANDIDATE_DRAFT" --repo "$GITHUB_REPOSITORY" --pattern "$file" --dir "$dest"
-            digest=$(jq -r --arg name "$file" '.assets[] | select(.name == $name and .state == "uploaded") | .digest' "$RUNNER_TEMP/staged-release.json")
-            test "$digest" = "sha256:$(shasum -a 256 "$dest/$file" | awk '{print $1}')"
-          done
       - name: Verify and prepare the packages
         shell: bash
         env:

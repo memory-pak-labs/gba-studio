@@ -33,6 +33,12 @@ describe('installed updater QA workflow', () => {
       ['windows-2022', 'ubuntu-24.04', 'macos-15-intel', 'macos-15']
     ]);
     expect(workflow.permissions.contents).toBe('read');
+    expect(qa.permissions).toBeUndefined();
+    expect(qa.needs).toBe('stage-macos-updater');
+    const stage = workflow.jobs['stage-macos-updater'];
+    expect(stage.permissions.contents).toBe('write');
+    expect(stage.steps.map(step => step.run).filter(Boolean).join('\n')).toContain('gh release download');
+    expect(stage.steps.map(step => step.run).filter(Boolean).join('\n')).not.toMatch(/gh release (?:edit|upload|delete)|npm /);
     expect(workflow.jobs['engine-pack'].if).toContain('!inputs.updater_qa_published');
     expect(qa.env.GBA_UPDATER_QA_ROOT).toContain('github.workspace');
     expect(qa.steps.map(step => step.run).filter(Boolean).join('\n')).toContain('scripts/prepare-published-updater-qa.mjs');
