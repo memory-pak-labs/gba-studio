@@ -17,9 +17,21 @@ on:
         options: [both, linux, windows]
         default: both
       updater_qa_published:
-        description: 'Test the published RC5 to RC6 update on Windows, Linux and both Mac architectures'
+        description: 'Test updating a published installation through the GitHub provider'
         type: boolean
         default: false
+      updater_qa_public_source:
+        description: 'Published source version for the GitHub provider smoke'
+        type: string
+        default: '0.1.0-rc.5'
+      updater_qa_target:
+        description: 'Target version for the GitHub provider smoke'
+        type: string
+        default: '0.1.0-rc.6'
+      updater_qa_candidate_run_id:
+        description: 'Optional successful Desktop packages run for an unpublished Windows/Linux target'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -288,24 +300,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows
-            runner: windows-2022
-          - platform: linux
-            runner: ubuntu-24.04
-          - platform: macos-intel
-            runner: macos-15-intel
-          - platform: macos-arm64
-            runner: macos-15
+        include: >-
+          ${{ fromJSON(inputs.updater_qa_candidate_run_id != '' &&
+          '[{"platform":"windows","runner":"windows-2022"},{"platform":"linux","runner":"ubuntu-24.04"}]' ||
+          '[{"platform":"windows","runner":"windows-2022"},{"platform":"linux","runner":"ubuntu-24.04"},{"platform":"macos-intel","runner":"macos-15-intel"},{"platform":"macos-arm64","runner":"macos-15"}]') }}
     defaults:
       run:
         working-directory: apps/desktop-electron
     env:
       GBA_UPDATER_QA_ROOT: ${{ github.workspace }}/.published-updater-qa
+      GBA_UPDATER_QA_SOURCE_VERSION: ${{ inputs.updater_qa_public_source }}
+      GBA_UPDATER_QA_TARGET_VERSION: ${{ inputs.updater_qa_target }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
@@ -317,10 +327,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev libfuse2t64
       - run: npm ci
-      - name: Verify and prepare the published packages
+      - name: Verify the staged package run
+        if: inputs.updater_qa_candidate_run_id != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          CANDIDATE_RUN: ${{ inputs.updater_qa_candidate_run_id }}
+        run: |
+          case "$CANDIDATE_RUN" in ''|*[!0-9]*) exit 1;; esac
+          source_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" --jq 'select(.conclusion == "success" and .path == ".github/workflows/desktop-packages.yml") | .head_sha')
+          test -n "$source_sha"
+          git merge-base --is-ancestor "$source_sha" HEAD
+          test -z "$(git diff --name-only "$source_sha" HEAD -- . ':!.github/workflows/desktop-packages.yml' ':!apps/desktop-electron/scripts/prepare-published-updater-qa.mjs' ':!apps/desktop-electron/scripts/updater-qa-workflow.test.mjs')"
+          test "$(git show "$source_sha:apps/desktop-electron/package.json" | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).version')" = "$GBA_UPDATER_QA_TARGET_VERSION"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: inputs.updater_qa_candidate_run_id != ''
+        with:
+          name: GBA-Studio-${{ matrix.platform }}-x64
+          path: ${{ github.workspace }}/.staged-updater-artifacts
+          run-id: ${{ inputs.updater_qa_candidate_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify and prepare the packages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GBA_UPDATER_QA_CANDIDATE_ARTIFACTS: ${{ inputs.updater_qa_candidate_run_id != '' && format('{0}/.staged-updater-artifacts', github.workspace) || '' }}
         run: node scripts/prepare-published-updater-qa.mjs
       - name: Exercise installed update and project persistence
         shell: bash

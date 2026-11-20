@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash, X509Certificate } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:https';
 import path from 'node:path';
 import { setTimeout as wait } from 'node:timers/promises';
@@ -12,8 +12,6 @@ const run = promisify(execFile);
 const repo = 'memory-pak-labs/gba-studio';
 const github = `https://github.com/${repo}/releases`;
 const releasePath = `/${repo}/releases`;
-const version = '0.1.0-rc.5';
-const targetVersion = '0.1.0-rc.6';
 export const macBundleFiles = ['MacOS/gba-studio', 'Resources/app.asar', 'CodeResources'];
 
 export async function verifyPublishedMacBundle(app) {
@@ -69,9 +67,50 @@ async function fetchPackage(asset, file) {
   return { url: asset.name, size: asset.size, sha256, sha512: await hashFile(file, 'sha512', 'base64') };
 }
 
+export function stagedReleaseAtom(atom, version, releasedAt) {
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) || !atom.includes('<entry>')) {
+    throw new Error('Cannot stage a version in the GitHub Atom feed');
+  }
+  const href = github + '/tag/v' + version;
+  const date = new Date(releasedAt).toISOString();
+  const entry = [
+    '<entry>',
+    '  <id>' + href + '</id>',
+    '  <updated>' + date + '</updated>',
+    '  <link rel="alternate" type="text/html" href="' + href + '"/>',
+    '  <title>GBA Studio ' + version + '</title>',
+    '  <content type="html"></content>',
+    '</entry>'
+  ].join('\n  ');
+  return atom.replace('<entry>', entry + '\n  <entry>');
+}
+
+export async function stagedPackage(directory, name) {
+  const entries = await readdir(directory, { withFileTypes: true, recursive: true });
+  const matches = entries.filter(entry => entry.isFile() && entry.name.replaceAll(' ', '.') === name);
+  if (matches.length !== 1) throw new Error('Expected one staged candidate for ' + name);
+  const file = path.join(matches[0].parentPath, matches[0].name);
+  return {
+    file,
+    metadata: {
+      url: name,
+      size: (await stat(file)).size,
+      sha256: await hashFile(file, 'sha256', 'hex'),
+      sha512: await hashFile(file, 'sha512', 'base64')
+    }
+  };
+}
+
 async function prepare() {
   if (!process.env.GBA_UPDATER_QA_ROOT) throw new Error('QA root is required');
   const root = path.resolve(process.env.GBA_UPDATER_QA_ROOT);
+  const version = process.env.GBA_UPDATER_QA_SOURCE_VERSION || '0.1.0-rc.5';
+  const targetVersion = process.env.GBA_UPDATER_QA_TARGET_VERSION || '0.1.0-rc.6';
+  const staged = process.env.GBA_UPDATER_QA_CANDIDATE_ARTIFACTS;
+  const versionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+  if (!versionPattern.test(version) || !versionPattern.test(targetVersion) || version === targetVersion) {
+    throw new Error('Provide distinct updater QA versions');
+  }
   const platform = process.platform;
   const architecture = process.arch;
   const packageName = {
@@ -82,21 +121,35 @@ async function prepare() {
   }[`${platform}-${architecture}`];
   if (!packageName) throw new Error(`Unsupported updater QA host: ${platform}-${architecture}`);
   await mkdir(root, { recursive: true });
-  const [previous, candidate] = await Promise.all([releaseMetadata(version), releaseMetadata(targetVersion)]);
+  const [previous, candidate] = await Promise.all([
+    releaseMetadata(version),
+    staged ? null : releaseMetadata(targetVersion)
+  ]);
+  const releaseDate = candidate?.created_at ?? new Date().toISOString();
   const sourceAsset = assetFor(previous, packageName(version));
-  const targetAsset = assetFor(candidate, packageName(targetVersion));
   const source = path.join(root, sourceAsset.name);
-  const targetInstaller = path.join(root, targetAsset.name);
-  const [sourceFile, targetFile] = await Promise.all([fetchPackage(sourceAsset, source), fetchPackage(targetAsset, targetInstaller)]);
+  const prepareTarget = async name => {
+    if (staged) return stagedPackage(staged, name);
+    const asset = assetFor(candidate, name);
+    const file = path.join(root, asset.name);
+    return { file, metadata: await fetchPackage(asset, file) };
+  };
+  const [sourceFile, target] = await Promise.all([
+    fetchPackage(sourceAsset, source),
+    prepareTarget(packageName(targetVersion))
+  ]);
+  const { file: targetInstaller, metadata: targetFile } = target;
   const targetFiles = [targetFile];
   if (platform === 'darwin') {
-    // Use the same two-architecture feed that will be published if QA passes.
     const otherArch = architecture === 'arm64' ? 'x64' : 'arm64';
-    const other = assetFor(candidate, `GBA-Studio-${targetVersion}-macOS-${otherArch}.zip`);
-    targetFiles.push(await fetchPackage(other, path.join(root, other.name)));
+    const other = await prepareTarget('GBA-Studio-' + targetVersion + '-macOS-' + otherArch + '.zip');
+    targetFiles.push(other.metadata);
     targetFiles.sort((a, b) => a.url.localeCompare(b.url));
   }
-  const checks = ['Verified the exact published RC5 and RC6 package bytes'];
+  const checks = [
+    'Verified the published ' + version + ' bytes against GitHub',
+    'Recorded the SHA-256 and SHA-512 of the ' + (staged ? 'staged ' : 'published ') + targetVersion + ' package'
+  ];
   let sourceExecutable;
   let targetBundleHashes;
   if (platform === 'win32') {
@@ -111,7 +164,7 @@ async function prepare() {
     for (const [index, archive] of [source, targetInstaller].entries()) {
       await run('/usr/bin/ditto', ['-x', '-k', archive, bundles[index]]);
       const app = path.join(bundles[index], 'gba-studio.app');
-      checks.push(`${index === 0 ? 'RC5' : 'RC6'}: ${await verifyPublishedMacBundle(app)}`);
+      checks.push(`${index === 0 ? version : targetVersion}: ${await verifyPublishedMacBundle(app)}`);
     }
     sourceExecutable = path.join(bundles[0], 'gba-studio.app', 'Contents', 'MacOS', 'gba-studio');
     const contents = path.join(bundles[1], 'gba-studio.app', 'Contents');
@@ -120,13 +173,14 @@ async function prepare() {
   }
   const atom = await fetch(`${github}.atom`);
   if (!atom.ok) throw new Error(`Published GitHub Atom feed returned ${atom.status}`);
-  const xml = await atom.text();
-  if (!xml.includes(`/tag/v${targetVersion}`)) throw new Error('Published RC6 absent from the GitHub Atom feed');
+  const currentAtom = await atom.text();
+  const xml = staged ? stagedReleaseAtom(currentAtom, targetVersion, releaseDate) : currentAtom;
+  if (!xml.includes('/tag/v' + targetVersion)) throw new Error('Target version absent from the GitHub Atom feed');
   await writeFile(path.join(root, 'github-releases.atom'), xml);
   await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=github.com',
     '-addext', 'subjectAltName=DNS:github.com,DNS:api.github.com', '-keyout', 'qa-key.pem', '-out', 'qa-cert.pem'], { cwd: root });
   const fixture = { published: true, platform, architecture, version, targetVersion, sourceExecutable,
-    sourceFile, targetFile, targetFiles, targetInstaller, targetBundleHashes, releaseDate: candidate.created_at, checks, port: 9758 };
+    sourceFile, targetFile, targetFiles, targetInstaller, targetBundleHashes, releaseDate, checks, port: 9758 };
   await writeFile(path.join(root, 'fixture.json'), JSON.stringify(fixture, null, 2));
 }
 
