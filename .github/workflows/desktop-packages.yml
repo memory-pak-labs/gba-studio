@@ -32,6 +32,10 @@ on:
         description: 'Optional successful Desktop packages run for an unpublished Windows/Linux target'
         type: string
         default: ''
+      updater_qa_candidate_draft:
+        description: 'Optional draft containing the notarized macOS target ZIPs'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -301,7 +305,9 @@ jobs:
       fail-fast: false
       matrix:
         include: >-
-          ${{ fromJSON(inputs.updater_qa_candidate_run_id != '' &&
+          ${{ fromJSON(inputs.updater_qa_candidate_draft != '' &&
+          '[{"platform":"macos-intel","runner":"macos-15-intel"},{"platform":"macos-arm64","runner":"macos-15"}]' ||
+          inputs.updater_qa_candidate_run_id != '' &&
           '[{"platform":"windows","runner":"windows-2022"},{"platform":"linux","runner":"ubuntu-24.04"}]' ||
           '[{"platform":"windows","runner":"windows-2022"},{"platform":"linux","runner":"ubuntu-24.04"},{"platform":"macos-intel","runner":"macos-15-intel"},{"platform":"macos-arm64","runner":"macos-15"}]') }}
     defaults:
@@ -327,16 +333,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1 libudev-dev libfuse2t64
       - run: npm ci
-      - name: Verify the staged package run
-        if: inputs.updater_qa_candidate_run_id != ''
+      - name: Verify staged package provenance
+        if: inputs.updater_qa_candidate_run_id != '' || inputs.updater_qa_candidate_draft != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_RUN: ${{ inputs.updater_qa_candidate_run_id }}
+          CANDIDATE_DRAFT: ${{ inputs.updater_qa_candidate_draft }}
         run: |
-          case "$CANDIDATE_RUN" in ''|*[!0-9]*) exit 1;; esac
-          source_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" --jq 'select(.conclusion == "success" and .path == ".github/workflows/desktop-packages.yml") | .head_sha')
-          test -n "$source_sha"
+          if [ -n "$CANDIDATE_DRAFT" ]; then
+            test -z "$CANDIDATE_RUN"
+            test "$CANDIDATE_DRAFT" = "v$GBA_UPDATER_QA_TARGET_VERSION"
+            gh release view "$CANDIDATE_DRAFT" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,targetCommitish,assets > "$RUNNER_TEMP/staged-release.json"
+            source_sha=$(jq -r 'select(.isDraft) | .targetCommitish' "$RUNNER_TEMP/staged-release.json")
+          else
+            case "$CANDIDATE_RUN" in ''|*[!0-9]*) exit 1;; esac
+            source_sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CANDIDATE_RUN" --jq 'select(.conclusion == "success" and .path == ".github/workflows/desktop-packages.yml") | .head_sha')
+          fi
+          printf '%s' "$source_sha" | grep -Eq '^[0-9a-f]{40}$'
           git merge-base --is-ancestor "$source_sha" HEAD
           test -z "$(git diff --name-only "$source_sha" HEAD -- . ':!.github/workflows/desktop-packages.yml' ':!apps/desktop-electron/scripts/prepare-published-updater-qa.mjs' ':!apps/desktop-electron/scripts/updater-qa-workflow.test.mjs')"
           test "$(git show "$source_sha:apps/desktop-electron/package.json" | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).version')" = "$GBA_UPDATER_QA_TARGET_VERSION"
@@ -347,11 +361,26 @@ jobs:
           path: ${{ github.workspace }}/.staged-updater-artifacts
           run-id: ${{ inputs.updater_qa_candidate_run_id }}
           github-token: ${{ github.token }}
+      - name: Download and verify the notarized draft archives
+        if: inputs.updater_qa_candidate_draft != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_DRAFT: ${{ inputs.updater_qa_candidate_draft }}
+        run: |
+          dest="$GITHUB_WORKSPACE/.staged-updater-artifacts"
+          mkdir "$dest"
+          for arch in arm64 x64; do
+            file="GBA-Studio-$GBA_UPDATER_QA_TARGET_VERSION-macOS-$arch.zip"
+            gh release download "$CANDIDATE_DRAFT" --repo "$GITHUB_REPOSITORY" --pattern "$file" --dir "$dest"
+            digest=$(jq -r --arg name "$file" '.assets[] | select(.name == $name and .state == "uploaded") | .digest' "$RUNNER_TEMP/staged-release.json")
+            test "$digest" = "sha256:$(shasum -a 256 "$dest/$file" | awk '{print $1}')"
+          done
       - name: Verify and prepare the packages
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          GBA_UPDATER_QA_CANDIDATE_ARTIFACTS: ${{ inputs.updater_qa_candidate_run_id != '' && format('{0}/.staged-updater-artifacts', github.workspace) || '' }}
+          GBA_UPDATER_QA_CANDIDATE_ARTIFACTS: ${{ (inputs.updater_qa_candidate_run_id != '' || inputs.updater_qa_candidate_draft != '') && format('{0}/.staged-updater-artifacts', github.workspace) || '' }}
         run: node scripts/prepare-published-updater-qa.mjs
       - name: Exercise installed update and project persistence
         shell: bash

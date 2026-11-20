@@ -28,6 +28,7 @@ describe('installed updater QA workflow', () => {
     const matrices = [...qa.strategy.matrix.include.matchAll(/'(\[.*?\])'/g)]
       .map((match) => JSON.parse(match[1]).map(({ runner }) => runner));
     expect(matrices).toEqual([
+      ['macos-15-intel', 'macos-15'],
       ['windows-2022', 'ubuntu-24.04'],
       ['windows-2022', 'ubuntu-24.04', 'macos-15-intel', 'macos-15']
     ]);
