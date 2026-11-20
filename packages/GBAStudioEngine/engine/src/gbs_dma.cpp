@@ -5,7 +5,7 @@
 extern "C" __attribute__((weak)) void gbs_hw_hdma_start(int, const void*, volatile void*, uint32_t, int) {
 }
 
-extern "C" __attribute__((weak)) void gbs_hw_wait_vblank() {}
+extern "C" __attribute__((weak)) size_t gbs_hw_wait_vblank() { return gbs_hw_flush_frame_dma(); }
 
 extern "C" __attribute__((weak)) void gbs_hw_hdma_stop(int) {
 }
@@ -201,8 +201,7 @@ bool dma_destination_pending(const volatile void* destination, size_t bytes) {
 bool dma_wait_for_destination(const volatile void* destination, size_t bytes) {
     while (dma_destination_pending(destination, bytes)) {
         begin_render_publication_transaction();
-        gbs_hw_wait_vblank();
-        if (!dma_flush_vblank_queue_budget(DmaChannel::Channel3, dma_default_vblank_budget_bytes)) return false;
+        if (!gbs_hw_wait_vblank()) return false;
     }
     return true;
 }
@@ -210,8 +209,7 @@ bool dma_wait_for_destination(const volatile void* destination, size_t bytes) {
 bool dma_wait_for_source(const void* source, size_t bytes) {
     while (dma_source_pending(source, bytes)) {
         begin_render_publication_transaction();
-        gbs_hw_wait_vblank();
-        if (!dma_flush_vblank_queue_budget(DmaChannel::Channel3, dma_default_vblank_budget_bytes)) return false;
+        if (!gbs_hw_wait_vblank()) return false;
     }
     return true;
 }
@@ -305,6 +303,10 @@ bool gbs_hw_enqueue_vblank_dma16(const void* source, volatile void* destination,
 
 bool gbs_hw_enqueue_vblank_dma32(const void* source, volatile void* destination, uint32_t words) {
     return gbs::dma_enqueue_vblank32(source, destination, words);
+}
+
+size_t gbs_hw_flush_frame_dma(void) {
+    return gbs::dma_flush_vblank_queue_budget(gbs::DmaChannel::Channel3, gbs::dma_default_vblank_budget_bytes);
 }
 
 size_t gbs_hw_flush_vblank_dma_queue(int channel) {

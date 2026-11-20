@@ -44,7 +44,7 @@ void gbs_hw_reset_scene_raster(void);
 void gbs_hw_set_hblank_dispatch_required(int required);
 
 void gbs_hw_init(void);
-void gbs_hw_wait_vblank(void);
+size_t gbs_hw_wait_vblank(void);
 typedef struct {
     uint32_t dma_bytes;
     uint32_t dma_transfers;
@@ -210,6 +210,7 @@ void gbs_hw_sio_close(void);
 void gbs_hw_flush_vram_writes(void);
 bool gbs_hw_enqueue_vblank_dma16(const void* source, volatile void* destination, uint32_t halfwords);
 size_t gbs_hw_flush_vblank_dma_queue(int channel);
+size_t gbs_hw_flush_frame_dma(void);
 
 #ifdef __cplusplus
 }

@@ -15,14 +15,15 @@ mode_start=source.index('void gbs_hw_set_display_mode(')
 mode=source[mode_start:source.index('void gbs_hw_set_affine_bg_wrap(',mode_start)]
 fallback_start=source.index('void gbs_hw_set_render_handoff_fallback(')
 fallback=source[fallback_start:source.index('void gbs_hw_flush_vram_writes(',fallback_start)]
-wait_start=source.index('void gbs_hw_wait_vblank(')
+publish_start=source.index('static size_t publish_video_frame(int vblank_irq_enabled) {')
+wait_start=source.index('size_t gbs_hw_wait_vblank(',publish_start)
 wait_end=source.index('{',wait_start)+1
 depth=1
 while depth:
     if source[wait_end]=='{':depth+=1
     elif source[wait_end]=='}':depth-=1
     wait_end+=1
-wait=source[wait_start:wait_end]
+wait=source[publish_start:wait_end]
 backdrop_start=source.index('void gbs_hw_set_backdrop(')
 backdrop=source[backdrop_start:source.index('uint16_t gbs_hw_get_backdrop(',backdrop_start)]
 palette_start=source.index('void gbs_hw_load_bg_palette(')
@@ -71,7 +72,15 @@ uint8_t affine_hblank_enabled=0, affine_hblank_frame_ready=0;
 #define REG_VCOUNT fake_vcount
 uint32_t frame_vblank_irq_ticks=0,frame_vblank_work_ticks=0;
 uint32_t gbs_hw_frame_counter_ticks() { return 0; }
-void gbs_bios_vblank_intr_wait() {}
+static size_t publish_video_frame(int vblank_irq_enabled);
+volatile uint8_t video_frame_ready=0;
+volatile size_t frame_dma_queue_flushed=0;
+void gbs_bios_vblank_intr_wait() {
+ assert(video_frame_ready);
+ video_frame_ready=0;
+ frame_dma_queue_flushed=publish_video_frame(1);
+}
+size_t gbs_hw_flush_frame_dma() { return 0; }
 void commit_shadow_bg_controls() {}
 void commit_shadow_oam() {}
 void commit_shadow_bg_scroll() {}
@@ -79,7 +88,7 @@ void commit_hblank_bg_scroll() {}
 void commit_pcm_stream_block() {}
 void gbs_audio_vblank_update() {}
 constexpr uint8_t GBS_RASTER_BACKDROP = 2;
-uint8_t scene_raster_overrides = 0, scanline_frame_ready = 0;
+uint8_t scene_raster_overrides = 0;
 void release_scene_raster_overrides() { assert(scene_raster_overrides == 0); }
 void commit_shadow_affine_transforms() {}
 void commit_scene_raster_frame() {}

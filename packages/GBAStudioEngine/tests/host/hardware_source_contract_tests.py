@@ -24,7 +24,7 @@ ISOMETRIC_SOURCE = ROOT / "engine" / "src" / "gbs_isometric.cpp"
 
 
 def function_body(source: str, name: str) -> str:
-    definition = re.search(r"\b(?:void|int|uint16_t|uint32_t)\s+" + re.escape(name) + r"\([^;{}]*\)\s*\{", source)
+    definition = re.search(r"\b(?:void|int|uint16_t|uint32_t|size_t)\s+" + re.escape(name) + r"\([^;{}]*\)\s*\{", source)
     if definition is None:
         raise AssertionError(f"definicao ausente para {name}")
     opening = definition.end() - 1
@@ -339,15 +339,14 @@ int main(void){
     def test_shadow_oam_is_committed_during_vblank(self) -> None:
         commit_body = function_body(self.source, "commit_shadow_oam")
         full_commit_body = function_body(self.source, "commit_shadow_oam_full")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
         init_body = function_body(self.source, "gbs_hw_init")
 
         self.assertIn("shadow_oam_dirty_first", commit_body)
         self.assertIn("const uint32_t first = shadow_oam_dirty_first;", commit_body)
         self.assertIn("gbs_hw_dma_copy(3, shadow_oam + first * 4u, MEM_OAM + first * 4u, units, 0)", commit_body)
         self.assertIn("gbs_hw_dma_copy(3, shadow_oam, MEM_OAM, 128u * 4u, 0)", full_commit_body)
-        self.assertIn("commit_shadow_oam();", wait_body)
-        self.assertLess(wait_body.index("commit_shadow_oam();"), wait_body.index("gbs_emit_vblank_interrupt"))
+        self.assertIn("commit_shadow_oam();", publish_body)
         self.assertIn("commit_shadow_oam_full();", init_body)
 
     def test_render_publication_buffers_leave_iwram_for_audio(self) -> None:
@@ -366,28 +365,28 @@ int main(void){
             self.assertNotIn('section(".ewram_bss")', declaration)
 
     def test_render_publication_gate_defers_all_shadow_state_until_vram_is_ready(self) -> None:
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
         map_body = function_body(self.source, "gbs_hw_load_bg_tilemap")
         controls_body = function_body(self.source, "commit_shadow_bg_controls")
 
-        self.assertIn("if (!render_publication_blocked)", wait_body)
-        self.assertIn("commit_shadow_bg_controls();", wait_body)
-        self.assertIn("commit_shadow_oam();", wait_body)
-        self.assertIn("commit_shadow_bg_tilemaps();", wait_body)
-        self.assertIn("commit_shadow_bg_scroll();", wait_body)
+        self.assertIn("if (!render_publication_blocked)", publish_body)
+        self.assertIn("commit_shadow_bg_controls();", publish_body)
+        self.assertIn("commit_shadow_oam();", publish_body)
+        self.assertIn("commit_shadow_bg_tilemaps();", publish_body)
+        self.assertIn("commit_shadow_bg_scroll();", publish_body)
         self.assertIn("shadow_bg_map_size_pending_mask", map_body)
         self.assertNotIn("*control =", map_body)
         self.assertIn("shadow_bg_map_size_pending_mask", controls_body)
 
     def test_runtime_handoff_uses_a_hidden_fallback_until_the_staged_frame_is_published(self) -> None:
         fallback_body = function_body(self.source, "gbs_hw_set_render_handoff_fallback")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
 
         self.assertIn("REG_DISPCNT = (1u << 6);", fallback_body)
         self.assertIn("render_handoff_fallback_active = 1", fallback_body)
-        self.assertIn("render_handoff_fallback_active", wait_body)
-        self.assertIn("shadow_bg_enabled_bits", wait_body)
-        self.assertIn("REG_DISPCNT", wait_body)
+        self.assertIn("render_handoff_fallback_active", publish_body)
+        self.assertIn("shadow_bg_enabled_bits", publish_body)
+        self.assertIn("REG_DISPCNT", publish_body)
 
     def test_optional_background_layers_start_disabled(self) -> None:
         init_body = function_body(self.source, "gbs_hw_init")
@@ -659,11 +658,11 @@ int main(void) {
 
     def test_vblank_commits_the_staged_ui_bg0_map(self) -> None:
         commit_body = function_body(self.source, "commit_shadow_bg_tilemaps")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
 
         self.assertIn("shadow_bg_tilemaps[layer]", commit_body)
         self.assertIn("screenblock_address(bg_screenblocks[layer])", commit_body)
-        self.assertIn("commit_shadow_bg_tilemaps();", wait_body)
+        self.assertIn("commit_shadow_bg_tilemaps();", publish_body)
 
     def test_affine_tilemap_does_not_reserve_a_full_map_copy(self) -> None:
         self.assertNotIn("affine_tilemap_upload_buffer", self.source)
@@ -897,6 +896,7 @@ int main() {
         slow = function_body(self.source, "gbs_hw_irq_dispatch_slow")
         code = """#include <stdint.h>
 #include <assert.h>
+#include <stddef.h>
 uint16_t REG_IF=1,REG_IE=1,BIOS_IRQ_FLAGS=0,REG_VCOUNT=0,REG_DISPSTAT=0;
 typedef struct { int enabled, speed, layer; } GbsSceneRasterTable;
 GbsSceneRasterTable scene_raster_tables[2];
@@ -916,26 +916,35 @@ void record_irq(uint32_t elapsed){irq_ticks+=elapsed;}
 void (*gbs_profiler_record_irq)(uint32_t)=record_irq;
 static void rearm_active_affine_hblank(void){++arms;}
 static void commit_hblank_bg_scroll(void){assert(REG_VCOUNT == 160);++affine_commits;}
-void gbs_hw_mix_audio_with_hblank(void){}
 enum { GBS_RASTER_PALETTE = 4, GBS_RASTER_ALPHA = 8, GBS_RASTER_MASK = 16 };
-static uint8_t scene_raster_overrides, scanline_frame_ready;
+static uint8_t scene_raster_overrides, video_frame_ready, render_handoff_fallback_active;
+static uint16_t REG_DISPCNT, palette[256], shadow_backdrop_color, shadow_display_mode, shadow_bg_enabled_bits;
+#define MEM_PALETTE palette
+static size_t frame_dma_queue_flushed;
+static int dma_flushes;
+static size_t gbs_hw_flush_frame_dma(void){assert(REG_VCOUNT==160);++dma_flushes;return 2;}
 static int oam_commits, bg_commits, map_commits, wave_commits;
+static int expected_oam_before_mix, expected_dma_before_mix;
 void commit_actor_wave_frame(void){assert(REG_VCOUNT==160);++wave_commits;}
 void apply_actor_wave_line(unsigned line){}
 static int scanline_effect_active(void)"""+function_body(self.source, "scanline_effect_active")+"""
 void commit_shadow_bg_controls(void){++bg_commits;}
 void commit_shadow_oam(void){assert(REG_VCOUNT==160);++oam_commits;}
 void commit_shadow_bg_tilemaps(void){assert(REG_VCOUNT==160);++map_commits;}
+void commit_shadow_bg_scroll(void){}
 void begin_scene_raster_overrides(void){} void release_scene_raster_overrides(void){}
 void commit_shadow_affine_transforms(void){}
 void commit_paged_affine_frame(void){}
 void commit_scene_raster_frame(void){} void apply_scene_raster_line(const GbsSceneRasterTable* table, unsigned line){}
 void commit_pcm_stream_block(void){}
 void gbs_audio_vblank_update(void){
+ if(expected_dma_before_mix){assert(oam_commits==expected_oam_before_mix);assert(dma_flushes==expected_dma_before_mix);}
  if(audio_must_follow_commit){assert(affine_commits==1);REG_VCOUNT=24;}
  if(scene_raster_tables[scene_raster_active].enabled){assert(oam_commits==1&&bg_commits==1&&map_commits==1);REG_VCOUNT=56;}
 }
+void gbs_hw_mix_audio_with_hblank(void){gbs_audio_vblank_update();}
 void gbs_dispatch_hardware_interrupts(uint16_t flags){}
+static size_t publish_video_frame(int vblank_irq_enabled)"""+function_body(self.source, "publish_video_frame")+"""
 static void gbs_hw_irq_dispatch_slow(uint16_t pending)"""+slow+"""
 void dispatch(void) {"""+irq+"""}
 int main(void){
@@ -947,11 +956,17 @@ int main(void){
  render_publication_blocked=0;audio_must_follow_commit=1;dispatch();
  assert(affine_commits==1 && affine_hblank_frame_ready==0 && REG_VCOUNT==24);
  audio_must_follow_commit=0;dispatch();assert(affine_commits==1);
- REG_VCOUNT=160; scene_raster_tables[0].enabled=GBS_RASTER_MASK; scanline_frame_ready=1;
- dispatch();assert(!scanline_frame_ready && oam_commits==1 && REG_VCOUNT==56);
+ REG_VCOUNT=160; scene_raster_tables[0].enabled=GBS_RASTER_MASK; video_frame_ready=1;
+ dispatch();assert(!video_frame_ready && oam_commits==1 && REG_VCOUNT==56);
  REG_VCOUNT=160;dispatch();assert(oam_commits==1); // no publication before the producer signals completion
- REG_VCOUNT=160;scene_raster_tables[0].enabled=0;actor_wave_staged.count=1;scanline_frame_ready=1;
- dispatch();assert(oam_commits==2 && wave_commits==2);
+ REG_VCOUNT=160;scene_raster_tables[0].enabled=0;actor_wave_staged.count=1;video_frame_ready=1;
+ dispatch();assert(oam_commits==2 && wave_commits==1);
+ actor_wave_staged.count=actor_wave_active.count=0;video_frame_ready=1;
+ expected_oam_before_mix=3;expected_dma_before_mix=3;dispatch();
+ assert(!video_frame_ready && frame_dma_queue_flushed==2);
+ dispatch();assert(dma_flushes==3);
+ render_publication_blocked=1;video_frame_ready=1;expected_dma_before_mix=4;
+ dispatch();assert(!video_frame_ready && dma_flushes==4);
 }
 """
         with tempfile.TemporaryDirectory() as directory:
@@ -964,7 +979,7 @@ int main(void){
         stop_body = function_body(self.source, "gbs_hw_hdma_stop")
         scroll_body = function_body(self.source, "gbs_hw_start_hblank_bg_scroll")
         commit_body = function_body(self.source, "commit_hblank_bg_scroll")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
         self.assertIn("DMA_REPEAT", start_body)
         self.assertIn("DMA_START_HBLANK", start_body)
         self.assertIn("dma[2] = 0", stop_body)
@@ -975,7 +990,7 @@ int main(void){
             "if (!affine_hblank_enabled && !pending_hblank_scroll_enabled && !pending_hblank_scroll_dirty)",
             commit_body,
         )
-        self.assertIn("commit_hblank_bg_scroll();", wait_body)
+        self.assertIn("commit_hblank_bg_scroll();", publish_body)
         affine_body = function_body(self.source, "gbs_hw_start_hblank_affine")
         self.assertIn("affine_hblank_active_buffer^1u", affine_body)
         self.assertIn("pending_hblank_scroll_dirty=1", affine_body)
@@ -1009,7 +1024,7 @@ int main(void){
         draw8_body = function_body(self.source, "gbs_hw_draw_room_to_bg")
         draw16_body = function_body(self.source, "gbs_hw_draw_room16_to_bg")
         commit_body = function_body(self.source, "commit_shadow_bg_tilemaps")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
 
         self.assertIn("stage_room_tilemap8", draw8_body)
         self.assertIn("stage_room_tilemap16", draw16_body)
@@ -1017,16 +1032,12 @@ int main(void){
         self.assertNotIn("screenblock_address", draw16_body)
         self.assertIn("shadow_bg_tilemaps[layer]", commit_body)
         self.assertIn("32u * 32u", commit_body)
-        self.assertIn("commit_shadow_bg_tilemaps();", wait_body)
-        self.assertLess(
-            wait_body.index("commit_shadow_bg_tilemaps();"),
-            wait_body.index("gbs_emit_vblank_interrupt"),
-        )
+        self.assertIn("commit_shadow_bg_tilemaps();", publish_body)
 
     def test_background_scroll_is_staged_and_committed_during_vblank(self) -> None:
         set_scroll_body = function_body(self.source, "gbs_hw_set_bg_scroll")
         commit_body = function_body(self.source, "commit_shadow_bg_scroll")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
         init_body = function_body(self.source, "gbs_hw_init")
 
         self.assertIn("shadow_bg_scroll_x[layer]", set_scroll_body)
@@ -1036,11 +1047,7 @@ int main(void){
         self.assertIn("0x04000010 + layer * 4", commit_body)
         self.assertIn("shadow_bg_scroll_x[layer]", commit_body)
         self.assertIn("shadow_bg_scroll_y[layer]", commit_body)
-        self.assertIn("commit_shadow_bg_scroll();", wait_body)
-        self.assertLess(
-            wait_body.index("commit_shadow_bg_scroll();"),
-            wait_body.index("gbs_emit_vblank_interrupt"),
-        )
+        self.assertIn("commit_shadow_bg_scroll();", publish_body)
         self.assertIn("commit_shadow_bg_scroll();", init_body)
 
     def test_background_layer_controls_are_staged_and_committed_during_vblank(self) -> None:
@@ -1048,7 +1055,7 @@ int main(void){
         character_base_body = function_body(self.source, "gbs_hw_set_bg_character_base")
         priority_body = function_body(self.source, "gbs_hw_set_bg_priority")
         commit_body = function_body(self.source, "commit_shadow_bg_controls")
-        wait_body = function_body(self.source, "gbs_hw_wait_vblank")
+        publish_body = function_body(self.source, "publish_video_frame")
 
         self.assertIn("shadow_bg_enabled_bits", enabled_body)
         self.assertNotIn("REG_DISPCNT =", enabled_body)
@@ -1056,7 +1063,7 @@ int main(void){
         self.assertNotIn("*control =", character_base_body)
         self.assertIn("shadow_bg_priority", priority_body)
         self.assertNotIn("*control =", priority_body)
-        self.assertIn("commit_shadow_bg_controls();", wait_body)
+        self.assertIn("commit_shadow_bg_controls();", publish_body)
         self.assertIn("shadow_bg_enabled_bits", commit_body)
         self.assertIn("shadow_bg_character_base", commit_body)
         self.assertIn("shadow_bg_priority", commit_body)

@@ -56,11 +56,12 @@ extern "C" void gbs_hw_init() {
     ++hardware_init_calls;
 }
 
-extern "C" void gbs_hw_wait_vblank() {
+extern "C" size_t gbs_hw_wait_vblank() {
     ++hardware_vblank_wait_calls;
     hardware_vblank_wait_sequence = ++call_sequence;
     hardware_vblank_publication_blocked = hardware_publication_blocked;
     hardware_performance_ticks += 20;
+    return gbs::dma_flush_vblank_queue_budget(gbs::DmaChannel::Channel3, gbs::dma_default_vblank_budget_bytes);
 }
 
 extern "C" void gbs_hw_set_render_publication_blocked(int blocked) {

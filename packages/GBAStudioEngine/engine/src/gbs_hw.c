@@ -114,7 +114,8 @@ static GbsSceneRasterTable scene_raster_tables[2] __attribute__((section(".ewram
 static uint8_t scene_raster_active, scene_raster_staging, scene_raster_phase;
 static uint16_t scene_raster_base_x;
 static volatile uint8_t scene_raster_ready;
-static volatile uint8_t scanline_frame_ready;
+static volatile uint8_t video_frame_ready;
+static volatile size_t frame_dma_queue_flushed;
 static uint8_t scene_raster_overrides;
 static uint16_t scene_raster_base_palette, scene_raster_base_blend, scene_raster_base_alpha;
 static uint16_t scene_raster_base_winin, scene_raster_base_winout;
@@ -138,6 +139,7 @@ static void commit_actor_wave_frame(void);
 static void apply_actor_wave_line(unsigned line) __attribute__((noinline, target("arm"), long_call));
 static int scanline_effect_active(void);
 static void commit_shadow_bg_controls(void);
+static size_t publish_video_frame(int vblank_irq_enabled);
 static void commit_shadow_oam(void);
 static void commit_shadow_bg_tilemaps(void);
 static void commit_shadow_affine_transforms(void);
@@ -339,20 +341,13 @@ static __attribute__((noinline)) void gbs_hw_irq_dispatch_slow(uint16_t pending)
         else if (affine_hblank_enabled) rearm_active_affine_hblank();
         commit_shadow_affine_transforms();
         commit_scene_raster_frame();
-        if (scanline_frame_ready) {
-            scanline_frame_ready = 0;
-            if (!render_publication_blocked &&
-                ((scene_raster_tables[scene_raster_active].enabled & (GBS_RASTER_PALETTE | GBS_RASTER_ALPHA | GBS_RASTER_MASK)) ||
-                 actor_wave_staged.count || actor_wave_active.count)) {
-                // DMA stalls the CPU. Publish completed shadow uploads in VBlank
-                // before a long stereo mix can return during visible scanlines.
-                commit_shadow_bg_controls();
-                commit_actor_wave_frame();
-                commit_shadow_oam();
-                commit_shadow_bg_tilemaps();
-            }
-        }
         commit_pcm_stream_block();
+        if (video_frame_ready) {
+            video_frame_ready = 0;
+            // Publish OAM and the matching tile uploads before mixing can
+            // run into active scanout and split an actor's animation frame.
+            frame_dma_queue_flushed = publish_video_frame(1);
+        }
         /* Mixing may extend into visible scanlines. The assembly wrapper
            permits only the bounded raster service to preempt it, preserving
            the IRQ context and using the system stack for nested work. */
@@ -1252,7 +1247,7 @@ static void apply_actor_wave_line(unsigned line) {
 }
 
 void gbs_hw_init(void) {
-    scanline_frame_ready = 0;
+    video_frame_ready = 0;
     actor_wave_staged.count = actor_wave_active.count = 0;
     gbs_hw_stage_paged_affine(0);
     affine_upload_screenblock_base = affine_screenblock_base;
@@ -1336,30 +1331,9 @@ void gbs_hw_init(void) {
     REG_IME = 1;
 }
 
-void gbs_hw_wait_vblank(void) {
-    frame_vblank_irq_ticks = 0;
-    const int vblank_irq_enabled = (REG_IE & (1u << 0)) != 0 && (REG_DISPSTAT & (1u << 3)) != 0;
-    if (paged_affine_staged.entries && !render_publication_blocked) paged_affine_ready = 1;
-    if (vblank_irq_enabled) {
-        // The audio IRQ can outlast VBlank. Publish the completed affine
-        // table at the start of that IRQ, before mixing delays this thread.
-        if (affine_hblank_enabled && !render_publication_blocked) affine_hblank_frame_ready = 1;
-        if (!render_publication_blocked) scanline_frame_ready = 1;
-        gbs_bios_vblank_intr_wait();
-    } else {
-        while (REG_VCOUNT >= 160) {
-        }
-        while (REG_VCOUNT < 160) {
-        }
-        commit_paged_affine_frame();
-    }
-    if (!vblank_irq_enabled) {
-        if (scene_raster_overrides) release_scene_raster_overrides();
-        commit_shadow_affine_transforms();
-        if (!render_publication_blocked) commit_actor_wave_frame();
-    }
-    const uint32_t publication_start = gbs_hw_frame_counter_ticks();
+static size_t publish_video_frame(int vblank_irq_enabled) {
     if (!render_publication_blocked) {
+        if (!vblank_irq_enabled || actor_wave_staged.count || actor_wave_active.count) commit_actor_wave_frame();
         commit_shadow_bg_controls();
         commit_shadow_oam();
         commit_shadow_bg_tilemaps();
@@ -1376,13 +1350,38 @@ void gbs_hw_wait_vblank(void) {
             render_handoff_fallback_active = 0;
         }
     }
-    if ((REG_IE & (1u << 0)) == 0) {
+    // Transactions also drain VRAM writes while keeping staged OAM and BGs hidden.
+    return gbs_hw_flush_frame_dma();
+}
+
+size_t gbs_hw_wait_vblank(void) {
+    frame_vblank_irq_ticks = 0;
+    if (paged_affine_staged.entries && !render_publication_blocked) paged_affine_ready = 1;
+    if ((REG_IE & 1u) != 0 && (REG_DISPSTAT & (1u << 3)) != 0) {
+        // The IRQ publishes this completed frame before the synchronous PCM mix.
+        if (affine_hblank_enabled && !render_publication_blocked) affine_hblank_frame_ready = 1;
+        video_frame_ready = 1;
+        gbs_bios_vblank_intr_wait();
+        frame_vblank_work_ticks = frame_vblank_irq_ticks;
+        return frame_dma_queue_flushed;
+    }
+    while (REG_VCOUNT >= 160) {
+    }
+    while (REG_VCOUNT < 160) {
+    }
+    const uint32_t publication_start = gbs_hw_frame_counter_ticks();
+    commit_paged_affine_frame();
+    if (scene_raster_overrides) release_scene_raster_overrides();
+    commit_shadow_affine_transforms();
+    const size_t flushed = publish_video_frame(0);
+    if ((REG_IE & 1u) == 0) {
         commit_pcm_stream_block();
         gbs_audio_vblank_update();
         commit_scene_raster_frame();
         gbs_emit_vblank_interrupt();
     }
-    frame_vblank_work_ticks = gbs_hw_frame_counter_ticks() - publication_start + frame_vblank_irq_ticks;
+    frame_vblank_work_ticks = gbs_hw_frame_counter_ticks() - publication_start;
+    return flushed;
 }
 
 int gbs_hw_frame_video_stats(GbsHwFrameVideoStats* out) {

@@ -153,7 +153,6 @@ void wait_vblank() {
     subsystem_profiler_pause();
     gbs_hw_wait_vblank();
     const uint32_t after_vblank_wait = gbs_hw_frame_counter_ticks();
-    dma_flush_vblank_queue_budget(DmaChannel::Channel3, dma_default_vblank_budget_bytes);
     if (render_publication_transaction && dma_vblank_queue_count() == 0) {
         render_publication_transaction = false;
         runtime_handoff_active = false;
