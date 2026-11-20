@@ -110,40 +110,51 @@ jobs:
                       installers.append((path, name))
           assert len(installers) == 7
 
-          gh('release', 'download', tag, '--repo', repo, '--pattern', 'UPLOAD_CHUNKS.json', '--dir', str(stage))
-          manifest = json.loads((stage / 'UPLOAD_CHUNKS.json').read_text())
-          assert manifest['tag'] == tag and manifest['sourceTagTarget'] == sha
           expected_mac = {f'GBA-Studio-{version}-macOS-{arch}.{extension}'
                           for arch in ['arm64', 'x64'] for extension in ['dmg', 'zip']}
-          assert len(manifest['files']) == 4
-          assert {file['name'] for file in manifest['files']} == expected_mac
-          parts = [p for f in manifest['files'] for p in f['parts']]
-          assert len({p['name'] for p in parts}) == len(parts)
-          chunks = stage / 'chunks'
-          chunks.mkdir()
+          existing = {a['name']: a for a in release()['assets']}
+          parts = []
+          if 'UPLOAD_CHUNKS.json' in existing:
+              gh('release', 'download', tag, '--repo', repo, '--pattern', 'UPLOAD_CHUNKS.json', '--dir', str(stage))
+              manifest = json.loads((stage / 'UPLOAD_CHUNKS.json').read_text())
+              assert manifest['tag'] == tag and manifest['sourceTagTarget'] == sha
+              assert len(manifest['files']) == 4
+              assert {file['name'] for file in manifest['files']} == expected_mac
+              parts = [p for f in manifest['files'] for p in f['parts']]
+              assert len({p['name'] for p in parts}) == len(parts)
+              chunks = stage / 'chunks'
+              chunks.mkdir()
 
-          def chunk(part):
-              name = part['name']
-              assert re.fullmatch(r'upload-chunk-mac-(arm64|x64)-(dmg|zip)-[0-9]{3}\.part', name)
-              gh('release', 'download', tag, '--repo', repo, '--pattern', name, '--dir', str(chunks))
-              path = chunks / name
-              assert path.stat().st_size == part['bytes'] and digest(path) == part['sha256']
+              def chunk(part):
+                  name = part['name']
+                  assert re.fullmatch(r'upload-chunk-mac-(arm64|x64)-(dmg|zip)-[0-9]{3}\.part', name)
+                  gh('release', 'download', tag, '--repo', repo, '--pattern', name, '--dir', str(chunks))
+                  path = chunks / name
+                  assert path.stat().st_size == part['bytes'] and digest(path) == part['sha256']
 
-          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-              list(executor.map(chunk, parts))
-          for file in manifest['files']:
-              name = file['name']
-              assert Path(name).name == name and name in checksums
-              assert name in expected_mac
-              assert file['sha256'] == checksums[name]
-              path = stage / name
-              with path.open('wb') as output:
-                  for part in file['parts']:
-                      with (chunks / part['name']).open('rb') as stream:
-                          while data := stream.read(1024 * 1024):
-                              output.write(data)
-              assert path.stat().st_size == file['bytes'] and digest(path) == checksums[name]
-              installers.append((path, name))
+              with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                  list(executor.map(chunk, parts))
+              for file in manifest['files']:
+                  name = file['name']
+                  assert Path(name).name == name and name in checksums
+                  assert name in expected_mac
+                  assert file['sha256'] == checksums[name]
+                  path = stage / name
+                  with path.open('wb') as output:
+                      for part in file['parts']:
+                          with (chunks / part['name']).open('rb') as stream:
+                              while data := stream.read(1024 * 1024):
+                                  output.write(data)
+                  assert path.stat().st_size == file['bytes'] and digest(path) == checksums[name]
+                  installers.append((path, name))
+          else:
+              for name in sorted(expected_mac):
+                  asset = existing[name]
+                  assert asset['state'] == 'uploaded' and asset['digest'] == 'sha256:' + checksums[name]
+                  gh('release', 'download', tag, '--repo', repo, '--pattern', name, '--dir', str(stage))
+                  path = stage / name
+                  assert path.stat().st_size == asset['size'] and digest(path) == checksums[name]
+                  installers.append((path, name))
           assert len({name for _, name in installers}) == 11
           existing = {a['name']: a for a in release()['assets']}
 
@@ -164,7 +175,7 @@ jobs:
               assert asset['digest'] == 'sha256:' + checksums[name], f'Uploaded hash mismatch: {name}'
 
           # Create feeds from the final verified bytes and public names, including
-          # the notarized Mac ZIPs after they have been reconstructed from chunks.
+          # the notarized Mac ZIPs downloaded from the draft or rebuilt from chunks.
           # JSON is a YAML subset accepted by electron-updater's YAML parser.
           def update_entry(path, name):
               sha512 = hashlib.sha512()
@@ -201,7 +212,8 @@ jobs:
               assert asset['digest'] == 'sha256:' + checksums[name], f'Uploaded feed hash mismatch: {name}'
           for part in parts:
               gh('release', 'delete-asset', tag, part['name'], '--repo', repo, '--yes')
-          gh('release', 'delete-asset', tag, 'UPLOAD_CHUNKS.json', '--repo', repo, '--yes')
+          if 'UPLOAD_CHUNKS.json' in existing:
+              gh('release', 'delete-asset', tag, 'UPLOAD_CHUNKS.json', '--repo', repo, '--yes')
           release()
-          print('Installers and update feeds verified; temporary chunks removed; release remains a draft.')
+          print('Installers and update feeds verified; release remains a draft.')
           PY

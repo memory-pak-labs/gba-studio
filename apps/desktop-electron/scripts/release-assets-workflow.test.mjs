@@ -43,6 +43,14 @@ manifest = dict(tag=tag, sourceTagTarget=sha, files=files)
 content['UPLOAD_CHUNKS.json'] = json.dumps(manifest).encode()
 for name in ['SHA256SUMS.txt', 'UPLOAD_CHUNKS.json']: existing[name] = asset(name, content[name])
 if scenario == 'tampered-chunk': content[files[-1]['parts'][0]['name']] = b'tampered'
+direct = scenario in ['direct', 'tampered-direct']
+if direct:
+ for file in files:
+  del existing[file['parts'][0]['name']]
+  existing[file['name']] = asset(file['name'], content[file['name']])
+ del existing['UPLOAD_CHUNKS.json']
+ if scenario == 'tampered-direct': content[files[-1]['name']] = b'tampered'
+
 baseline = {name: dict(value) for name, value in existing.items() if not name.startswith('upload-chunk-') and name != 'UPLOAD_CHUNKS.json'}
 
 def gh(args, text=True):
@@ -69,11 +77,11 @@ with patch.object(subprocess, 'check_output', gh):
  try:
   exec(compile(os.environ['RELEASE_WORKFLOW_PYTHON'], 'release-assets.yml', 'exec'), {})
  except AssertionError:
-  assert scenario in ['tampered-chunk', 'failed-ci']; assert not uploads and not deleted
+  assert scenario in ['tampered-chunk', 'tampered-direct', 'failed-ci']; assert not uploads and not deleted
  else:
-  assert scenario == 'success'
+  assert scenario in ['success', 'direct']
   assert all(existing[name] == value for name, value in baseline.items())
-  assert len(existing) == 20 and len(deleted) == 5
+  assert len(existing) == 20 and len(deleted) == (0 if direct else 5)
   import base64
   for feed_name, expected in {
    'latest.yml': ['GBA.Studio.Setup.'+version+'.exe'],
@@ -91,7 +99,7 @@ print('fixture OK')
 `;
 
 describe('montagem dos instaladores separados na release draft', () => {
-  it.each(['success', 'tampered-chunk', 'failed-ci'])('%s', scenario => {
+  it.each(['success', 'direct', 'tampered-chunk', 'tampered-direct', 'failed-ci'])('%s', scenario => {
     const directory = mkdtempSync(join(tmpdir(), 'gba-release-workflow-'));
     try {
       const output = execFileSync(process.env.GBA_STUDIO_TEST_PYTHON ?? 'python3', ['-c', fixture], {

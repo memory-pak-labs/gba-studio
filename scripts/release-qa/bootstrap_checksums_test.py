@@ -31,6 +31,14 @@ class BootstrapChecksumsTests(unittest.TestCase):
     def test_builds_all_16_hashes(self):
         self.assertEqual(len(self.check()),16)
         self.assertEqual(normalized('GBA Studio Setup '+self.version+'.exe',self.version),'GBA.Studio.Setup.'+self.version+'.exe')
+    def test_accepts_identified_draft_installers_without_chunks(self):
+        for file in self.manifest['files']:
+            self.assets[file['name']] = {'state': 'uploaded', 'size': file['bytes'], 'digest': 'sha256:' + file['sha256']}
+        self.assertEqual(self.check(), build_checksums(self.root, None, self.version, self.tag, self.sha, self.assets))
+        self.assets[self.manifest['files'][0]['name']]['digest'] = 'missing'
+        with self.assertRaises(AssertionError):
+            build_checksums(self.root, None, self.version, self.tag, self.sha, self.assets)
+
     def test_rejects_changed_chunk(self):
         self.assets[self.manifest['files'][0]['parts'][0]['name']]['digest']='sha256:'+'0'*64
         with self.assertRaises(AssertionError): self.check()

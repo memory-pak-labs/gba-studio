@@ -37,7 +37,6 @@ def normalized(name, version):
 
 
 def build_checksums(stage, manifest, version, tag, sha, assets):
-    assert manifest['tag'] == tag and manifest['sourceTagTarget'] == sha
     checksums = {}
     for folder in ['GBA-Studio-windows-x64', 'GBA-Studio-linux-x64']:
         for file in (stage / folder).rglob('*'):
@@ -47,15 +46,23 @@ def build_checksums(stage, manifest, version, tag, sha, assets):
             checksums[name] = digest(file)
     assert set(checksums) == expected_packages(version), 'Missing CI package'
     expected_mac = {f'GBA-Studio-{version}-macOS-{arch}.{ext}' for arch in ['arm64', 'x64'] for ext in ['dmg', 'zip']}
-    assert len(manifest['files']) == 4 and {f['name'] for f in manifest['files']} == expected_mac
-    for file in manifest['files']:
-        assert re.fullmatch(r'[0-9a-f]{64}', file['sha256']) and file['bytes'] > 0
-        assert file['parts'] and sum(part['bytes'] for part in file['parts']) == file['bytes']
-        for part in file['parts']:
-            assert re.fullmatch(r'upload-chunk-mac-(arm64|x64)-(dmg|zip)-[0-9]{3}\.part', part['name'])
-            asset = assets[part['name']]
-            assert asset['state'] == 'uploaded' and asset['size'] == part['bytes'] and asset['digest'] == 'sha256:' + part['sha256']
-        checksums[file['name']] = file['sha256']
+    if manifest is None:
+        for name in expected_mac:
+            asset = assets[name]
+            assert asset['state'] == 'uploaded' and asset['size'] > 0
+            assert re.fullmatch(r'sha256:[0-9a-f]{64}', asset['digest'])
+            checksums[name] = asset['digest'].removeprefix('sha256:')
+    else:
+        assert manifest['tag'] == tag and manifest['sourceTagTarget'] == sha
+        assert len(manifest['files']) == 4 and {f['name'] for f in manifest['files']} == expected_mac
+        for file in manifest['files']:
+            assert re.fullmatch(r'[0-9a-f]{64}', file['sha256']) and file['bytes'] > 0
+            assert file['parts'] and sum(part['bytes'] for part in file['parts']) == file['bytes']
+            for part in file['parts']:
+                assert re.fullmatch(r'upload-chunk-mac-(arm64|x64)-(dmg|zip)-[0-9]{3}\.part', part['name'])
+                asset = assets[part['name']]
+                assert asset['state'] == 'uploaded' and asset['size'] == part['bytes'] and asset['digest'] == 'sha256:' + part['sha256']
+            checksums[file['name']] = file['sha256']
     extra = ['BUILD_INFO.json', 'VALIDATION.md', 'RELEASE_NOTES.md'] + [f'GBA-Studio-{version}-macos-{arch}-licenses-and-sources.zip' for arch in ['arm64','x64']]
     for name in extra:
         path = stage / 'extras' / name
@@ -78,11 +85,13 @@ def main():
     assets = {item['name']: item for item in release['assets']}
     with tempfile.TemporaryDirectory(prefix='rc5-checksums-') as temporary:
         stage = Path(temporary)
-        gh('release','download',tag,'--repo',repo,'--pattern','UPLOAD_CHUNKS.json','--dir',str(stage))
-        manifest_path = stage / 'UPLOAD_CHUNKS.json'
-        manifest_asset = assets['UPLOAD_CHUNKS.json']
-        assert manifest_asset['state']=='uploaded' and manifest_asset['size']==manifest_path.stat().st_size and manifest_asset['digest']=='sha256:'+digest(manifest_path)
-        manifest = json.loads(manifest_path.read_text())
+        manifest = None
+        if 'UPLOAD_CHUNKS.json' in assets:
+            gh('release','download',tag,'--repo',repo,'--pattern','UPLOAD_CHUNKS.json','--dir',str(stage))
+            manifest_path = stage / 'UPLOAD_CHUNKS.json'
+            manifest_asset = assets['UPLOAD_CHUNKS.json']
+            assert manifest_asset['state']=='uploaded' and manifest_asset['size']==manifest_path.stat().st_size and manifest_asset['digest']=='sha256:'+digest(manifest_path)
+            manifest = json.loads(manifest_path.read_text())
         for name in ['GBA-Studio-windows-x64','GBA-Studio-linux-x64']:
             gh('run','download',run_id,'--repo',repo,'--name',name,'--dir',str(stage/name))
         extras = stage/'extras'; extras.mkdir()
